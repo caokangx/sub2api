@@ -256,7 +256,7 @@ func (s *ClaudeResetCreditService) organization(ctx context.Context, token, prox
 	if err != nil {
 		return "", err
 	}
-	s.headers(ctx, req, token)
+	claudeResetHeaders(req, token)
 	resp, err := s.do(req, proxy)
 	if err != nil {
 		return "", infraerrors.ServiceUnavailable("CLAUDE_RESET_PROFILE_FAILED", "OAuth profile unavailable")
@@ -290,7 +290,7 @@ func (s *ClaudeResetCreditService) claim(ctx context.Context, token, proxy, org,
 	if err != nil {
 		return unknown
 	}
-	s.headers(ctx, req, token)
+	claudeResetHeaders(req, token)
 	resp, err := s.do(req, proxy)
 	if err != nil {
 		return unknown

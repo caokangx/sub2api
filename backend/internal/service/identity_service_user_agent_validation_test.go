@@ -125,8 +125,8 @@ func TestGetOrCreateFingerprintRejectsSentinelVersionOnUpgrade(t *testing.T) {
 	require.Zero(t, cache.setCalls, "被拒的 UA 不应触发任何写入")
 }
 
-// 合法的真实版本升级必须照常生效，校验不能把正常升级一起挡掉。
-func TestGetOrCreateFingerprintStillUpgradesOnValidNewerVersion(t *testing.T) {
+// 客户端上报的更高版本也必须被收口到全局固定版本。
+func TestGetOrCreateFingerprintPinsValidNewerVersion(t *testing.T) {
 	cache := &stubIdentityCache{fingerprint: &Fingerprint{
 		UserAgent: "claude-cli/2.1.22 (external, cli)",
 		ClientID:  "cid-1",
@@ -134,13 +134,11 @@ func TestGetOrCreateFingerprintStillUpgradesOnValidNewerVersion(t *testing.T) {
 	}}
 	svc := NewIdentityService(cache)
 
-	// 客户端版本取高于 CLICurrentVersion 的合法值，使本用例只验证常规升级，
-	// 不与版本下限抬升耦合（低于下限的客户端升级由 version_floor 测试覆盖）。
 	newUA := "claude-cli/2.9.0 (external, cli)"
 	fp, err := svc.GetOrCreateFingerprint(context.Background(), 1, headersWithUA(newUA))
 
 	require.NoError(t, err)
-	require.Equal(t, newUA, fp.UserAgent)
+	require.Equal(t, "claude-cli/"+claude.CLICurrentVersion+" (external, cli)", fp.UserAgent)
 	require.Equal(t, 1, cache.setCalls)
 }
 

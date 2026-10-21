@@ -80,7 +80,7 @@ func (s *GatewayService) beginClaudeTelemetryAttempt(
 		MetadataUserID:   metadataUserID,
 		AccountUUID:      accountUUID,
 		OrganizationUUID: organizationUUID,
-		SessionIDHeader:  wireRequest.Header.Get("X-Claude-Code-Session-Id"),
+		SessionIDHeader:  getHeaderRaw(wireRequest.Header, "X-Claude-Code-Session-Id"),
 		AccountFallback:  strconv.FormatInt(account.ID, 10),
 		DeviceFallback:   strconv.FormatInt(account.ID, 10) + ":" + metadataUserID,
 		SessionFallback:  strconv.FormatInt(account.ID, 10) + ":" + metadataUserID,
@@ -94,20 +94,16 @@ func (s *GatewayService) beginClaudeTelemetryAttempt(
 	}
 
 	headers := wireRequest.Header
-	version := ExtractCLIVersion(headers.Get("User-Agent"))
-	if version == "" {
-		version = ClaudeTelemetryProfile
-	}
 	environment := claudetelemetry.ClientEnvironment{
-		Platform:    headers.Get("x-stainless-os"),
-		PlatformRaw: headers.Get("x-stainless-os"),
-		Arch:        headers.Get("x-stainless-arch"),
-		NodeVersion: headers.Get("x-stainless-runtime-version"),
-		Runtime:     headers.Get("x-stainless-runtime"),
-		Terminal:    headers.Get("x-claude-code-terminal"),
-		Shell:       headers.Get("x-claude-code-shell"),
-		Version:     version,
-		VersionBase: version,
+		Platform:    getHeaderRaw(headers, "x-stainless-os"),
+		PlatformRaw: getHeaderRaw(headers, "x-stainless-os"),
+		Arch:        getHeaderRaw(headers, "x-stainless-arch"),
+		NodeVersion: getHeaderRaw(headers, "x-stainless-runtime-version"),
+		Runtime:     getHeaderRaw(headers, "x-stainless-runtime"),
+		Terminal:    getHeaderRaw(headers, "x-claude-code-terminal"),
+		Shell:       getHeaderRaw(headers, "x-claude-code-shell"),
+		Version:     ClaudeTelemetryProfile,
+		VersionBase: ClaudeTelemetryProfile,
 	}
 	route := claudetelemetry.DeliveryRoute{
 		Key:   fmt.Sprintf("anthropic:%d:%s", account.ID, proxyURL),
@@ -121,7 +117,7 @@ func (s *GatewayService) beginClaudeTelemetryAttempt(
 	if stream {
 		mode = claudetelemetry.ObserveSSE
 	}
-	retryCount, _ := strconv.Atoi(strings.TrimSpace(headers.Get("x-stainless-retry-count")))
+	retryCount, _ := strconv.Atoi(strings.TrimSpace(getHeaderRaw(headers, "x-stainless-retry-count")))
 	if retryCount < 0 {
 		retryCount = 0
 	}
@@ -129,7 +125,7 @@ func (s *GatewayService) beginClaudeTelemetryAttempt(
 		EventContext: claudetelemetry.EventContext{
 			Identity: identity, IdentitySources: sources,
 			Model:       gjson.GetBytes(wireBody, "model").String(),
-			Betas:       headers.Get("anthropic-beta"),
+			Betas:       getHeaderRaw(headers, "anthropic-beta"),
 			Environment: environment,
 			SubscriptionType: telemetryFirstNonEmpty(
 				account.GetExtraString("subscription_type"),

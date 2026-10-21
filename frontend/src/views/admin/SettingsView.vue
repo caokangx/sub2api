@@ -1427,6 +1427,12 @@
         </div>
         <!-- /Tab: Claude Telemetry -->
 
+        <!-- Tab: Claude Anti-Ban -->
+        <div v-if="activeTab === 'antiBan'" class="space-y-6">
+          <ClaudeAntiBanSettings />
+        </div>
+        <!-- /Tab: Claude Anti-Ban -->
+
         <!-- Tab: Security — Registration, Turnstile, LinuxDo -->
         <div v-show="activeTab === 'security'" class="space-y-6">
           <!-- Registration Settings -->
@@ -5865,61 +5871,6 @@
                 <Toggle v-model="form.openai_codex_version_auto_sync_enabled" />
               </div>
 
-              <!-- Claude Code 客户端版本号 -->
-              <div>
-                <label
-                  class="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300"
-                >
-                  {{
-                    t(
-                      "admin.settings.gatewayForwarding.claudeCodeClientVersion",
-                    )
-                  }}
-                </label>
-                <input
-                  v-model="form.claude_code_client_version"
-                  type="text"
-                  class="input w-full font-mono text-sm"
-                  placeholder="2.1.280"
-                />
-                <p class="mt-1.5 text-xs text-gray-500 dark:text-gray-400">
-                  {{
-                    t(
-                      "admin.settings.gatewayForwarding.claudeCodeClientVersionHint",
-                    )
-                  }}
-                </p>
-              </div>
-
-              <!-- Claude Code 版本号自动同步 -->
-              <div class="flex items-center justify-between">
-                <div>
-                  <label
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    {{
-                      t(
-                        "admin.settings.gatewayForwarding.claudeCodeVersionAutoSync",
-                      )
-                    }}
-                  </label>
-                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    {{
-                      t(
-                        "admin.settings.gatewayForwarding.claudeCodeVersionAutoSyncHint",
-                      )
-                    }}
-                  </p>
-                  <p
-                    v-if="claudeSyncedVersionLabel"
-                    class="mt-0.5 text-xs text-gray-500 dark:text-gray-400"
-                  >
-                    {{ claudeSyncedVersionLabel }}
-                  </p>
-                </div>
-                <Toggle v-model="form.claude_code_version_auto_sync_enabled" />
-              </div>
-
             </div>
           </div>
 
@@ -8909,7 +8860,7 @@
 
         <!-- Save Button -->
         <div
-          v-show="activeTab !== 'backup' && activeTab !== 'telemetry'"
+          v-show="activeTab !== 'backup' && activeTab !== 'telemetry' && activeTab !== 'antiBan'"
           class="flex justify-end"
         >
           <button
@@ -9042,6 +8993,7 @@ import ImageUpload from "@/components/common/ImageUpload.vue";
 import BackupSettings from "@/views/admin/BackupView.vue";
 import EmailTemplateEditor from "@/views/admin/settings/EmailTemplateEditor.vue";
 import ClaudeTelemetrySettings from "@/views/admin/settings/ClaudeTelemetrySettings.vue";
+import ClaudeAntiBanSettings from "@/views/admin/settings/ClaudeAntiBanSettings.vue";
 import RechargeBonusTierEditor from "@/components/admin/settings/RechargeBonusTierEditor.vue";
 import {
   normalizeRechargeBonusMode,
@@ -9108,6 +9060,7 @@ type SettingsTab =
   | "users"
   | "gateway"
   | "telemetry"
+  | "antiBan"
   | "payment"
   | "email"
   | "backup";
@@ -9119,6 +9072,7 @@ const settingsTabs = [
   { key: "security" as SettingsTab, icon: "shield" as const },
   { key: "users" as SettingsTab, icon: "user" as const },
   { key: "gateway" as SettingsTab, icon: "server" as const },
+  { key: "antiBan" as SettingsTab, icon: "shield" as const },
   { key: "telemetry" as SettingsTab, icon: "chartBar" as const },
   { key: "payment" as SettingsTab, icon: "creditCard" as const },
   { key: "email" as SettingsTab, icon: "mail" as const },
@@ -10042,10 +9996,6 @@ const form = reactive<SettingsForm>({
   // 只读展示：自动同步任务写入的官方最新稳定版，不参与提交（提交载荷按字段显式构造）
   openai_codex_client_version_synced: "",
   openai_codex_version_auto_sync_enabled: true,
-  claude_code_client_version: "",
-  // 只读展示：自动同步任务写入的官方最新稳定版，不参与提交（提交载荷按字段显式构造）
-  claude_code_client_version_synced: "",
-  claude_code_version_auto_sync_enabled: true,
   // codex_cli_only 加固
   min_codex_version: "",
   max_codex_version: "",
@@ -11046,14 +10996,6 @@ const codexSyncedVersionLabel = computed(() => {
   });
 });
 
-const claudeSyncedVersionLabel = computed(() => {
-  const synced = form.claude_code_client_version_synced?.trim();
-  if (!synced) return "";
-  return t("admin.settings.gatewayForwarding.claudeCodeVersionSyncedValue", {
-    version: synced,
-  });
-});
-
 async function loadSettings() {
   loading.value = true;
   loadFailed.value = false;
@@ -11694,9 +11636,6 @@ async function saveSettings() {
         form.openai_codex_client_version?.trim() || "",
       openai_codex_version_auto_sync_enabled:
         form.openai_codex_version_auto_sync_enabled,
-      claude_code_client_version: form.claude_code_client_version?.trim() || "",
-      claude_code_version_auto_sync_enabled:
-        form.claude_code_version_auto_sync_enabled,
       min_codex_version: form.min_codex_version?.trim() || "",
       max_codex_version: form.max_codex_version?.trim() || "",
       codex_cli_only_allow_app_server_clients:

@@ -4,7 +4,11 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"regexp"
+	"strings"
+	"unicode/utf16"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/tidwall/gjson"
 )
 
@@ -15,31 +19,95 @@ import (
 // 进一步触发 Anthropic 的第三方检测。
 const fingerprintSalt = "59cf53e54c78"
 
+var (
+	leadingSystemReminderPattern = regexp.MustCompile(`^[ \t\r\n]*<system-reminder>[\s\S]*?</system-reminder>[ \t]*(?:\r?\n)*`)
+	systemReminderPattern        = regexp.MustCompile(`<system-reminder>[\s\S]*?</system-reminder>`)
+)
+
 // computeClaudeCodeFingerprint 复刻真实 Claude Code CLI 的 cc_version 指纹算法：
 //
-//  1. 取 messages 中第一条 role=user 的纯文本（首块 text）
-//  2. 取该文本的第 4、7、20 字符（不足以 '0' 补齐）
+//  1. 按 user 消息与 text block 顺序取首段非 system-reminder 正文
+//  2. 取该文本的第 4、7、20 个 UTF-16 code unit（不足以 '0' 补齐）
 //  3. SHA256(SALT + chars + cc_version) 取 hex 前 3 字符
 //
 // 算法来自 Parrot src/transform/cc_mimicry.py:compute_fingerprint，与官方 CLI 字节对齐。
 // 任何偏差都会导致 cc_version=X.Y.Z.{fp} 在上游侧与真实 CLI 不一致。
 func computeClaudeCodeFingerprint(body []byte, version string) string {
-	firstText := extractFirstUserText(body)
+	return computeClaudeCodeFingerprintForText(firstUserTextForBilling(body), version)
+}
+
+func computeClaudeCodeFingerprintForText(firstText, version string) string {
+	codeUnits := utf16.Encode([]rune(firstText))
 	indices := []int{4, 7, 20}
-	chars := make([]byte, 0, 3)
+	sampled := make([]uint16, 0, len(indices))
 	for _, i := range indices {
-		if i < len(firstText) {
-			chars = append(chars, firstText[i])
+		if i < len(codeUnits) {
+			sampled = append(sampled, codeUnits[i])
 		} else {
-			chars = append(chars, '0')
+			sampled = append(sampled, uint16('0'))
 		}
 	}
-	sum := sha256.Sum256([]byte(fingerprintSalt + string(chars) + version))
+	chars := string(utf16.Decode(sampled))
+	sum := sha256.Sum256([]byte(fingerprintSalt + chars + version))
 	return hex.EncodeToString(sum[:])[:3]
 }
 
-// extractFirstUserText 提取 messages 中第一条 user 消息的首段 text 内容。
-// 兼容 string 和 []block 两种 content 格式。
+// firstUserTextForBilling 从入站 messages 选择真实用户正文。完整闭合的
+// <system-reminder> 段只从指纹输入剥离，不修改实际请求消息。
+func firstUserTextForBilling(body []byte) string {
+	messages := gjson.GetBytes(body, "messages")
+	if !messages.IsArray() {
+		return ""
+	}
+	first := ""
+	found := false
+	messages.ForEach(func(_, msg gjson.Result) bool {
+		if msg.Get("role").String() != "user" {
+			return true
+		}
+		skippedReminder := false
+		visitText := func(text string) bool {
+			original := text
+			for leadingSystemReminderPattern.MatchString(text) {
+				text = leadingSystemReminderPattern.ReplaceAllString(text, "")
+			}
+			text = systemReminderPattern.ReplaceAllString(text, "")
+			if text != original {
+				skippedReminder = true
+				if strings.TrimSpace(text) == "" {
+					return true
+				}
+			}
+			first = text
+			found = true
+			return false
+		}
+		content := msg.Get("content")
+		if content.Type == gjson.String {
+			if !visitText(content.String()) {
+				return false
+			}
+		} else if content.IsArray() {
+			content.ForEach(func(_, block gjson.Result) bool {
+				if block.Get("type").String() != "text" {
+					return true
+				}
+				return visitText(block.Get("text").String())
+			})
+			if found {
+				return false
+			}
+		}
+		if !skippedReminder {
+			return false
+		}
+		return true
+	})
+	return first
+}
+
+// extractFirstUserText returns the first raw user text for stable session
+// derivation. Billing uses firstUserTextForBilling instead.
 func extractFirstUserText(body []byte) string {
 	messages := gjson.GetBytes(body, "messages")
 	if !messages.IsArray() {
@@ -63,7 +131,6 @@ func extractFirstUserText(body []byte) string {
 				}
 				return true
 			})
-			return false
 		}
 		return false
 	})
@@ -74,7 +141,7 @@ func extractFirstUserText(body []byte) string {
 //
 // 形态对齐真实 Claude Code CLI：
 //
-//	x-anthropic-billing-header: cc_version=2.1.161.{fp}; cc_entrypoint=cli;
+//	x-anthropic-billing-header: cc_version=2.1.284.{fp}; cc_entrypoint=cli;
 //
 // 注意：新版 Claude Code CLI 已不再发送 cch=... 签名字段（见 issue #3358）。我们
 // 随之去掉了 cch 段——继续注入它反而会让伪装请求偏离真实 CLI 流量。cc_version +
@@ -83,11 +150,13 @@ func extractFirstUserText(body []byte) string {
 //
 // 此 block 不带 cache_control（与真实 CLI 一致；cache breakpoint 由后续的
 // Claude Code prompt block 承担）。
-func buildBillingAttributionText(body []byte, cliVersion string) (string, error) {
-	if cliVersion == "" {
-		return "", fmt.Errorf("cliVersion required")
-	}
-	fp := computeClaudeCodeFingerprint(body, cliVersion)
+func buildBillingAttributionText(body []byte) (string, error) {
+	return buildBillingAttributionTextForSample(firstUserTextForBilling(body))
+}
+
+func buildBillingAttributionTextForSample(sample string) (string, error) {
+	cliVersion := claude.CLICurrentVersion
+	fp := computeClaudeCodeFingerprintForText(sample, cliVersion)
 	return fmt.Sprintf(
 		"x-anthropic-billing-header: cc_version=%s.%s; cc_entrypoint=cli;",
 		cliVersion, fp,

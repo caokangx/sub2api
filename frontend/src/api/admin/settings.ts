@@ -644,9 +644,6 @@ export interface SystemSettings {
   openai_codex_client_version: string;
   openai_codex_client_version_synced: string;
   openai_codex_version_auto_sync_enabled: boolean;
-  claude_code_client_version: string;
-  claude_code_client_version_synced: string;
-  claude_code_version_auto_sync_enabled: boolean;
   // codex_cli_only 加固
   min_codex_version: string;
   max_codex_version: string;
@@ -971,8 +968,6 @@ export interface UpdateSettingsRequest {
   openai_codex_user_agent?: string;
   openai_codex_client_version?: string;
   openai_codex_version_auto_sync_enabled?: boolean;
-  claude_code_client_version?: string;
-  claude_code_version_auto_sync_enabled?: boolean;
   // codex_cli_only 加固
   min_codex_version?: string;
   max_codex_version?: string;
@@ -1462,6 +1457,58 @@ export async function updateClaudeTelemetrySettings(
   return data;
 }
 
+// ==================== Claude Anti-Ban Settings ====================
+
+export type ClaudeEnvironmentRewriteMode = "off" | "observe" | "rewrite";
+export type ClaudeEnvironmentUnmatchedMode = "pass" | "reject";
+
+export interface ClaudeEnvironmentProfile {
+  working_directory: string;
+  git_repository: boolean;
+  platform: "darwin" | "linux" | "win32";
+  shell: "bash" | "zsh" | "fish" | "powershell" | "cmd";
+  os_version: string;
+  additional_working_directories: string[];
+  memory_directory: string;
+  git_user: string;
+  current_branch: string;
+  main_branch: string;
+  git_status: "clean" | "unavailable";
+  recent_commits: string[];
+  home_directory?: string;
+  user_identity: string;
+  arch: string;
+  runtime: string;
+  runtime_version: string;
+  package_version: string;
+}
+
+export interface ClaudeAntiBanSettings {
+  probe_interception_enabled: boolean;
+  environment: {
+    mode: ClaudeEnvironmentRewriteMode;
+    on_unmatched: ClaudeEnvironmentUnmatchedMode;
+    profile: ClaudeEnvironmentProfile;
+  };
+}
+
+export async function getClaudeAntiBanSettings(): Promise<ClaudeAntiBanSettings> {
+  const { data } = await apiClient.get<ClaudeAntiBanSettings>(
+    "/admin/settings/claude-anti-ban",
+  );
+  return data;
+}
+
+export async function updateClaudeAntiBanSettings(
+  settings: ClaudeAntiBanSettings,
+): Promise<ClaudeAntiBanSettings> {
+  const { data } = await apiClient.put<ClaudeAntiBanSettings>(
+    "/admin/settings/claude-anti-ban",
+    settings,
+  );
+  return data;
+}
+
 // ==================== Stream Timeout Settings ====================
 
 /**
@@ -1693,6 +1740,8 @@ export const settingsAPI = {
   updatePanelRateLimitSettings,
   getClaudeTelemetrySettings,
   updateClaudeTelemetrySettings,
+  getClaudeAntiBanSettings,
+  updateClaudeAntiBanSettings,
   getStreamTimeoutSettings,
   updateStreamTimeoutSettings,
   getRectifierSettings,

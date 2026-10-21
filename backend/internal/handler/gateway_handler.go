@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"time"
+	"unicode/utf16"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/Wei-Shaw/sub2api/internal/domain"
@@ -162,6 +163,51 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 
 	setOpsRequestContext(c, "", false)
 
+	var probeReply *string
+	var originalMaxTokens *int
+	nativeClaudeMessages := c.Request.URL.Path == "/v1/messages" &&
+		apiKey.Group != nil && apiKey.Group.Platform == service.PlatformAnthropic
+	if nativeClaudeMessages {
+		antiBan := service.DefaultClaudeAntiBanSettings()
+		var settingsErr error
+		if h.settingService != nil {
+			antiBan, settingsErr = h.settingService.GetClaudeAntiBanSettings(c.Request.Context())
+		}
+		if settingsErr != nil {
+			reqLog.Warn("gateway.claude_anti_ban_settings_failed_using_defaults", zap.Error(settingsErr))
+			antiBan = service.DefaultClaudeAntiBanSettings()
+		}
+		preprocessed, preprocessErr := service.PreprocessNativeClaudeMessages(body, antiBan)
+		if preprocessErr != nil {
+			var requestErr *service.ClaudeMessagesPreprocessError
+			if errors.As(preprocessErr, &requestErr) {
+				h.errorResponse(c, requestErr.Status, "invalid_request_error", requestErr.Message)
+			} else {
+				reqLog.Error("gateway.claude_preprocess_failed", zap.Error(preprocessErr))
+				h.errorResponse(c, http.StatusBadRequest, "invalid_request_error", "Failed to preprocess request body")
+			}
+			return
+		}
+		body = preprocessed.Body
+		probeReply = preprocessed.ProbeReply
+		originalMaxTokens = preprocessed.OriginalMaxTokens
+		c.Request = c.Request.WithContext(service.WithClaudeMessagesPreprocessContext(
+			c.Request.Context(), preprocessed,
+		))
+		if report := preprocessed.EnvironmentReport; report.Applicable || report.SafeguardsPreserved {
+			reqLog.Info("gateway.claude_environment_preprocessed",
+				zap.String("mode", antiBan.Environment.Mode),
+				zap.Strings("formats", report.Formats),
+				zap.Int("environment_blocks", report.EnvironmentBlocks),
+				zap.Int("unmatched_environment_blocks", report.UnmatchedEnvironmentBlocks),
+				zap.Int("memory_blocks", report.MemoryBlocks),
+				zap.Int("user_blocks", report.UserBlocks),
+				zap.Bool("safeguards_preserved", report.SafeguardsPreserved),
+				zap.Bool("applied", report.Applied),
+			)
+		}
+	}
+
 	bodyRef := service.NewRequestBodyRef(body)
 	parsedReq, err := service.ParseGatewayRequest(bodyRef, domain.PlatformAnthropic)
 	if err != nil {
@@ -172,6 +218,15 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	body = parsedReq.Body.Bytes()
 	reqModel := parsedReq.Model
 	reqStream := parsedReq.Stream
+	if originalMaxTokens != nil {
+		parsedReq.MaxTokens = *originalMaxTokens
+	}
+	if probeReply != nil {
+		setOpsRequestContext(c, reqModel, reqStream)
+		setOpsEndpointContext(c, "", int16(service.RequestTypeFromLegacy(reqStream, false)))
+		sendClaudeProbeResponse(c, reqModel, reqStream, *probeReply)
+		return
+	}
 	bindRequestedReasoningEffort(c, body, reqModel)
 	ensureCompositeTargetPlatform(c, apiKey, reqModel)
 	if policyBody, changed, err := applyAnthropicReasoningEffortPolicyForRequest(c, apiKey, body); err != nil {
@@ -2469,6 +2524,79 @@ func sendMockInterceptResponse(c *gin.Context, model string, interceptType Inter
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+func sendClaudeProbeResponse(c *gin.Context, model string, stream bool, reply string) {
+	if strings.TrimSpace(model) == "" {
+		model = "claude-sonnet-4-6"
+	}
+	msgID := generateRealisticMsgID()
+	outputTokens := max(1, (len(utf16.Encode([]rune(reply)))+3)/4)
+	usage := gin.H{
+		"input_tokens":                1,
+		"cache_creation_input_tokens": 0,
+		"cache_read_input_tokens":     0,
+		"cache_creation": gin.H{
+			"ephemeral_5m_input_tokens": 0,
+			"ephemeral_1h_input_tokens": 0,
+		},
+		"output_tokens": outputTokens,
+		"service_tier":  "standard",
+		"inference_geo": "not_available",
+	}
+	payload := gin.H{
+		"model": model, "id": msgID, "type": "message", "role": "assistant",
+		"content":     []gin.H{{"type": "text", "text": reply}},
+		"stop_reason": "end_turn", "stop_sequence": nil, "stop_details": nil,
+		"usage": usage, "context_management": gin.H{"applied_edits": []any{}},
+	}
+	if !stream {
+		c.JSON(http.StatusOK, payload)
+		return
+	}
+
+	c.Header("Content-Type", "text/event-stream")
+	c.Header("Cache-Control", "no-cache")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	start := gin.H{
+		"type": "message_start",
+		"message": gin.H{
+			"model": model, "id": msgID, "type": "message", "role": "assistant",
+			"content": []any{}, "stop_reason": nil, "stop_sequence": nil, "stop_details": nil,
+			"usage": gin.H{
+				"input_tokens": 1, "cache_creation_input_tokens": 0,
+				"cache_read_input_tokens": 0, "output_tokens": 1,
+			},
+		},
+	}
+	events := []struct {
+		name string
+		data any
+	}{
+		{"message_start", start},
+		{"content_block_start", gin.H{
+			"type": "content_block_start", "index": 0,
+			"content_block": gin.H{"type": "text", "text": ""},
+		}},
+		{"content_block_delta", gin.H{
+			"type": "content_block_delta", "index": 0,
+			"delta": gin.H{"type": "text_delta", "text": reply},
+		}},
+		{"content_block_stop", gin.H{"type": "content_block_stop", "index": 0}},
+		{"message_delta", gin.H{
+			"type":  "message_delta",
+			"delta": gin.H{"stop_reason": "end_turn", "stop_sequence": nil, "stop_details": nil},
+			"usage": gin.H{"output_tokens": outputTokens},
+		}},
+		{"message_stop", gin.H{"type": "message_stop"}},
+	}
+	for _, event := range events {
+		raw, _ := json.Marshal(event.data)
+		_, _ = c.Writer.WriteString("event: " + event.name + "\n")
+		_, _ = c.Writer.WriteString("data: " + string(raw) + "\n\n")
+		c.Writer.Flush()
+	}
 }
 
 // extractQuotaResetSeconds 从 quota 错误的 metadata 中提取 window_resets_at 并计算

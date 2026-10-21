@@ -595,6 +595,9 @@ func registerSettingsRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 		// Claude telemetry configuration
 		adminSettings.GET("/claude-telemetry", h.Admin.Setting.GetClaudeTelemetrySettings)
 		adminSettings.PUT("/claude-telemetry", h.Admin.Setting.UpdateClaudeTelemetrySettings)
+		// Claude request anti-ban preprocessing configuration
+		adminSettings.GET("/claude-anti-ban", h.Admin.Setting.GetClaudeAntiBanSettings)
+		adminSettings.PUT("/claude-anti-ban", h.Admin.Setting.UpdateClaudeAntiBanSettings)
 		// 流超时处理配置
 		adminSettings.GET("/stream-timeout", h.Admin.Setting.GetStreamTimeoutSettings)
 		adminSettings.PUT("/stream-timeout", h.Admin.Setting.UpdateStreamTimeoutSettings)

@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -116,6 +117,16 @@ func (f *fakeGroupRepo) UpdateSortOrders(context.Context, []service.GroupSortOrd
 
 type fakeConcurrencyCache struct{}
 
+type antiBanTestSettingRepo struct{ service.SettingRepository }
+
+func (antiBanTestSettingRepo) GetValue(context.Context, string) (string, error) {
+	return "", service.ErrSettingNotFound
+}
+
+func (antiBanTestSettingRepo) GetMultiple(context.Context, []string) (map[string]string, error) {
+	return map[string]string{}, nil
+}
+
 func (f *fakeConcurrencyCache) AcquireAccountSlot(context.Context, int64, int, string) (bool, error) {
 	return true, nil
 }
@@ -215,6 +226,80 @@ func newTestGatewayHandler(t *testing.T, group *service.Group, accounts []*servi
 	return h, cleanup
 }
 
+func TestGatewayHandlerMessages_LocalProbeReturnsBeforeAccountSelection(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	groupID := int64(2100)
+	group := &service.Group{
+		ID: groupID, Hydrated: true, Platform: service.PlatformAnthropic, Status: service.StatusActive,
+	}
+	h, cleanup := newTestGatewayHandler(t, group, nil)
+	defer cleanup()
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/messages",
+		bytes.NewBufferString(`{"model":"claude-sonnet-5-5","stream":false,"messages":[{"role":"user","content":"ping"}]}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), ctxkey.Group, group))
+	c.Request = req
+	apiKey := &service.APIKey{
+		ID: 3100, UserID: 4100, GroupID: &groupID, Status: service.StatusActive,
+		User: &service.User{ID: 4100, Concurrency: 10, Balance: 0}, Group: group,
+	}
+	c.Set(string(middleware.ContextKeyAPIKey), apiKey)
+	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: apiKey.UserID, Concurrency: 10})
+
+	h.Messages(c)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	_, selected := c.Get(opsAccountIDKey)
+	require.False(t, selected)
+	require.Contains(t, rec.Body.String(), `"text":"pong"`)
+}
+
+func TestGatewayHandlerMessages_MaxTokensOneHaikuSurvivesStrictNormalization(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	groupID, accountID := int64(2101), int64(1101)
+	group := &service.Group{
+		ID: groupID, Hydrated: true, Platform: service.PlatformAnthropic, Status: service.StatusActive,
+	}
+	account := &service.Account{
+		ID: accountID, Name: "anthropic-probe", Platform: service.PlatformAnthropic,
+		Type: service.AccountTypeOAuth, Status: service.StatusActive, Schedulable: true, Concurrency: 1,
+		Credentials:   map[string]any{"intercept_warmup_requests": true},
+		AccountGroups: []service.AccountGroup{{AccountID: accountID, GroupID: groupID}},
+	}
+	h, cleanup := newTestGatewayHandler(t, group, []*service.Account{account})
+	defer cleanup()
+	h.settingService = service.NewSettingService(antiBanTestSettingRepo{}, &config.Config{})
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/messages",
+		bytes.NewBufferString(`{"model":"claude-haiku-4-5","max_tokens":1,"stream":false,"messages":[{"role":"user","content":"health"}]}`),
+	)
+	req.Header.Set("User-Agent", "claude-cli/2.1.284 (external, cli)")
+	req = req.WithContext(context.WithValue(req.Context(), ctxkey.Group, group))
+	c.Request = req
+	apiKey := &service.APIKey{
+		ID: 3101, UserID: 4101, GroupID: &groupID, Status: service.StatusActive,
+		User: &service.User{ID: 4101, Concurrency: 10, Balance: 100}, Group: group,
+	}
+	c.Set(string(middleware.ContextKeyAPIKey), apiKey)
+	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: apiKey.UserID, Concurrency: 10})
+
+	h.Messages(c)
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), `"stop_reason":"max_tokens"`)
+	require.Contains(t, rec.Body.String(), `"text":"#"`)
+}
+
 func TestGatewayHandlerMessages_InterceptWarmup_AntigravityAccount_MixedSchedulingV1(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -256,6 +341,7 @@ func TestGatewayHandlerMessages_InterceptWarmup_AntigravityAccount_MixedScheduli
 	body := []byte(`{
 		"model": "claude-sonnet-4-5",
 		"max_tokens": 256,
+		"stream": false,
 		"messages": [{"role":"user","content":[{"type":"text","text":"Warmup"}]}]
 	}`)
 	req := httptest.NewRequest("POST", "/v1/messages", bytes.NewReader(body))

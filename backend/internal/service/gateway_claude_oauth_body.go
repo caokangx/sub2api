@@ -351,13 +351,8 @@ func (s *GatewayService) buildOAuthMetadataUserID(parsed *ParsedRequest, account
 	seed := buildStableSessionSeed(account.ID, sessionContextDiscriminator(parsed.SessionContext), firstUserText)
 	sessionID := generateSessionUUID(seed)
 
-	// 根据指纹 UA 版本选择输出格式
-	var uaVersion string
-	if fp != nil {
-		uaVersion = ExtractCLIVersion(fp.UserAgent)
-	}
 	accountUUID := strings.TrimSpace(account.GetExtraString("account_uuid"))
-	return FormatMetadataUserID(userID, accountUUID, sessionID, uaVersion)
+	return FormatMetadataUserID(userID, accountUUID, sessionID, claude.CLICurrentVersion)
 }
 
 // applyClaudeCodeOAuthMimicryToBody 将"非 Claude Code 客户端 + Claude OAuth 账号"
@@ -473,12 +468,8 @@ func (s *GatewayService) buildOAuthMetadataUserIDFromBody(
 	seed := buildStableSessionSeed(account.ID, clientDiscriminator, extractFirstUserText(body))
 	sessionID := generateSessionUUID(seed)
 
-	var uaVersion string
-	if fp != nil {
-		uaVersion = ExtractCLIVersion(fp.UserAgent)
-	}
 	accountUUID := strings.TrimSpace(account.GetExtraString("account_uuid"))
-	return FormatMetadataUserID(userID, accountUUID, sessionID, uaVersion)
+	return FormatMetadataUserID(userID, accountUUID, sessionID, claude.CLICurrentVersion)
 }
 
 // buildStableSessionSeed 为伪装路径合成的 metadata.user_id session_id 生成"会话级稳定"种子。
@@ -766,7 +757,7 @@ func decodeClaudeOAuthSystemPromptCacheControl(raw json.RawMessage) (any, error)
 	return value, nil
 }
 
-func expandClaudeOAuthSystemPromptTextTemplate(body []byte, text string, expansionPrompt string) (string, error) {
+func expandClaudeOAuthSystemPromptTextTemplate(body []byte, text string, expansionPrompt, billingSample string) (string, error) {
 	if text == "" {
 		return "", nil
 	}
@@ -774,11 +765,11 @@ func expandClaudeOAuthSystemPromptTextTemplate(body []byte, text string, expansi
 	// 同一次展开内只取一次版本号，billing attribution / 指纹 / 占位符三处共用，
 	// 避免运行期版本翻转瞬间取到不同值。
 	cliVersion := claude.EffectiveCLIVersion()
-	billingText, err := buildBillingAttributionText(body, cliVersion)
+	billingText, err := buildBillingAttributionTextForSample(billingSample)
 	if err != nil {
 		return "", err
 	}
-	fp := computeClaudeCodeFingerprint(body, cliVersion)
+	fp := computeClaudeCodeFingerprintForText(billingSample, cliVersion)
 	replacer := strings.NewReplacer(
 		"{billing_header}", billingText,
 		"{cc_version}", cliVersion,
@@ -813,7 +804,7 @@ func defaultClaudeOAuthSystemPromptBlockConfig() []claudeOAuthSystemPromptBlockC
 	}
 }
 
-func buildClaudeOAuthSystemPromptBlocksJSON(body []byte, expansionPrompt string, blocksConfig string) ([][]byte, error) {
+func buildClaudeOAuthSystemPromptBlocksJSON(body []byte, expansionPrompt, blocksConfig, billingSample string) ([][]byte, error) {
 	blocks, err := parseClaudeOAuthSystemPromptBlocksConfig(blocksConfig)
 	if err != nil {
 		return nil, err
@@ -834,7 +825,7 @@ func buildClaudeOAuthSystemPromptBlocksJSON(body []byte, expansionPrompt string,
 		if blockType != "text" {
 			return nil, fmt.Errorf("system block %d type %q is not supported", i, block.Type)
 		}
-		text, err := expandClaudeOAuthSystemPromptTextTemplate(body, block.Text, expansionPrompt)
+		text, err := expandClaudeOAuthSystemPromptTextTemplate(body, block.Text, expansionPrompt, billingSample)
 		if err != nil {
 			return nil, err
 		}
@@ -907,9 +898,13 @@ func extractSystemTextAndCacheControl(system any) (string, any) {
 	}
 }
 
-func rewriteSystemForNonClaudeCodeWithPromptBlocks(body []byte, system any, expansionPrompt string, blocksConfig string) []byte {
+func rewriteSystemForNonClaudeCodeWithPromptBlocks(body []byte, system any, expansionPrompt string, blocksConfig string, samples ...string) []byte {
 	system = normalizeSystemParam(system)
 	expansionPrompt = defaultClaudeOAuthExpansionPrompt(expansionPrompt)
+	billingSample := firstUserTextForBilling(body)
+	if len(samples) > 0 {
+		billingSample = samples[0]
+	}
 
 	// 1. 提取原始 system prompt 文本及其缓存断点
 	originalSystemText, originalSystemCacheControl := extractSystemTextAndCacheControl(system)
@@ -926,10 +921,10 @@ func rewriteSystemForNonClaudeCodeWithPromptBlocks(body []byte, system any, expa
 	//    缺失 billing block 的系统 payload 是 Anthropic 判定第三方的关键信号之一
 	//    （真实 CLI 每个请求都带）。新版 CLI 已取消 cch=... 签名字段，故 block 不再注入
 	//    cch（见 buildBillingAttributionText）。
-	systemBlocks, blockErr := buildClaudeOAuthSystemPromptBlocksJSON(body, expansionPrompt, blocksConfig)
+	systemBlocks, blockErr := buildClaudeOAuthSystemPromptBlocksJSON(body, expansionPrompt, blocksConfig, billingSample)
 	if blockErr != nil {
 		logger.LegacyPrintf("service.gateway", "Warning: failed to build configured Claude OAuth system blocks: %v", blockErr)
-		systemBlocks, blockErr = buildClaudeOAuthSystemPromptBlocksJSON(body, expansionPrompt, "")
+		systemBlocks, blockErr = buildClaudeOAuthSystemPromptBlocksJSON(body, expansionPrompt, "", billingSample)
 	}
 	if blockErr != nil {
 		logger.LegacyPrintf("service.gateway", "Warning: failed to build default Claude OAuth system blocks: %v", blockErr)

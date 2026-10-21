@@ -51,6 +51,7 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		return nil, nil, err
 	}
 	body = stripDeferredToolCacheControl(body)
+	body = syncBillingHeaderVersionForSample(body, claudeBillingSampleFromContext(ctx, body))
 	if account.Platform == PlatformAnthropic && account.Type == AccountTypeServiceAccount {
 		req, err := s.buildUpstreamRequestAnthropicVertex(ctx, c, account, body, token, modelID, reqStream)
 		return req, body, err
@@ -116,16 +117,10 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		}
 	}
 
-	// 一致性铁律：同一次请求内只取一次 mimic UA，出站 User-Agent 头与
-	// 请求体 x-anthropic-billing-header 的 cc_version 都源自这一个字符串，
-	// 避免运行期版本缓存翻转瞬间头/体版本自相矛盾（会被判非正版客户端）。
+	// 出站 User-Agent 与 billing cc_version 都源自全局固定版本。
 	mimicUserAgent := claude.DefaultUserAgent()
 
 	// Mimicry may override the cached User-Agent later, even without a fingerprint.
-	if billingUA := effectiveBillingUserAgent(mimicUserAgent, tokenType, mimicClaudeCode, fingerprint); billingUA != "" {
-		body = syncBillingHeaderVersion(body, billingUA)
-	}
-
 	// === 计算最终 anthropic-beta header（先于 body sanitize 与 CCH 签名）===
 	//
 	// 顺序约束：
@@ -233,6 +228,10 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 	// 账号级请求头覆写（仅 anthropic/openai api_key 账号启用时生效；OAuth 路径 no-op）。
 	// 放在所有 header 逻辑之后，确保配置值对同名头拥有最终决定权。
 	account.ApplyHeaderOverrides(req.Header)
+	if pinnedUA, changed := pinClaudeCLIUserAgentVersion(getHeaderRaw(req.Header, "User-Agent")); changed {
+		setHeaderRaw(req.Header, "User-Agent", pinnedUA)
+	}
+	applyClaudeEnvironmentHeadersFromContext(ctx, req.Header)
 	filterSonnet55ToolsetBetaHeader(req.Header, body, modelID)
 
 	// === DEBUG: 打印上游转发请求（headers + body 摘要），与 CLIENT_ORIGINAL 对比 ===
@@ -381,6 +380,10 @@ func (s *GatewayService) buildUpstreamRequestAnthropicVertex(
 	if finalBeta != "" {
 		setHeaderRaw(req.Header, "anthropic-beta", finalBeta)
 	}
+	if pinnedUA, changed := pinClaudeCLIUserAgentVersion(getHeaderRaw(req.Header, "User-Agent")); changed {
+		setHeaderRaw(req.Header, "User-Agent", pinnedUA)
+	}
+	applyClaudeEnvironmentHeadersFromContext(ctx, req.Header)
 
 	s.debugLogGatewaySnapshot("UPSTREAM_FORWARD_VERTEX_ANTHROPIC", req.Header, vertexBody, map[string]string{
 		"url":        req.URL.String(),

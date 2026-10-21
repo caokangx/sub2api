@@ -6,10 +6,12 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 )
 
 const (
-	CompatibilityProfile = "2.1.284"
+	CompatibilityProfile = claude.CLICurrentVersion
 	defaultFirstPartyURL = "https://api.anthropic.com/api/event_logging/v2/batch"
 	defaultDatadogURL    = "https://http-intake.logs.us5.datadoghq.com/api/v2/logs"
 )

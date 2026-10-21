@@ -130,8 +130,6 @@ type SettingService struct {
 	openAICodexUASF             singleflight.Group
 	openAICodexVersionCache     atomic.Value // *cachedOpenAICodexClientVersion
 	openAICodexVersionSF        singleflight.Group
-	claudeCodeVersionCache      atomic.Value // *cachedClaudeCodeClientVersion
-	claudeCodeVersionSF         singleflight.Group
 	codexRestrictionPolicyCache atomic.Value // *cachedCodexRestrictionPolicy
 	codexRestrictionPolicySF    singleflight.Group
 
@@ -161,6 +159,7 @@ type SettingService struct {
 	claudeTelemetryStatus      atomic.Pointer[ClaudeTelemetryRuntimeStatus]
 	claudeTelemetryListenersMu sync.Mutex
 	claudeTelemetryListeners   []func(*ClaudeTelemetryRuntimeConfig)
+	claudeAntiBanRuntime       atomic.Pointer[ClaudeAntiBanSettings]
 }
 
 // DefaultPlatformQuotaSetting 单 platform 三档限额（nil = 沿用上层；0 = 显式禁用；>0 = 上限）

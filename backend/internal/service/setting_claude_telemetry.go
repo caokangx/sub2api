@@ -14,11 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 )
 
 const (
-	ClaudeTelemetryProfile = "2.1.284"
+	ClaudeTelemetryProfile = claude.CLICurrentVersion
 
 	ClaudeTelemetryModeOff     = "off"
 	ClaudeTelemetryModeRecord  = "record"

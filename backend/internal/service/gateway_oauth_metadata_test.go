@@ -1,7 +1,6 @@
 package service
 
 import (
-	"regexp"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -22,14 +21,16 @@ func TestBuildOAuthMetadataUserID_FallbackWithoutAccountUUID(t *testing.T) {
 		Extra: map[string]any{}, // intentionally missing account_uuid / claude_user_id
 	}
 
-	fp := &Fingerprint{ClientID: "deadbeef"} // should be used as user id in legacy format
+	fp := &Fingerprint{ClientID: "deadbeef"}
 
 	got := svc.buildOAuthMetadataUserID(parsed, account, fp)
 	require.NotEmpty(t, got)
 
-	// Legacy format: user_{client}_account__session_{uuid}
-	re := regexp.MustCompile(`^user_[a-zA-Z0-9]+_account__session_[a-f0-9-]{36}$`)
-	require.True(t, re.MatchString(got), "unexpected user_id format: %s", got)
+	metadata := ParseMetadataUserID(got)
+	require.NotNil(t, metadata)
+	require.Equal(t, "deadbeef", metadata.DeviceID)
+	require.Empty(t, metadata.AccountUUID)
+	require.NotEmpty(t, metadata.SessionID)
 }
 
 func TestBuildOAuthMetadataUserID_UsesAccountUUIDWhenPresent(t *testing.T) {
@@ -54,9 +55,11 @@ func TestBuildOAuthMetadataUserID_UsesAccountUUIDWhenPresent(t *testing.T) {
 	got := svc.buildOAuthMetadataUserID(parsed, account, nil)
 	require.NotEmpty(t, got)
 
-	// New format: user_{client}_account_{account_uuid}_session_{uuid}
-	re := regexp.MustCompile(`^user_clientid123_account_acc-uuid_session_[a-f0-9-]{36}$`)
-	require.True(t, re.MatchString(got), "unexpected user_id format: %s", got)
+	metadata := ParseMetadataUserID(got)
+	require.NotNil(t, metadata)
+	require.Equal(t, "clientid123", metadata.DeviceID)
+	require.Equal(t, "acc-uuid", metadata.AccountUUID)
+	require.NotEmpty(t, metadata.SessionID)
 }
 
 // TestBuildOAuthMetadataUserID_SessionIDStableAcrossTurns 验证伪装路径合成的

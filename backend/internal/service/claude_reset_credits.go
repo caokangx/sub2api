@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/httpclient"
 )
@@ -73,7 +74,6 @@ type ClaudeResetCreditService struct {
 	accounts claudeResetAccounts
 	tokens   claudeResetTokens
 	proxies  ProxyRepository
-	settings *SettingService
 	do       func(*http.Request, string) (*http.Response, error)
 	now      func() time.Time
 
@@ -82,8 +82,8 @@ type ClaudeResetCreditService struct {
 	locks       LeaderLockCache
 }
 
-func NewClaudeResetCreditService(accounts AccountRepository, tokens *ClaudeTokenProvider, proxies ProxyRepository, settings *SettingService) *ClaudeResetCreditService {
-	s := &ClaudeResetCreditService{accounts: accounts, tokens: tokens, proxies: proxies, settings: settings, now: time.Now}
+func NewClaudeResetCreditService(accounts AccountRepository, tokens *ClaudeTokenProvider, proxies ProxyRepository) *ClaudeResetCreditService {
+	s := &ClaudeResetCreditService{accounts: accounts, tokens: tokens, proxies: proxies, now: time.Now}
 	s.do = func(req *http.Request, proxy string) (*http.Response, error) {
 		client, err := httpclient.GetClient(httpclient.Options{ProxyURL: proxy, Timeout: 25 * time.Second, ValidateResolvedIP: true})
 		if err != nil {
@@ -129,13 +129,13 @@ func (s *ClaudeResetCreditService) account(ctx context.Context, id int64) (*Acco
 	return a, token, proxy, nil
 }
 
-func (s *ClaudeResetCreditService) headers(ctx context.Context, req *http.Request, token string) {
+func claudeResetHeaders(req *http.Request, token string) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("anthropic-beta", "oauth-2025-04-20")
 	req.Header.Set("x-app", "cli")
-	req.Header.Set("User-Agent", "claude-cli/"+s.settings.GetClaudeCodeClientVersion(ctx)+" (external, cli)")
+	req.Header.Set("User-Agent", claude.DefaultUserAgent())
 }
 
 func (s *ClaudeResetCreditService) query(ctx context.Context, id int64) (*ClaudeResetCredits, error) {
@@ -157,7 +157,7 @@ func (s *ClaudeResetCreditService) fetchBlock(ctx context.Context, token, proxy 
 	if err != nil {
 		return nil, err
 	}
-	s.headers(ctx, req, token)
+	claudeResetHeaders(req, token)
 	resp, err := s.do(req, proxy)
 	if err != nil {
 		return nil, infraerrors.ServiceUnavailable("CLAUDE_RESET_QUERY_FAILED", "reset status request failed")

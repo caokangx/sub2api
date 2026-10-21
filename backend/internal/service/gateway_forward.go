@@ -221,7 +221,10 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		systemRaw, _ := parsed.SystemValue()
 		systemPromptInjectionEnabled, systemPrompt, systemPromptBlocks := s.claudeOAuthSystemPromptInjectionSettings(ctx)
 		if systemPromptInjectionEnabled {
-			if err := replaceBody(rewriteSystemForNonClaudeCodeWithPromptBlocks(body, systemRaw, systemPrompt, systemPromptBlocks)); err != nil {
+			if err := replaceBody(rewriteSystemForNonClaudeCodeWithPromptBlocks(
+				body, systemRaw, systemPrompt, systemPromptBlocks,
+				claudeBillingSampleFromContext(ctx, body),
+			)); err != nil {
 				return nil, err
 			}
 		}
@@ -415,7 +418,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			return
 		}
 		telemetryAttempt = s.beginClaudeTelemetryAttempt(
-			ctx, c, account, wireBody, wireRequest, token, proxyURL, tlsProfile,
+			ctx, c, account, claudeTelemetryBodyFromContext(ctx, wireBody), wireRequest, token, proxyURL, tlsProfile,
 			reqStream, isClaudeCode,
 		)
 	}

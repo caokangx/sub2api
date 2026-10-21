@@ -398,6 +398,7 @@ func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthrough(
 	token string,
 ) (*http.Request, error) {
 	body = stripDeferredToolCacheControl(body)
+	body = syncBillingHeaderVersion(body)
 	targetURL := claudeAPICountTokensURL
 	baseURL := getAnthropicGatewayBaseURL(account)
 	if baseURL != "" {
@@ -457,6 +458,9 @@ func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthrough(
 
 	// 账号级请求头覆写（最终生效，覆盖上面所有来源的同名头）
 	account.ApplyHeaderOverrides(req.Header)
+	if pinnedUA, changed := pinClaudeCLIUserAgentVersion(getHeaderRaw(req.Header, "User-Agent")); changed {
+		setHeaderRaw(req.Header, "User-Agent", pinnedUA)
+	}
 	filterSonnet55ToolsetBetaHeader(req.Header, body, gjson.GetBytes(body, "model").String())
 
 	return req, nil
@@ -465,6 +469,7 @@ func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthrough(
 // buildCountTokensRequest 构建 count_tokens 上游请求
 func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token, tokenType, modelID string, mimicClaudeCode bool) (*http.Request, []byte, error) {
 	body = stripDeferredToolCacheControl(body)
+	body = syncBillingHeaderVersion(body)
 	// 确定目标 URL
 	targetURL := claudeAPICountTokensURL
 	baseURL := ""
@@ -516,18 +521,8 @@ func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Con
 		}
 	}
 
-	// Disabled fingerprint unification does not disable forced mimicry headers.
-	var billingFingerprint *Fingerprint
-	if ctEnableFP {
-		billingFingerprint = ctFingerprint
-	}
-	// 一致性铁律：同一次请求内只取一次 mimic UA，billing cc_version 与出站
-	// User-Agent 头共用这一个字符串（同 buildUpstreamRequest）。
+	// 出站 User-Agent 与 billing cc_version 都源自全局固定版本。
 	ctMimicUserAgent := claude.DefaultUserAgent()
-	if billingUA := effectiveBillingUserAgent(ctMimicUserAgent, tokenType, mimicClaudeCode, billingFingerprint); billingUA != "" {
-		body = syncBillingHeaderVersion(body, billingUA)
-	}
-
 	// === 计算最终 anthropic-beta header（先于 body sanitize 与 CCH 签名）===
 	// 顺序约束同 buildUpstreamRequest。
 	ctEffectiveDropSet := mergeDropSets(s.getBetaPolicyFilterSet(ctx, c, account, modelID))
@@ -611,6 +606,9 @@ func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Con
 
 	// 账号级请求头覆写（仅 anthropic/openai api_key 账号启用时生效；OAuth 路径 no-op）
 	account.ApplyHeaderOverrides(req.Header)
+	if pinnedUA, changed := pinClaudeCLIUserAgentVersion(getHeaderRaw(req.Header, "User-Agent")); changed {
+		setHeaderRaw(req.Header, "User-Agent", pinnedUA)
+	}
 	filterSonnet55ToolsetBetaHeader(req.Header, body, modelID)
 
 	if c != nil && tokenType == "oauth" {

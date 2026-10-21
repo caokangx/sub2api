@@ -564,6 +564,7 @@ function mountView() {
         ImageUpload: ImageUploadStub,
         BackupSettings: true,
         ClaudeTelemetrySettings: true,
+        ClaudeAntiBanSettings: true,
       },
     },
   });
@@ -606,6 +607,16 @@ async function openTelemetryTab(wrapper: ReturnType<typeof mountView>) {
 
   expect(telemetryTabButton).toBeDefined();
   await telemetryTabButton?.trigger("click");
+  await flushPromises();
+}
+
+async function openAntiBanTab(wrapper: ReturnType<typeof mountView>) {
+  const antiBanTabButton = wrapper
+    .findAll("button")
+    .find((node) => node.text().includes("admin.settings.tabs.antiBan"));
+
+  expect(antiBanTabButton).toBeDefined();
+  await antiBanTabButton?.trigger("click");
   await flushPromises();
 }
 
@@ -746,6 +757,16 @@ describe("admin SettingsView payment visible method controls", () => {
     await openTelemetryTab(wrapper);
     expect(wrapper.get("#settings-tab-telemetry").attributes("aria-selected")).toBe("true");
     expect((telemetry.element.parentElement as HTMLElement).style.display).not.toBe("none");
+  });
+
+  it("renders Claude anti-ban settings in a dedicated tab", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    expect(wrapper.find("claude-anti-ban-settings-stub").exists()).toBe(false);
+    await openAntiBanTab(wrapper);
+    expect(wrapper.get("#settings-tab-antiBan").attributes("aria-selected")).toBe("true");
+    expect(wrapper.find("claude-anti-ban-settings-stub").exists()).toBe(true);
   });
 
   it("loads and saves the open button visibility for each custom menu", async () => {

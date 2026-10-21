@@ -63,3 +63,30 @@ func TestSendMockInterceptResponse_MaxTokensOneHaiku(t *testing.T) {
 	require.True(t, ok)
 	require.Equal(t, float64(1), usage["output_tokens"])
 }
+
+func TestSendClaudeProbeResponseJSON(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+
+	sendClaudeProbeResponse(ctx, "claude-sonnet-5-5", false, "pong")
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	var response map[string]any
+	require.NoError(t, json.Unmarshal(rec.Body.Bytes(), &response))
+	require.Equal(t, "end_turn", response["stop_reason"])
+	require.Equal(t, "pong", response["content"].([]any)[0].(map[string]any)["text"])
+}
+
+func TestSendClaudeProbeResponseSSE(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+
+	sendClaudeProbeResponse(ctx, "claude-sonnet-5-5", true, "Ready")
+
+	require.Equal(t, http.StatusOK, rec.Code)
+	require.Contains(t, rec.Body.String(), "event: message_start")
+	require.Contains(t, rec.Body.String(), `"text":"Ready"`)
+	require.Contains(t, rec.Body.String(), "event: message_stop")
+}
