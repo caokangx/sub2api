@@ -203,8 +203,6 @@
 
         <!-- Tab: Gateway -->
         <div v-show="activeTab === 'gateway'" class="space-y-6">
-          <ClaudeTelemetrySettings />
-
           <!-- Overload Cooldown (529) Settings -->
           <div class="card">
             <div
@@ -1422,6 +1420,12 @@
           </div>
         </div>
         <!-- /Tab: Gateway -->
+
+        <!-- Tab: Claude Telemetry -->
+        <div v-show="activeTab === 'telemetry'" class="space-y-6">
+          <ClaudeTelemetrySettings />
+        </div>
+        <!-- /Tab: Claude Telemetry -->
 
         <!-- Tab: Security — Registration, Turnstile, LinuxDo -->
         <div v-show="activeTab === 'security'" class="space-y-6">
@@ -8904,7 +8908,10 @@
         </div>
 
         <!-- Save Button -->
-        <div v-show="activeTab !== 'backup'" class="flex justify-end">
+        <div
+          v-show="activeTab !== 'backup' && activeTab !== 'telemetry'"
+          class="flex justify-end"
+        >
           <button
             type="submit"
             :disabled="saving || loadFailed"
@@ -9100,6 +9107,7 @@ type SettingsTab =
   | "security"
   | "users"
   | "gateway"
+  | "telemetry"
   | "payment"
   | "email"
   | "backup";
@@ -9111,6 +9119,7 @@ const settingsTabs = [
   { key: "security" as SettingsTab, icon: "shield" as const },
   { key: "users" as SettingsTab, icon: "user" as const },
   { key: "gateway" as SettingsTab, icon: "server" as const },
+  { key: "telemetry" as SettingsTab, icon: "chartBar" as const },
   { key: "payment" as SettingsTab, icon: "creditCard" as const },
   { key: "email" as SettingsTab, icon: "mail" as const },
   { key: "backup" as SettingsTab, icon: "database" as const },

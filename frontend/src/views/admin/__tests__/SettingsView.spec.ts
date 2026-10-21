@@ -599,6 +599,16 @@ async function openGatewayTab(wrapper: ReturnType<typeof mountView>) {
   await flushPromises();
 }
 
+async function openTelemetryTab(wrapper: ReturnType<typeof mountView>) {
+  const telemetryTabButton = wrapper
+    .findAll("button")
+    .find((node) => node.text().includes("admin.settings.tabs.telemetry"));
+
+  expect(telemetryTabButton).toBeDefined();
+  await telemetryTabButton?.trigger("click");
+  await flushPromises();
+}
+
 async function openUsersTab(wrapper: ReturnType<typeof mountView>) {
   const usersTabButton = wrapper
     .findAll("button")
@@ -723,6 +733,19 @@ describe("admin SettingsView payment visible method controls", () => {
     });
     fetchPublicSettings.mockResolvedValue(undefined);
     adminSettingsFetch.mockResolvedValue(undefined);
+  });
+
+  it("renders Claude telemetry in its own tab instead of the gateway tab", async () => {
+    const wrapper = mountView();
+    await flushPromises();
+
+    await openGatewayTab(wrapper);
+    const telemetry = wrapper.get("claude-telemetry-settings-stub");
+    expect((telemetry.element.parentElement as HTMLElement).style.display).toBe("none");
+
+    await openTelemetryTab(wrapper);
+    expect(wrapper.get("#settings-tab-telemetry").attributes("aria-selected")).toBe("true");
+    expect((telemetry.element.parentElement as HTMLElement).style.display).not.toBe("none");
   });
 
   it("loads and saves the open button visibility for each custom menu", async () => {
