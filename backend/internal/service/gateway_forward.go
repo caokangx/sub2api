@@ -386,6 +386,39 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	// 重试循环
 	var resp *http.Response
 	lastWireBody := body
+	var telemetryAttempt *ClaudeTelemetryAttempt
+	defer func() {
+		if telemetryAttempt == nil {
+			return
+		}
+		requestID := ""
+		if resp != nil {
+			requestID = resp.Header.Get("x-request-id")
+		}
+		if result != nil && result.RequestID != "" {
+			requestID = result.RequestID
+		}
+		var failoverErr *UpstreamFailoverError
+		if errors.As(err, &failoverErr) {
+			failoverErr.attachClaudeTelemetryAttempt(telemetryAttempt, requestID)
+			telemetryAttempt = nil
+			return
+		}
+		finishClaudeTelemetryAttempt(ctx, telemetryAttempt, requestID)
+	}()
+	startTelemetryAttempt := func(wireBody []byte, wireRequest *http.Request) {
+		if telemetryAttempt != nil {
+			telemetryAttempt.Abort()
+		}
+		if !claudeTelemetryRouteEligible(ctx) {
+			telemetryAttempt = nil
+			return
+		}
+		telemetryAttempt = s.beginClaudeTelemetryAttempt(
+			ctx, c, account, wireBody, wireRequest, token, proxyURL, tlsProfile,
+			reqStream, isClaudeCode,
+		)
+	}
 	retryStart := time.Now()
 	for attempt := 1; attempt <= maxRetryAttempts; attempt++ {
 		// 构建上游请求（每次重试需要重新构建，因为请求体需要重新读取）
@@ -397,6 +430,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 		// 记录本次实际发送的 wire body；只有请求成功后才写回 ParsedRequest，避免 400 retry 基于已签名 CCH 再改写。
 		lastWireBody = wireBody
+		startTelemetryAttempt(wireBody, upstreamReq)
 
 		// 发送请求
 		resp, err = s.httpUpstream.DoWithTLS(upstreamReq, proxyURL, account.ID, account.Concurrency, tlsProfile)
@@ -462,6 +496,8 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 					retryReq, retryWireBody, buildErr := s.buildUpstreamRequest(retryCtx, c, account, filteredBody, token, tokenType, reqModel, reqStream, shouldMimicClaudeCode)
 					releaseRetryCtx()
 					if buildErr == nil {
+						lastWireBody = retryWireBody
+						startTelemetryAttempt(retryWireBody, retryReq)
 						retryResp, retryErr := s.httpUpstream.DoWithTLS(retryReq, proxyURL, account.ID, account.Concurrency, tlsProfile)
 						if retryErr == nil {
 							if retryResp.StatusCode < 400 {
@@ -505,6 +541,8 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 									retryReq2, retryWireBody2, buildErr2 := s.buildUpstreamRequest(retryCtx2, c, account, filteredBody2, token, tokenType, reqModel, reqStream, shouldMimicClaudeCode)
 									releaseRetryCtx2()
 									if buildErr2 == nil {
+										lastWireBody = retryWireBody2
+										startTelemetryAttempt(retryWireBody2, retryReq2)
 										retryResp2, retryErr2 := s.httpUpstream.DoWithTLS(retryReq2, proxyURL, account.ID, account.Concurrency, tlsProfile)
 										if retryErr2 == nil {
 											if retryResp2.StatusCode < 400 {
@@ -588,6 +626,8 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 						budgetRetryReq, budgetWireBody, buildErr := s.buildUpstreamRequest(budgetRetryCtx, c, account, rectifiedBody, token, tokenType, reqModel, reqStream, shouldMimicClaudeCode)
 						releaseBudgetRetryCtx()
 						if buildErr == nil {
+							lastWireBody = budgetWireBody
+							startTelemetryAttempt(budgetWireBody, budgetRetryReq)
 							budgetRetryResp, retryErr := s.httpUpstream.DoWithTLS(budgetRetryReq, proxyURL, account.ID, account.Concurrency, tlsProfile)
 							if retryErr == nil {
 								if budgetRetryResp.StatusCode < 400 {

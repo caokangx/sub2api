@@ -910,6 +910,10 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			c.Set("parsed_request", attemptParsedReq)
 			var result *service.ForwardResult
 			requestCtx := c.Request.Context()
+			requestCtx = service.WithClaudeTelemetryRouteEligible(
+				requestCtx,
+				currentAPIKey.Group != nil && currentAPIKey.Group.Platform == service.PlatformAnthropic,
+			)
 			if fs.SwitchCount > 0 {
 				requestCtx = service.WithAccountSwitchCount(requestCtx, fs.SwitchCount, h.metadataBridgeEnabled())
 			}
@@ -1059,20 +1063,24 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 				if errors.As(err, &failoverErr) {
 					// 流式内容已写入客户端，无法撤销，禁止 failover 以防止流拼接腐化
 					if c.Writer.Size() != writerSizeBeforeForward {
+						failoverErr.CompleteClaudeTelemetry(c.Request.Context())
 						h.handleFailoverExhausted(c, failoverErr, account.Platform, true)
 						return
 					}
 					action := fs.HandleFailoverError(c.Request.Context(), h.gatewayService, account.ID, account.Platform, account.GetPoolModeRetryCount(), failoverErr)
 					switch action {
 					case FailoverContinue:
+						failoverErr.AbortClaudeTelemetry()
 						// 本次尝试已确定性失败，立即释放该账号的会话注册
 						h.gatewayService.ReleaseAccountSession(context.Background(), account, sessionKey)
 						delete(sessionSlotAccounts, account.ID)
 						continue
 					case FailoverExhausted:
+						failoverErr.CompleteClaudeTelemetry(c.Request.Context())
 						h.handleFailoverExhausted(c, fs.LastFailoverErr, account.Platform, streamStarted)
 						return
 					case FailoverCanceled:
+						failoverErr.AbortClaudeTelemetry()
 						failoverClientGone(c)
 						return
 					}

@@ -130,6 +130,7 @@ code-reviews/
 AGENTS.md
 backend/cmd/server/server
 deploy/docker-compose.override.yml
+deploy/postgres18_data/
 .gocache/
 vite.config.js
 docs/*
@@ -139,6 +140,7 @@ docs/*
 !docs/ASYNC_IMAGE_TASKS.md
 !docs/BATCH_IMAGE_MVP.md
 !docs/COMPOSITE_GROUPS.md
+!docs/CLAUDE_TELEMETRY.md
 !docs/PLUGIN_DEVELOPMENT.md
 !docs/channel-monitor-v2-safe-defaults.md
 !docs/codex-credits.md
@@ -156,6 +158,9 @@ aicodex
 output/
 .codegraph/
 issues/
+captured-data/
+telemetry-batches.ndjson
+data/telemetry/
 
 # Vitest / Vite cache at repo root
 .vite/

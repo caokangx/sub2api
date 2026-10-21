@@ -1376,6 +1376,92 @@ export async function updatePanelRateLimitSettings(
   return data;
 }
 
+// ==================== Claude Telemetry Settings ====================
+
+export type ClaudeTelemetryMode = "off" | "record" | "forward" | "both";
+
+export interface ClaudeTelemetryDeliveryStatus {
+  successes: number;
+  failures: number;
+  last_success_at: string | null;
+  last_error: string;
+}
+
+export interface ClaudeTelemetryRuntimeStatus {
+  available: boolean;
+  profile: string;
+  queue_length: number;
+  queue_capacity: number;
+  dropped_events: number;
+  last_flush_at: string | null;
+  first_party: ClaudeTelemetryDeliveryStatus;
+  datadog: ClaudeTelemetryDeliveryStatus;
+}
+
+export interface ClaudeTelemetrySettings {
+  profile: string;
+  mode: ClaudeTelemetryMode;
+  setup_token_enabled: boolean;
+  record_file: string;
+  first_party: {
+    enabled: boolean;
+    url: string;
+  };
+  datadog: {
+    enabled: boolean;
+    url: string;
+    api_key?: string;
+    api_key_configured: boolean;
+    clear_api_key?: boolean;
+  };
+  batch: {
+    delay_ms: number;
+    size: number;
+    queue_size: number;
+  };
+  timeout_ms: number;
+  retry: {
+    max_attempts: number;
+    base_delay_ms: number;
+    max_delay_ms: number;
+  };
+  sampling: {
+    default_rate: number;
+    event_rates: Record<string, number>;
+  };
+  flush_on_exit: boolean;
+  runtime: ClaudeTelemetryRuntimeStatus;
+}
+
+export type UpdateClaudeTelemetrySettingsRequest = Omit<
+  ClaudeTelemetrySettings,
+  "runtime" | "profile" | "datadog"
+> & {
+  datadog: {
+    enabled: boolean;
+    url: string;
+    api_key?: string;
+    clear_api_key?: boolean;
+  };
+};
+
+export async function getClaudeTelemetrySettings(): Promise<ClaudeTelemetrySettings> {
+  const { data } = await apiClient.get<ClaudeTelemetrySettings>(
+    "/admin/settings/claude-telemetry",
+  );
+  return data;
+}
+
+export async function updateClaudeTelemetrySettings(
+  settings: UpdateClaudeTelemetrySettingsRequest,
+): Promise<ClaudeTelemetrySettings> {
+  const { data } = await apiClient.put<ClaudeTelemetrySettings>(
+    "/admin/settings/claude-telemetry",
+    settings,
+  );
+  return data;
+}
+
 // ==================== Stream Timeout Settings ====================
 
 /**
@@ -1605,6 +1691,8 @@ export const settingsAPI = {
   updateRateLimit429CooldownSettings,
   getPanelRateLimitSettings,
   updatePanelRateLimitSettings,
+  getClaudeTelemetrySettings,
+  updateClaudeTelemetrySettings,
   getStreamTimeoutSettings,
   updateStreamTimeoutSettings,
   getRectifierSettings,

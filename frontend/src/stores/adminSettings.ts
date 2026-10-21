@@ -2,6 +2,10 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { adminAPI } from '@/api'
 import type { CustomMenuItem } from '@/types'
+import type {
+  ClaudeTelemetrySettings,
+  UpdateClaudeTelemetrySettingsRequest,
+} from '@/api/admin/settings'
 
 export const useAdminSettingsStore = defineStore('adminSettings', () => {
   const loaded = ref(false)
@@ -50,6 +54,9 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
   const opsQueryModeDefault = ref(readCachedString('ops_query_mode_default_cached', 'auto'))
   const paymentEnabled = ref(readCachedBool('payment_enabled_cached', false))
   const customMenuItems = ref<CustomMenuItem[]>([])
+  const claudeTelemetry = ref<ClaudeTelemetrySettings | null>(null)
+  const claudeTelemetryLoading = ref(false)
+  const claudeTelemetrySaving = ref(false)
 
   async function fetch(force = false): Promise<void> {
     if (loaded.value && !force) return
@@ -108,6 +115,31 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
     loaded.value = true
   }
 
+  async function loadClaudeTelemetry(force = false, silent = false): Promise<ClaudeTelemetrySettings> {
+    if (claudeTelemetry.value && !force) return claudeTelemetry.value
+    if (!silent) claudeTelemetryLoading.value = true
+    try {
+      const settings = await adminAPI.settings.getClaudeTelemetrySettings()
+      claudeTelemetry.value = settings
+      return settings
+    } finally {
+      if (!silent) claudeTelemetryLoading.value = false
+    }
+  }
+
+  async function saveClaudeTelemetry(
+    settings: UpdateClaudeTelemetrySettingsRequest,
+  ): Promise<ClaudeTelemetrySettings> {
+    claudeTelemetrySaving.value = true
+    try {
+      const updated = await adminAPI.settings.updateClaudeTelemetrySettings(settings)
+      claudeTelemetry.value = updated
+      return updated
+    } finally {
+      claudeTelemetrySaving.value = false
+    }
+  }
+
   // Keep UI consistent if we learn that ops is disabled via feature-gated 404s.
   // (event is dispatched from the axios interceptor)
   let eventHandlerCleanup: (() => void) | null = null
@@ -140,10 +172,15 @@ export const useAdminSettingsStore = defineStore('adminSettings', () => {
     opsQueryModeDefault,
     paymentEnabled,
     customMenuItems,
+    claudeTelemetry,
+    claudeTelemetryLoading,
+    claudeTelemetrySaving,
     fetch,
     setOpsMonitoringEnabledLocal,
     setOpsRealtimeMonitoringEnabledLocal,
     setPaymentEnabledLocal,
-    setOpsQueryModeDefaultLocal
+    setOpsQueryModeDefaultLocal,
+    loadClaudeTelemetry,
+    saveClaudeTelemetry
   }
 })

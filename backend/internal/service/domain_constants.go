@@ -584,6 +584,9 @@ const (
 	// SettingKeyOpenAIAPIKeyHealthBreakerSettings stores the opt-in OpenAI pool API-key breaker config.
 	SettingKeyOpenAIAPIKeyHealthBreakerSettings = "openai_apikey_health_breaker_settings"
 
+	// SettingKeyClaudeTelemetrySettings stores the Claude telemetry exporter configuration as JSON.
+	SettingKeyClaudeTelemetrySettings = "claude_telemetry_settings"
+
 	// =========================
 	// Stream Timeout Handling
 	// =========================

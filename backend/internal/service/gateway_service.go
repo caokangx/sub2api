@@ -708,6 +708,8 @@ type UpstreamFailoverError struct {
 	NextAccountAction        NextAccountAction
 	ClientStatusCode         int
 	ClientMessage            string
+	claudeTelemetryAttempt   *ClaudeTelemetryAttempt
+	claudeTelemetryRequestID string
 }
 
 func (e *UpstreamFailoverError) Error() string {
@@ -805,6 +807,7 @@ type GatewayService struct {
 	tlsFPProfileService   *TLSFingerprintProfileService
 	balanceNotifyService  *BalanceNotifyService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
+	claudeTelemetry       *ClaudeTelemetryManager
 }
 
 // NewGatewayService creates a new GatewayService
@@ -837,9 +840,14 @@ func NewGatewayService(
 	compositeResolver *CompositeRouteResolver,
 	balanceNotifyService *BalanceNotifyService,
 	userPlatformQuotaRepo UserPlatformQuotaRepository,
+	claudeTelemetry ...*ClaudeTelemetryManager,
 ) *GatewayService {
 	userGroupRateTTL := resolveUserGroupRateCacheTTL(cfg)
 	modelsListTTL := resolveModelsListCacheTTL(cfg)
+	var telemetryManager *ClaudeTelemetryManager
+	if len(claudeTelemetry) > 0 {
+		telemetryManager = claudeTelemetry[0]
+	}
 
 	svc := &GatewayService{
 		accountRepo:           accountRepo,
@@ -874,6 +882,7 @@ func NewGatewayService(
 		compositeResolver:     compositeResolver,
 		balanceNotifyService:  balanceNotifyService,
 		userPlatformQuotaRepo: userPlatformQuotaRepo,
+		claudeTelemetry:       telemetryManager,
 	}
 	if compositeResolver != nil {
 		compositeResolver.SetModelOwnershipResolver(svc.resolveCompositeModelOwnership)

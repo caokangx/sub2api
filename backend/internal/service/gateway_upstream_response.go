@@ -875,6 +875,9 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 				dataLine = sseDataRe.ReplaceAllString(trimmed, "")
 			}
 		}
+		if dataLine != "" {
+			observeClaudeTelemetrySSEJSON(c, []byte(dataLine))
+		}
 
 		if eventName == "error" {
 			return nil, dataLine, nil, &sseStreamErrorEventError{RawData: dataLine}
@@ -1401,6 +1404,9 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 	body, err := ReadUpstreamResponseBody(resp.Body, s.cfg, c, anthropicTooLargeError)
 	if err != nil {
 		return nil, err
+	}
+	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+		observeClaudeTelemetryJSON(c, body)
 	}
 	observer := upstreamResponseModelObserverFromContext(c)
 	if observer == nil {
