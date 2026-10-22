@@ -1,0 +1,1823 @@
+{
+  "binary_sha256": "50a14c2f50f56668380fdda490167f1d3630d5cc18fb8aed3073c2c7ea7314fe",
+  "entries": [
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-177052691.js",
+      "module_offset": 833,
+      "file_offset": 177053524
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-177052691.js",
+      "module_offset": 919,
+      "file_offset": 177053610
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-177052691.js",
+      "module_offset": 953,
+      "file_offset": 177053644
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-177052691.js",
+      "module_offset": 1993,
+      "file_offset": 177054684
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-177052691.js",
+      "module_offset": 2079,
+      "file_offset": 177054770
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-177052691.js",
+      "module_offset": 2113,
+      "file_offset": 177054804
+    },
+    {
+      "anchor": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "module": "evidence/modules/module-177320724.js",
+      "module_offset": 12865,
+      "file_offset": 177333589
+    },
+    {
+      "anchor": "DISABLE_TELEMETRY",
+      "module": "evidence/modules/module-177320724.js",
+      "module_offset": 12947,
+      "file_offset": 177333671
+    },
+    {
+      "anchor": "DO_NOT_TRACK",
+      "module": "evidence/modules/module-177320724.js",
+      "module_offset": 13004,
+      "file_offset": 177333728
+    },
+    {
+      "anchor": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "module": "evidence/modules/module-177320724.js",
+      "module_offset": 13173,
+      "file_offset": 177333897
+    },
+    {
+      "anchor": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "module": "evidence/modules/module-177320724.js",
+      "module_offset": 13221,
+      "file_offset": 177333945
+    },
+    {
+      "anchor": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "module": "evidence/modules/module-177320724.js",
+      "module_offset": 13305,
+      "file_offset": 177334029
+    },
+    {
+      "anchor": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "module": "evidence/modules/module-177320724.js",
+      "module_offset": 13353,
+      "file_offset": 177334077
+    },
+    {
+      "anchor": "DISABLE_TELEMETRY",
+      "module": "evidence/modules/module-177320724.js",
+      "module_offset": 13410,
+      "file_offset": 177334134
+    },
+    {
+      "anchor": "DISABLE_TELEMETRY",
+      "module": "evidence/modules/module-177320724.js",
+      "module_offset": 13435,
+      "file_offset": 177334159
+    },
+    {
+      "anchor": "DO_NOT_TRACK",
+      "module": "evidence/modules/module-177320724.js",
+      "module_offset": 13472,
+      "file_offset": 177334196
+    },
+    {
+      "anchor": "DO_NOT_TRACK",
+      "module": "evidence/modules/module-177320724.js",
+      "module_offset": 13493,
+      "file_offset": 177334217
+    },
+    {
+      "anchor": "OTEL_LOG_USER_PROMPTS",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 42435,
+      "file_offset": 177688998
+    },
+    {
+      "anchor": "OTEL_LOG_ASSISTANT_RESPONSES",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 42459,
+      "file_offset": 177689022
+    },
+    {
+      "anchor": "OTEL_LOG_TOOL_CONTENT",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 42490,
+      "file_offset": 177689053
+    },
+    {
+      "anchor": "OTEL_LOG_TOOL_DETAILS",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 42514,
+      "file_offset": 177689077
+    },
+    {
+      "anchor": "OTEL_LOGS_EXPORTER",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 42566,
+      "file_offset": 177689129
+    },
+    {
+      "anchor": "BETA_TRACING_ENDPOINT",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 42618,
+      "file_offset": 177689181
+    },
+    {
+      "anchor": "OTEL_LOGS_EXPORTER",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 42646,
+      "file_offset": 177689209
+    },
+    {
+      "anchor": "CLAUDE_CODE_ENABLE_TELEMETRY",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44167,
+      "file_offset": 177690730
+    },
+    {
+      "anchor": "OTEL_LOGS_EXPORTER",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44198,
+      "file_offset": 177690761
+    },
+    {
+      "anchor": "OTEL_METRICS_EXPORTER",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44219,
+      "file_offset": 177690782
+    },
+    {
+      "anchor": "OTEL_TRACES_EXPORTER",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44243,
+      "file_offset": 177690806
+    },
+    {
+      "anchor": "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44266,
+      "file_offset": 177690829
+    },
+    {
+      "anchor": "ENABLE_ENHANCED_TELEMETRY_BETA",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44304,
+      "file_offset": 177690867
+    },
+    {
+      "anchor": "OTEL_LOG_USER_PROMPTS",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44337,
+      "file_offset": 177690900
+    },
+    {
+      "anchor": "OTEL_LOG_ASSISTANT_RESPONSES",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44361,
+      "file_offset": 177690924
+    },
+    {
+      "anchor": "OTEL_LOG_TOOL_CONTENT",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44392,
+      "file_offset": 177690955
+    },
+    {
+      "anchor": "OTEL_LOG_TOOL_DETAILS",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44416,
+      "file_offset": 177690979
+    },
+    {
+      "anchor": "OTEL_LOG_USER_PROMPTS",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44481,
+      "file_offset": 177691044
+    },
+    {
+      "anchor": "OTEL_LOG_TOOL_CONTENT",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44505,
+      "file_offset": 177691068
+    },
+    {
+      "anchor": "OTEL_LOG_TOOL_DETAILS",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44529,
+      "file_offset": 177691092
+    },
+    {
+      "anchor": "OTEL_LOGS_EXPORTER",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44567,
+      "file_offset": 177691130
+    },
+    {
+      "anchor": "OTEL_METRICS_EXPORTER",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44588,
+      "file_offset": 177691151
+    },
+    {
+      "anchor": "OTEL_TRACES_EXPORTER",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 44612,
+      "file_offset": 177691175
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 49778,
+      "file_offset": 177696341
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 50934,
+      "file_offset": 177697497
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 51059,
+      "file_offset": 177697622
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 51157,
+      "file_offset": 177697720
+    },
+    {
+      "anchor": "CLAUDE_CODE_ENABLE_TELEMETRY",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 53603,
+      "file_offset": 177700166
+    },
+    {
+      "anchor": "OTEL_LOG_ASSISTANT_RESPONSES",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 55026,
+      "file_offset": 177701589
+    },
+    {
+      "anchor": "OTEL_LOG_TOOL_CONTENT",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 55057,
+      "file_offset": 177701620
+    },
+    {
+      "anchor": "OTEL_LOG_TOOL_DETAILS",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 55081,
+      "file_offset": 177701644
+    },
+    {
+      "anchor": "OTEL_LOG_USER_PROMPTS",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 55105,
+      "file_offset": 177701668
+    },
+    {
+      "anchor": "OTEL_LOGS_EXPORTER",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 55157,
+      "file_offset": 177701720
+    },
+    {
+      "anchor": "OTEL_METRICS_EXPORTER",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 55208,
+      "file_offset": 177701771
+    },
+    {
+      "anchor": "OTEL_TRACES_EXPORTER",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 55521,
+      "file_offset": 177702084
+    },
+    {
+      "anchor": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 59127,
+      "file_offset": 177705690
+    },
+    {
+      "anchor": "DISABLE_TELEMETRY",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 59196,
+      "file_offset": 177705759
+    },
+    {
+      "anchor": "DO_NOT_TRACK",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 59216,
+      "file_offset": 177705779
+    },
+    {
+      "anchor": "CLAUDE_CODE_ENHANCED_TELEMETRY_BETA",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 315107,
+      "file_offset": 177961670
+    },
+    {
+      "anchor": "ENABLE_ENHANCED_TELEMETRY_BETA",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 315145,
+      "file_offset": 177961708
+    },
+    {
+      "anchor": "CLAUDE_CODE_CUSTOM_OAUTH_URL",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 329065,
+      "file_offset": 177975628
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-177646563.js",
+      "module_offset": 329767,
+      "file_offset": 177976330
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-178452600.js",
+      "module_offset": 820,
+      "file_offset": 178453420
+    },
+    {
+      "anchor": "CLAUDE_CODE_CUSTOM_OAUTH_URL",
+      "module": "evidence/modules/module-178452600.js",
+      "module_offset": 998,
+      "file_offset": 178453598
+    },
+    {
+      "anchor": "function Kg()",
+      "module": "evidence/modules/module-178452600.js",
+      "module_offset": 1036,
+      "file_offset": 178453636
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 15060,
+      "file_offset": 179807768
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 72512,
+      "file_offset": 179865220
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 72598,
+      "file_offset": 179865306
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 72632,
+      "file_offset": 179865340
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 73384,
+      "file_offset": 179866092
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 73470,
+      "file_offset": 179866178
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 73504,
+      "file_offset": 179866212
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 106982,
+      "file_offset": 179899690
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 107068,
+      "file_offset": 179899776
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 107102,
+      "file_offset": 179899810
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 146081,
+      "file_offset": 179938789
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 147356,
+      "file_offset": 179940064
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 147381,
+      "file_offset": 179940089
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 147422,
+      "file_offset": 179940130
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 149976,
+      "file_offset": 179942684
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 150007,
+      "file_offset": 179942715
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 150029,
+      "file_offset": 179942737
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 152187,
+      "file_offset": 179944895
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 152209,
+      "file_offset": 179944917
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 197189,
+      "file_offset": 179989897
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 197211,
+      "file_offset": 179989919
+    },
+    {
+      "anchor": "ClaudeCodeInternalEvent",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 198080,
+      "file_offset": 179990788
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 198136,
+      "file_offset": 179990844
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 198167,
+      "file_offset": 179990875
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 198192,
+      "file_offset": 179990900
+    },
+    {
+      "anchor": "GrowthbookExperimentEvent",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 198254,
+      "file_offset": 179990962
+    },
+    {
+      "anchor": "CLAUDE_CODE_CUSTOM_OAUTH_URL",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 371264,
+      "file_offset": 180163972
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 395203,
+      "file_offset": 180187911
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 395289,
+      "file_offset": 180187997
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 395323,
+      "file_offset": 180188031
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 403136,
+      "file_offset": 180195844
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 403222,
+      "file_offset": 180195930
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 403256,
+      "file_offset": 180195964
+    },
+    {
+      "anchor": "OTEL_LOG_TOOL_DETAILS",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 407387,
+      "file_offset": 180200095
+    },
+    {
+      "anchor": "OTEL_LOG_TOOL_CONTENT",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 408549,
+      "file_offset": 180201257
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 416022,
+      "file_offset": 180208730
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 416108,
+      "file_offset": 180208816
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 416142,
+      "file_offset": 180208850
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 417611,
+      "file_offset": 180210319
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 417697,
+      "file_offset": 180210405
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 417731,
+      "file_offset": 180210439
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 418117,
+      "file_offset": 180210825
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 418203,
+      "file_offset": 180210911
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 418237,
+      "file_offset": 180210945
+    },
+    {
+      "anchor": "1p_failed_events",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 423908,
+      "file_offset": 180216616
+    },
+    {
+      "anchor": "/api/event_logging/v2/batch",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 424820,
+      "file_offset": 180217528
+    },
+    {
+      "anchor": "retryPreviousBatches",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 425459,
+      "file_offset": 180218167
+    },
+    {
+      "anchor": "retryPreviousBatches",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 427628,
+      "file_offset": 180220336
+    },
+    {
+      "anchor": "retryPreviousBatches",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 427705,
+      "file_offset": 180220413
+    },
+    {
+      "anchor": "retryPreviousBatches",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 428368,
+      "file_offset": 180221076
+    },
+    {
+      "anchor": "transformLogsToEvents",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 430591,
+      "file_offset": 180223299
+    },
+    {
+      "anchor": "transformLogsToEvents",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 436412,
+      "file_offset": 180229120
+    },
+    {
+      "anchor": "ClaudeCodeInternalEvent",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 436517,
+      "file_offset": 180229225
+    },
+    {
+      "anchor": "GrowthbookExperimentEvent",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 436605,
+      "file_offset": 180229313
+    },
+    {
+      "anchor": "GrowthbookExperimentEvent",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 436725,
+      "file_offset": 180229433
+    },
+    {
+      "anchor": "core_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 437179,
+      "file_offset": 180229887
+    },
+    {
+      "anchor": "user_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 437195,
+      "file_offset": 180229903
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 437340,
+      "file_offset": 180230048
+    },
+    {
+      "anchor": "core_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 437392,
+      "file_offset": 180230100
+    },
+    {
+      "anchor": "additional_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 437973,
+      "file_offset": 180230681
+    },
+    {
+      "anchor": "tengu_frond_boric",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 439340,
+      "file_offset": 180232048
+    },
+    {
+      "anchor": "tengu_event_sampling_config",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 439410,
+      "file_offset": 180232118
+    },
+    {
+      "anchor": "tengu_1p_event_batch_config",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 439663,
+      "file_offset": 180232371
+    },
+    {
+      "anchor": "core_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 440412,
+      "file_offset": 180233120
+    },
+    {
+      "anchor": "user_metadata",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 440428,
+      "file_offset": 180233136
+    },
+    {
+      "anchor": "GrowthbookExperimentEvent",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 441259,
+      "file_offset": 180233967
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 442367,
+      "file_offset": 180235075
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 442453,
+      "file_offset": 180235161
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 442487,
+      "file_offset": 180235195
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 443431,
+      "file_offset": 180236139
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 443517,
+      "file_offset": 180236225
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 443551,
+      "file_offset": 180236259
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 518073,
+      "file_offset": 180310781
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 518159,
+      "file_offset": 180310867
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 518193,
+      "file_offset": 180310901
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 550518,
+      "file_offset": 180343226
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 555479,
+      "file_offset": 180348187
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 557500,
+      "file_offset": 180350208
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 573562,
+      "file_offset": 180366270
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 573648,
+      "file_offset": 180366356
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 573682,
+      "file_offset": 180366390
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 575316,
+      "file_offset": 180368024
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 575402,
+      "file_offset": 180368110
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 575436,
+      "file_offset": 180368144
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 577991,
+      "file_offset": 180370699
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 578077,
+      "file_offset": 180370785
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 578111,
+      "file_offset": 180370819
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 582688,
+      "file_offset": 180375396
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 582774,
+      "file_offset": 180375482
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 582808,
+      "file_offset": 180375516
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 626199,
+      "file_offset": 180418907
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-179792708.js",
+      "module_offset": 629079,
+      "file_offset": 180421787
+    },
+    {
+      "anchor": "logEvent reentered while collecting metadata",
+      "module": "evidence/modules/module-180680008.js",
+      "module_offset": 1125,
+      "file_offset": 180681133
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-182661555.js",
+      "module_offset": 4216,
+      "file_offset": 182665771
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-182661555.js",
+      "module_offset": 5873,
+      "file_offset": 182667428
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-182661555.js",
+      "module_offset": 5959,
+      "file_offset": 182667514
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-182661555.js",
+      "module_offset": 5993,
+      "file_offset": 182667548
+    },
+    {
+      "anchor": "OTEL_LOG_USER_PROMPTS",
+      "module": "evidence/modules/module-182661555.js",
+      "module_offset": 8958,
+      "file_offset": 182670513
+    },
+    {
+      "anchor": "OTEL_LOG_ASSISTANT_RESPONSES",
+      "module": "evidence/modules/module-182661555.js",
+      "module_offset": 9047,
+      "file_offset": 182670602
+    },
+    {
+      "anchor": "OTEL_LOG_USER_PROMPTS",
+      "module": "evidence/modules/module-182661555.js",
+      "module_offset": 9079,
+      "file_offset": 182670634
+    },
+    {
+      "anchor": "event.name",
+      "module": "evidence/modules/module-182661555.js",
+      "module_offset": 9421,
+      "file_offset": 182670976
+    },
+    {
+      "anchor": "event.sequence",
+      "module": "evidence/modules/module-182661555.js",
+      "module_offset": 9479,
+      "file_offset": 182671034
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 32264,
+      "file_offset": 184871584
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 32350,
+      "file_offset": 184871670
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 32384,
+      "file_offset": 184871704
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 32738,
+      "file_offset": 184872058
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 32824,
+      "file_offset": 184872144
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 32858,
+      "file_offset": 184872178
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 33025,
+      "file_offset": 184872345
+    },
+    {
+      "anchor": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 268933,
+      "file_offset": 185108253
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 316337,
+      "file_offset": 185155657
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 316423,
+      "file_offset": 185155743
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 316457,
+      "file_offset": 185155777
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 774170,
+      "file_offset": 185613490
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 785677,
+      "file_offset": 185624997
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 785763,
+      "file_offset": 185625083
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 785797,
+      "file_offset": 185625117
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 786151,
+      "file_offset": 185625471
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 786237,
+      "file_offset": 185625557
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 786271,
+      "file_offset": 185625591
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 786438,
+      "file_offset": 185625758
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 925572,
+      "file_offset": 185764892
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 925658,
+      "file_offset": 185764978
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 925692,
+      "file_offset": 185765012
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1199018,
+      "file_offset": 186038338
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1199104,
+      "file_offset": 186038424
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1199138,
+      "file_offset": 186038458
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1205798,
+      "file_offset": 186045118
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1205884,
+      "file_offset": 186045204
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1205918,
+      "file_offset": 186045238
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1206319,
+      "file_offset": 186045639
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1206405,
+      "file_offset": 186045725
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1206439,
+      "file_offset": 186045759
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1216723,
+      "file_offset": 186056043
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1216809,
+      "file_offset": 186056129
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1216843,
+      "file_offset": 186056163
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1217215,
+      "file_offset": 186056535
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1217301,
+      "file_offset": 186056621
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1217335,
+      "file_offset": 186056655
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1292034,
+      "file_offset": 186131354
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1381066,
+      "file_offset": 186220386
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1381152,
+      "file_offset": 186220472
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1381186,
+      "file_offset": 186220506
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1433749,
+      "file_offset": 186273069
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1433835,
+      "file_offset": 186273155
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1433869,
+      "file_offset": 186273189
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1598709,
+      "file_offset": 186438029
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1598795,
+      "file_offset": 186438115
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1598829,
+      "file_offset": 186438149
+    },
+    {
+      "anchor": "tengu_api_success",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1603758,
+      "file_offset": 186443078
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1725547,
+      "file_offset": 186564867
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1725633,
+      "file_offset": 186564953
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1725667,
+      "file_offset": 186564987
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1849507,
+      "file_offset": 186688827
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1849593,
+      "file_offset": 186688913
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1849627,
+      "file_offset": 186688947
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1849981,
+      "file_offset": 186689301
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1850067,
+      "file_offset": 186689387
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1850101,
+      "file_offset": 186689421
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1850268,
+      "file_offset": 186689588
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1888341,
+      "file_offset": 186727661
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1888427,
+      "file_offset": 186727747
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1888461,
+      "file_offset": 186727781
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1888844,
+      "file_offset": 186728164
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1888930,
+      "file_offset": 186728250
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1888964,
+      "file_offset": 186728284
+    },
+    {
+      "anchor": "tengu_api_error",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1892198,
+      "file_offset": 186731518
+    },
+    {
+      "anchor": "tengu_api_success",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1898325,
+      "file_offset": 186737645
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1943856,
+      "file_offset": 186783176
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 1949162,
+      "file_offset": 186788482
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3057877,
+      "file_offset": 187897197
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3057963,
+      "file_offset": 187897283
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3057997,
+      "file_offset": 187897317
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3058389,
+      "file_offset": 187897709
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3058475,
+      "file_offset": 187897795
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3058509,
+      "file_offset": 187897829
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3058885,
+      "file_offset": 187898205
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3058971,
+      "file_offset": 187898291
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3059005,
+      "file_offset": 187898325
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3117877,
+      "file_offset": 187957197
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3117963,
+      "file_offset": 187957283
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3117997,
+      "file_offset": 187957317
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3542055,
+      "file_offset": 188381375
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3542141,
+      "file_offset": 188381461
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3542175,
+      "file_offset": 188381495
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3916668,
+      "file_offset": 188755988
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3916754,
+      "file_offset": 188756074
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3916788,
+      "file_offset": 188756108
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3917142,
+      "file_offset": 188756462
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3917228,
+      "file_offset": 188756548
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3917262,
+      "file_offset": 188756582
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-184839320.js",
+      "module_offset": 3917429,
+      "file_offset": 188756749
+    },
+    {
+      "anchor": "/api/claude_code/metrics",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 25222,
+      "file_offset": 209496596
+    },
+    {
+      "anchor": "metrics_enabled",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 26318,
+      "file_offset": 209497692
+    },
+    {
+      "anchor": "transformMetricsForInternal",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 26864,
+      "file_offset": 209498238
+    },
+    {
+      "anchor": "transformMetricsForInternal",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 28891,
+      "file_offset": 209500265
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 33825,
+      "file_offset": 209505199
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 33911,
+      "file_offset": 209505285
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 33945,
+      "file_offset": 209505319
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 35213,
+      "file_offset": 209506587
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 35299,
+      "file_offset": 209506673
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 35333,
+      "file_offset": 209506707
+    },
+    {
+      "anchor": "BETA_TRACING_ENDPOINT",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 35826,
+      "file_offset": 209507200
+    },
+    {
+      "anchor": "OTEL_METRICS_EXPORTER",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 38006,
+      "file_offset": 209509380
+    },
+    {
+      "anchor": "OTEL_LOGS_EXPORTER",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 38226,
+      "file_offset": 209509600
+    },
+    {
+      "anchor": "OTEL_LOGS_EXPORTER",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 39074,
+      "file_offset": 209510448
+    },
+    {
+      "anchor": "OTEL_TRACES_EXPORTER",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 39167,
+      "file_offset": 209510541
+    },
+    {
+      "anchor": "OTEL_TRACES_EXPORTER",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 39947,
+      "file_offset": 209511321
+    },
+    {
+      "anchor": "CLAUDE_CODE_ENABLE_TELEMETRY",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 40049,
+      "file_offset": 209511423
+    },
+    {
+      "anchor": "OTEL_METRICS_EXPORTER",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 40514,
+      "file_offset": 209511888
+    },
+    {
+      "anchor": "OTEL_LOGS_EXPORTER",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 40538,
+      "file_offset": 209511912
+    },
+    {
+      "anchor": "OTEL_TRACES_EXPORTER",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 40559,
+      "file_offset": 209511933
+    },
+    {
+      "anchor": "OTEL_METRICS_EXPORTER",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 40836,
+      "file_offset": 209512210
+    },
+    {
+      "anchor": "CLAUDE_CODE_ENABLE_TELEMETRY",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 40908,
+      "file_offset": 209512282
+    },
+    {
+      "anchor": "CLAUDE_CODE_ENABLE_TELEMETRY",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 40951,
+      "file_offset": 209512325
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 41688,
+      "file_offset": 209513062
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 41774,
+      "file_offset": 209513148
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 41808,
+      "file_offset": 209513182
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 42559,
+      "file_offset": 209513933
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 42645,
+      "file_offset": 209514019
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 42679,
+      "file_offset": 209514053
+    },
+    {
+      "anchor": "CLAUDE_CODE_ENABLE_TELEMETRY",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 44055,
+      "file_offset": 209515429
+    },
+    {
+      "anchor": "VERSION:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 44376,
+      "file_offset": 209515750
+    },
+    {
+      "anchor": "BUILD_TIME:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 44462,
+      "file_offset": 209515836
+    },
+    {
+      "anchor": "GIT_SHA:",
+      "module": "evidence/modules/module-209471374.js",
+      "module_offset": 44496,
+      "file_offset": 209515870
+    },
+    {
+      "anchor": "CLAUDE_CODE_CUSTOM_OAUTH_URL",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 3673,
+      "file_offset": 209842637
+    },
+    {
+      "anchor": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 3704,
+      "file_offset": 209842668
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 3800,
+      "file_offset": 209842764
+    },
+    {
+      "anchor": "DISABLE_TELEMETRY",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 4465,
+      "file_offset": 209843429
+    },
+    {
+      "anchor": "DO_NOT_TRACK",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 4485,
+      "file_offset": 209843449
+    },
+    {
+      "anchor": "ClaudeCodeInternalEvent",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 8320,
+      "file_offset": 209847284
+    },
+    {
+      "anchor": "snake_case token",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 9427,
+      "file_offset": 209848391
+    },
+    {
+      "anchor": "snake_case token",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 9723,
+      "file_offset": 209848687
+    },
+    {
+      "anchor": "snake_case token",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 10181,
+      "file_offset": 209849145
+    },
+    {
+      "anchor": "snake_case token",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 10462,
+      "file_offset": 209849426
+    },
+    {
+      "anchor": "/api/event_logging/v2/batch",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 10577,
+      "file_offset": 209849541
+    },
+    {
+      "anchor": "DISABLE_TELEMETRY",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 22894,
+      "file_offset": 209861858
+    },
+    {
+      "anchor": "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 22958,
+      "file_offset": 209861922
+    },
+    {
+      "anchor": "DO_NOT_TRACK",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 23029,
+      "file_offset": 209861993
+    },
+    {
+      "anchor": "CLAUDE_CODE_CUSTOM_OAUTH_URL",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 23076,
+      "file_offset": 209862040
+    },
+    {
+      "anchor": "CLAUDE_CODE_PROVIDER_MANAGED_BY_HOST",
+      "module": "evidence/modules/module-209838964.js",
+      "module_offset": 23200,
+      "file_offset": 209862164
+    }
+  ]
+}

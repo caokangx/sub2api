@@ -77,8 +77,9 @@ type Group struct {
 	ModelPricing              []ChannelModelPricing
 
 	// Claude Code 客户端限制
-	ClaudeCodeOnly  bool
-	FallbackGroupID *int64
+	ClaudeCodeOnly         bool
+	ForceClaudeCodeProfile bool
+	FallbackGroupID        *int64
 	// 无效请求兜底分组（仅 anthropic 平台使用）
 	FallbackGroupIDOnInvalidRequest *int64
 

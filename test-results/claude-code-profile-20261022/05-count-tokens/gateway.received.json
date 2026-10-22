@@ -1,0 +1,49 @@
+{
+  "captured_at": "2026-10-22 17:55:52.269",
+  "tag": "CLIENT_ORIGINAL_COUNT_TOKENS",
+  "context": {
+    "account": "2224(local-claude-profile-capture)",
+    "account_type": "oauth",
+    "model": "claude-sonnet-4-6"
+  },
+  "headers": {
+    "Anthropic-Version": "2023-06-01",
+    "User-Agent": "profile-smoke/1.0",
+    "Content-Type": "application/json",
+    "X-Client-Request-Id": "profile-test-05-count-tokens",
+    "Accept-Encoding": "identity",
+    "Content-Length": "484",
+    "X-Api-Key": "[redacted]",
+    "Connection": "close"
+  },
+  "body": {
+    "model": "claude-sonnet-4-6",
+    "max_tokens": 16,
+    "stream": false,
+    "system": "PROFILE_TEST_CALLER_SYSTEM_MUST_DISAPPEAR",
+    "tools": [
+      {
+        "name": "caller_private_tool",
+        "description": "PROFILE_TEST_CALLER_TOOL_MUST_DISAPPEAR",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "tool_choice": {
+      "type": "tool",
+      "name": "caller_private_tool"
+    },
+    "messages": [
+      {
+        "role": "user",
+        "content": "PROFILE_TEST_USER_MESSAGE_MUST_REMAIN. Reply OK. Case: 05-count-tokens"
+      }
+    ]
+  }
+}

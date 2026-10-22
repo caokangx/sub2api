@@ -1,0 +1,32 @@
+[
+  {
+    "name": "01-string-system",
+    "path": "/v1/messages",
+    "user_agent": "profile-smoke/1.0"
+  },
+  {
+    "name": "02-block-system-history",
+    "path": "/v1/messages",
+    "user_agent": "profile-smoke/1.0"
+  },
+  {
+    "name": "03-no-system-no-tools",
+    "path": "/v1/messages",
+    "user_agent": "profile-smoke/1.0"
+  },
+  {
+    "name": "04-claude-client",
+    "path": "/v1/messages",
+    "user_agent": "claude-cli/2.1.284 (external, cli)"
+  },
+  {
+    "name": "05-count-tokens",
+    "path": "/v1/messages/count_tokens",
+    "user_agent": "profile-smoke/1.0"
+  },
+  {
+    "name": "06-fable",
+    "path": "/v1/messages",
+    "user_agent": "profile-smoke/1.0"
+  }
+]

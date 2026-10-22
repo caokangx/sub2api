@@ -1,0 +1,65 @@
+{
+  "model": "claude-sonnet-4-6",
+  "max_tokens": 16,
+  "stream": false,
+  "system": [
+    {
+      "type": "text",
+      "text": "PROFILE_TEST_CALLER_BLOCK_1_MUST_DISAPPEAR",
+      "cache_control": {
+        "type": "ephemeral"
+      }
+    },
+    {
+      "type": "text",
+      "text": "PROFILE_TEST_CALLER_BLOCK_2_MUST_DISAPPEAR"
+    }
+  ],
+  "tools": [
+    {
+      "name": "caller_private_tool",
+      "description": "PROFILE_TEST_CALLER_TOOL_MUST_DISAPPEAR",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "tool_choice": {
+    "type": "tool",
+    "name": "caller_private_tool"
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "PROFILE_TEST_USER_MESSAGE_MUST_REMAIN. Reply OK. Case: 02-block-system-history"
+    },
+    {
+      "role": "assistant",
+      "content": [
+        {
+          "type": "tool_use",
+          "id": "profile_tool_1",
+          "name": "caller_private_tool",
+          "input": {
+            "value": "history"
+          }
+        }
+      ]
+    },
+    {
+      "role": "user",
+      "content": [
+        {
+          "type": "tool_result",
+          "tool_use_id": "profile_tool_1",
+          "content": "PROFILE_TEST_TOOL_RESULT_MUST_REMAIN"
+        }
+      ]
+    }
+  ]
+}

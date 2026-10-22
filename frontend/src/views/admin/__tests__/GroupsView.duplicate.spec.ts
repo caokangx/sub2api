@@ -108,6 +108,7 @@ const sourceGroup: AdminGroup = {
   peak_end: '',
   peak_rate_multiplier: 1,
   claude_code_only: false,
+  force_claude_code_profile: false,
   fallback_group_id: null,
   fallback_group_id_on_invalid_request: null,
   allow_messages_dispatch: false,
@@ -176,6 +177,23 @@ function mountView() {
 }
 
 describe('GroupsView duplicate action', () => {
+  it('loads and saves the Anthropic Claude Code profile policy', async () => {
+    const group = { ...sourceGroup, platform: 'anthropic', force_claude_code_profile: true }
+    listGroups.mockResolvedValue({ items: [group], total: 1, page: 1, page_size: 20, pages: 1 })
+    updateGroup.mockResolvedValue(group)
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.findAll('button').find(button => button.text() === 'common.edit')!.trigger('click')
+    await flushPromises()
+    const toggle = wrapper.get('[data-testid="edit-claude-code-profile-toggle"]')
+    expect(toggle.attributes('aria-checked')).toBe('true')
+    await toggle.trigger('click')
+    await wrapper.get('#edit-group-form').trigger('submit')
+    await flushPromises()
+    expect(updateGroup).toHaveBeenCalledWith(42, expect.objectContaining({ force_claude_code_profile: false }))
+    wrapper.unmount()
+  })
+
   beforeEach(() => {
     authState.isSimpleMode = false
     localStorage.clear()

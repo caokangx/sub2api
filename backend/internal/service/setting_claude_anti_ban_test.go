@@ -16,7 +16,7 @@ func TestClaudeAntiBanSettingsDefaultsAndSave(t *testing.T) {
 	initial, err := settings.GetClaudeAntiBanSettings(ctx)
 	require.NoError(t, err)
 	require.True(t, initial.ProbeInterceptionEnabled)
-	require.Equal(t, ClaudeEnvironmentModeOff, initial.Environment.Mode)
+	require.Equal(t, ClaudeEnvironmentModeRewrite, initial.Environment.Mode)
 	require.Equal(t, "darwin", initial.Environment.Profile.Platform)
 	require.Equal(t, "/Users/developer/project", initial.Environment.Profile.WorkingDirectory)
 	require.NotNil(t, initial.Environment.Profile.AdditionalWorkingDirectories)

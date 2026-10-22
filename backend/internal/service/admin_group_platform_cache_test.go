@@ -85,3 +85,19 @@ func TestUpdateGroupWithoutChannelCacheInvalidator(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, PlatformOpenAI, got.Platform)
 }
+
+func TestClaudeCodeProfileGroupUpdate(t *testing.T) {
+	for _, platform := range []string{PlatformAnthropic, PlatformOpenAI} {
+		t.Run(platform, func(t *testing.T) {
+			repo := &groupPlatformRepoStub{group: &Group{ID: 7, Name: "g", Platform: PlatformAnthropic, ForceClaudeCodeProfile: true}}
+			svc := &adminServiceImpl{groupRepo: repo}
+			got, err := svc.UpdateGroup(context.Background(), 7, &UpdateGroupInput{Platform: platform})
+			require.NoError(t, err)
+			require.Equal(t, platform == PlatformAnthropic, got.ForceClaudeCodeProfile)
+			value := false
+			got, err = svc.UpdateGroup(context.Background(), 7, &UpdateGroupInput{ForceClaudeCodeProfile: &value})
+			require.NoError(t, err)
+			require.False(t, got.ForceClaudeCodeProfile)
+		})
+	}
+}

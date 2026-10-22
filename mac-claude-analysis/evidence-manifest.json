@@ -1,0 +1,141 @@
+{
+  "analysis": {
+    "method": "Static extraction of NUL-delimited UTF-8 modules from Mach-O __BUN,__bun; executable not launched",
+    "generated_at": "2026-10-15T09:05:15.213738+00:00"
+  },
+  "binary": {
+    "path": "/Users/yikangcao/.local/share/claude/versions/2.1.284",
+    "size": 226563088,
+    "sha256": "50a14c2f50f56668380fdda490167f1d3630d5cc18fb8aed3073c2c7ea7314fe",
+    "cpu_type": 16777228,
+    "architecture": "arm64",
+    "code_signature": {
+      "Identifier": "com.anthropic.claude-code",
+      "CDHash": "3cefc7cf7812320eda7674f06af0a9d9f215309d",
+      "Timestamp": "Sep 28, 2026 at 10:29:41",
+      "TeamIdentifier": "Q6L2SF6YDW",
+      "Runtime Version": "26.5.0",
+      "Authorities": "Developer ID Application: Anthropic PBC (Q6L2SF6YDW) | Developer ID Certification Authority | Apple Root CA",
+      "Verification": "valid on disk; satisfies designated requirement"
+    },
+    "version": "2.1.284",
+    "build_time": "2026-09-28T02:26:10Z",
+    "git_sha": "2b8ce618c24de26410e4bdfc4e1d592accd61f61",
+    "source_map_group": "darwin"
+  },
+  "container": {
+    "format": "Mach-O 64-bit",
+    "source_section": "__BUN,__bun",
+    "section_file_offset": 68206592,
+    "section_size": 157689482,
+    "source_module_count": 2167
+  },
+  "whole_binary_searches": {
+    "accepted_count": 0,
+    "empty_log_success": 1
+  },
+  "modules": [
+    {
+      "file": "evidence/modules/module-177052691.js",
+      "file_offset_start": 177052691,
+      "file_offset_end": 177055203,
+      "length": 2512,
+      "sha256": "25c4de4d2a837e360b5095c47c5d205c97606df3f9db306680a15013a945d13b",
+      "roles": [
+        "build_metadata"
+      ]
+    },
+    {
+      "file": "evidence/modules/module-177320724.js",
+      "file_offset_start": 177320724,
+      "file_offset_end": 177340182,
+      "length": 19458,
+      "sha256": "fc5b7b3ae8e9e81393ffcf8dea04ebdb2e20e01317a83c035190834b2d15d04c",
+      "roles": [
+        "traffic_opt_out"
+      ]
+    },
+    {
+      "file": "evidence/modules/module-177646563.js",
+      "file_offset_start": 177646563,
+      "file_offset_end": 178066917,
+      "length": 420354,
+      "sha256": "2cb5a6382a8f29e3730ea7c1a60a544872c151cb915e1d61302bf13552bb99e4",
+      "roles": [
+        "otel_configuration",
+        "runtime_environment_schema"
+      ]
+    },
+    {
+      "file": "evidence/modules/module-178452600.js",
+      "file_offset_start": 178452600,
+      "file_offset_end": 178454613,
+      "length": 2013,
+      "sha256": "19feb0e0a2f301c89d9a0d5c7c550b8c68e72f711658594ccc23f680891226ac",
+      "roles": [
+        "internal_event_gating"
+      ]
+    },
+    {
+      "file": "evidence/modules/module-179792708.js",
+      "file_offset_start": 179792708,
+      "file_offset_end": 180441174,
+      "length": 648466,
+      "sha256": "ddc347363f419967b008c7e5c5001c674f1417bbbb26a74c0b4b5225dada55bb",
+      "roles": [
+        "internal_events"
+      ]
+    },
+    {
+      "file": "evidence/modules/module-180680008.js",
+      "file_offset_start": 180680008,
+      "file_offset_end": 180681755,
+      "length": 1747,
+      "sha256": "82542f7ae141bd93c14d90f4461047917a3c37e27a8b44564922911b99a4467b",
+      "roles": [
+        "event_sampling_wrapper"
+      ]
+    },
+    {
+      "file": "evidence/modules/module-182661555.js",
+      "file_offset_start": 182661555,
+      "file_offset_end": 182673608,
+      "length": 12053,
+      "sha256": "317972255f973eba65ed2620441a206627b67e3cf51bb8f46d4267c84cf3cf22",
+      "roles": [
+        "otel_log_records"
+      ]
+    },
+    {
+      "file": "evidence/modules/module-184839320.js",
+      "file_offset_start": 184839320,
+      "file_offset_end": 188971770,
+      "length": 4132450,
+      "sha256": "6f347ce8a2b23dc0ca9f5ad676263e0e582bf4c8e8b0a243b23165e5d73adb25",
+      "roles": [
+        "api_event_call_sites"
+      ]
+    },
+    {
+      "file": "evidence/modules/module-209471374.js",
+      "file_offset_start": 209471374,
+      "file_offset_end": 209522736,
+      "length": 51362,
+      "sha256": "343e6df3a52b10d28fd4456910c89845e9e7cadff51de442d00563b6663b3351",
+      "roles": [
+        "internal_metrics",
+        "otel_configuration"
+      ]
+    },
+    {
+      "file": "evidence/modules/module-209838964.js",
+      "file_offset_start": 209838964,
+      "file_offset_end": 209868335,
+      "length": 29371,
+      "sha256": "2a032666d8f4783fade768257421b85abca50ab125e4f8b9ca917bc13a2ddd00",
+      "roles": [
+        "plugin_telemetry"
+      ]
+    }
+  ]
+}

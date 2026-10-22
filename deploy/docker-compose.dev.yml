@@ -125,12 +125,14 @@ services:
     container_name: sub2api-postgres-dev
     restart: unless-stopped
     volumes:
-      - ./postgres_data:/var/lib/postgresql/data:Z
+      # Keep using the existing PostgreSQL 18 cluster created by the previous
+      # local development environment.
+      - ./postgres18_data:/var/lib/postgresql:Z
     environment:
       - POSTGRES_USER=${POSTGRES_USER:-sub2api}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
       - POSTGRES_DB=${POSTGRES_DB:-sub2api}
-      - PGDATA=/var/lib/postgresql/data
+      - PGDATA=/var/lib/postgresql/18/docker
       - TZ=${TZ:-Asia/Shanghai}
     networks:
       - sub2api-network

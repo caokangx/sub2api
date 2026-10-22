@@ -78,7 +78,19 @@ func claudeSafeguardsFromContext(ctx context.Context) json.RawMessage {
 		return nil
 	}
 	value, _ := ctx.Value(claudePreprocessContextKey{}).(claudePreprocessContext)
-	return append(json.RawMessage(nil), value.Safeguards...)
+	safeguards := append(json.RawMessage(nil), value.Safeguards...)
+	if profile, ok := ctx.Value(claudeCodeProfileEnvironmentKey{}).(*ClaudeEnvironmentProfile); ok && profile != nil && len(safeguards) > 0 {
+		var decoded any
+		if json.Unmarshal(safeguards, &decoded) == nil {
+			wrapper := map[string]any{"safeguards": decoded}
+			if rewriteSafeguardEnvironment(wrapper, *profile) {
+				if encoded, err := json.Marshal(wrapper["safeguards"]); err == nil {
+					return encoded
+				}
+			}
+		}
+	}
+	return safeguards
 }
 
 func claudeTelemetryBodyFromContext(ctx context.Context, wireBody []byte) []byte {
@@ -102,6 +114,12 @@ func claudeTelemetryBodyFromContext(ctx context.Context, wireBody []byte) []byte
 func claudeEnvironmentProfileFromContext(ctx context.Context) *ClaudeEnvironmentProfile {
 	if ctx == nil {
 		return nil
+	}
+	if forced, ok := ctx.Value(claudeCodeProfileEnvironmentKey{}).(*ClaudeEnvironmentProfile); ok && forced != nil {
+		profile := *forced
+		profile.AdditionalWorkingDirectories = append([]string(nil), forced.AdditionalWorkingDirectories...)
+		profile.RecentCommits = append([]string(nil), forced.RecentCommits...)
+		return &profile
 	}
 	value, _ := ctx.Value(claudePreprocessContextKey{}).(claudePreprocessContext)
 	if value.Environment == nil {

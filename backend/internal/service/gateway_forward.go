@@ -93,6 +93,9 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	if parsed == nil {
 		return nil, fmt.Errorf("parse request: empty request")
 	}
+	if c != nil {
+		c.Set(toolNameRewriteKey, nil)
+	}
 	// API-key mappings and OAuth native IDs are resolved before mimicry.
 	validationModel := parsed.Model
 	if account != nil {
@@ -105,7 +108,11 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 	}
 	if account != nil && account.Platform == PlatformAnthropic {
-		if err := validateClaude55Request(parsed.Body.Bytes(), validationModel); err != nil {
+		validationBody := parsed.Body.Bytes()
+		if forceClaudeCodeProfile(ctx, account) {
+			validationBody, _ = deleteJSONPathBytes(validationBody, "tool_choice")
+		}
+		if err := validateClaude55Request(validationBody, validationModel); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"type": "error", "error": gin.H{"type": "invalid_request_error", "message": err.Error()}})
 			return nil, err
 		}
@@ -123,7 +130,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	beginUpstreamResponseModelObservation(c)
 
 	// Web Search 模拟：纯 web_search 请求时，直接调用搜索 API 构造响应
-	if account != nil && s.shouldEmulateWebSearch(ctx, account, parsed.GroupID, parsed.Body.Bytes()) {
+	if account != nil && !forceClaudeCodeProfile(ctx, account) && s.shouldEmulateWebSearch(ctx, account, parsed.GroupID, parsed.Body.Bytes()) {
 		return s.handleWebSearchEmulation(ctx, c, account, parsed)
 	}
 
@@ -211,6 +218,20 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	}
 
 	shouldMimicClaudeCode := account.IsOAuth() && !isClaudeCode
+	forceProfile := forceClaudeCodeProfile(ctx, account)
+	if forceProfile {
+		var canonical []byte
+		ctx, canonical, err = s.prepareClaudeCodeProfile(ctx, body, reqModel)
+		if err != nil {
+			return nil, err
+		}
+		if err := replaceBody(canonical); err != nil {
+			return nil, err
+		}
+		if c != nil {
+			c.Set(toolNameRewriteKey, &ToolNameRewrite{PreserveNames: true})
+		}
+	}
 
 	if shouldMimicClaudeCode {
 		// 与 Parrot 对齐：OAuth 账号无条件重写 system（即使客户端已发了 Claude Code
@@ -220,7 +241,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		// Parrot 的 transform_request 从不检查客户端 system 内容，直接覆盖。
 		systemRaw, _ := parsed.SystemValue()
 		systemPromptInjectionEnabled, systemPrompt, systemPromptBlocks := s.claudeOAuthSystemPromptInjectionSettings(ctx)
-		if systemPromptInjectionEnabled {
+		if systemPromptInjectionEnabled && !forceProfile {
 			if err := replaceBody(rewriteSystemForNonClaudeCodeWithPromptBlocks(
 				body, systemRaw, systemPrompt, systemPromptBlocks,
 				claudeBillingSampleFromContext(ctx, body),
@@ -256,16 +277,18 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		if err := replaceBody(s.rewriteMessageCacheControlIfEnabled(ctx, body)); err != nil {
 			return nil, err
 		}
-		if rw := buildToolNameRewriteFromBody(body); rw != nil {
-			if err := replaceBody(applyToolNameRewriteToBody(body, rw)); err != nil {
-				return nil, err
-			}
-			if c != nil {
-				c.Set(toolNameRewriteKey, rw)
-			}
-		} else {
-			if err := replaceBody(applyToolsLastCacheBreakpoint(body)); err != nil {
-				return nil, err
+		if !forceProfile {
+			if rw := buildToolNameRewriteFromBody(body); rw != nil {
+				if err := replaceBody(applyToolNameRewriteToBody(body, rw)); err != nil {
+					return nil, err
+				}
+				if c != nil {
+					c.Set(toolNameRewriteKey, rw)
+				}
+			} else {
+				if err := replaceBody(applyToolsLastCacheBreakpoint(body)); err != nil {
+					return nil, err
+				}
 			}
 		}
 	}

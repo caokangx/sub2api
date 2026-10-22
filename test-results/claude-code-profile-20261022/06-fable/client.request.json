@@ -1,0 +1,41 @@
+{
+  "method": "POST",
+  "url": "http://127.0.0.1:8080/v1/messages",
+  "headers": {
+    "x-api-key": "[redacted; temporary local test key]",
+    "content-type": "application/json",
+    "anthropic-version": "2023-06-01",
+    "user-agent": "profile-smoke/1.0",
+    "x-client-request-id": "profile-test-06-fable"
+  },
+  "body": {
+    "model": "claude-fable-5-1",
+    "max_tokens": 16,
+    "stream": false,
+    "system": "PROFILE_TEST_CALLER_SYSTEM_MUST_DISAPPEAR",
+    "tools": [
+      {
+        "name": "caller_private_tool",
+        "description": "PROFILE_TEST_CALLER_TOOL_MUST_DISAPPEAR",
+        "input_schema": {
+          "type": "object",
+          "properties": {
+            "value": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    ],
+    "tool_choice": {
+      "type": "tool",
+      "name": "caller_private_tool"
+    },
+    "messages": [
+      {
+        "role": "user",
+        "content": "PROFILE_TEST_USER_MESSAGE_MUST_REMAIN. Reply OK. Case: 06-fable"
+      }
+    ]
+  }
+}

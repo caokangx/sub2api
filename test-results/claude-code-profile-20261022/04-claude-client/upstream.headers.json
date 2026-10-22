@@ -1,0 +1,21 @@
+{
+  "Accept": "application/json",
+  "X-Stainless-Retry-Count": "0",
+  "X-Stainless-Timeout": "600",
+  "X-Stainless-Lang": "js",
+  "x-stainless-package-version": "0.112.1",
+  "x-stainless-os": "darwin",
+  "x-stainless-arch": "arm64",
+  "x-stainless-runtime": "node",
+  "x-stainless-runtime-version": "v26.3.0",
+  "anthropic-dangerous-direct-browser-access": "true",
+  "anthropic-version": "2023-06-01",
+  "authorization": "[redacted]",
+  "x-app": "cli",
+  "User-Agent": "claude-cli/2.1.284 (external, cli)",
+  "content-type": "application/json",
+  "anthropic-beta": "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,fine-grained-tool-streaming-2025-05-14",
+  "x-client-request-id": "profile-test-04-claude-client",
+  "Accept-Encoding": "identity",
+  "x-claude-code-shell": "zsh"
+}

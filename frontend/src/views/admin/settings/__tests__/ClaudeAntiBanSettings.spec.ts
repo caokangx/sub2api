@@ -43,7 +43,7 @@ const ToggleStub = defineComponent({
 const response = () => ({
   probe_interception_enabled: true,
   environment: {
-    mode: "off" as const,
+    mode: "rewrite" as const,
     on_unmatched: "pass" as const,
     profile: {
       working_directory: "/Users/developer/project",
@@ -82,6 +82,7 @@ describe("ClaudeAntiBanSettings", () => {
     await flushPromises();
 
     expect(wrapper.get<HTMLInputElement>('[data-testid="anti-ban-probe"]').element.checked).toBe(true);
+    expect(wrapper.get<HTMLSelectElement>('[data-testid="anti-ban-mode"]').element.value).toBe("rewrite");
     expect(wrapper.text()).toContain("admin.settings.claudeAntiBan.alwaysOnHint");
     expect(wrapper.get<HTMLInputElement>('[data-testid="anti-ban-working-directory"]').element.value)
       .toBe("/Users/developer/project");

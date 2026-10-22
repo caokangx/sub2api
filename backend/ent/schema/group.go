@@ -204,6 +204,9 @@ func (Group) Fields() []ent.Field {
 		field.Bool("claude_code_only").
 			Default(false).
 			Comment("是否仅允许 Claude Code 客户端"),
+		field.Bool("force_claude_code_profile").
+			Default(false).
+			Comment("Anthropic OAuth 原生请求强制使用完整 Claude Code system/tools"),
 		field.Int64("fallback_group_id").
 			Optional().
 			Nillable().

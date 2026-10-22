@@ -1,0 +1,33 @@
+{
+  "model": "claude-sonnet-4-6",
+  "max_tokens": 16,
+  "stream": false,
+  "system": "PROFILE_TEST_CALLER_SYSTEM_MUST_DISAPPEAR",
+  "tools": [
+    {
+      "name": "caller_private_tool",
+      "description": "PROFILE_TEST_CALLER_TOOL_MUST_DISAPPEAR",
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+  "tool_choice": {
+    "type": "tool",
+    "name": "caller_private_tool"
+  },
+  "messages": [
+    {
+      "role": "user",
+      "content": "PROFILE_TEST_USER_MESSAGE_MUST_REMAIN. Reply OK. Case: 04-claude-client"
+    }
+  ],
+  "metadata": {
+    "user_id": "user_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_account_00000000-0000-0000-0000-000000000040_session_123e4567-e89b-12d3-a456-426614174000"
+  }
+}

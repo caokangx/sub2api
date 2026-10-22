@@ -1,0 +1,22 @@
+{
+  "case": "04-claude-client",
+  "http_status": 502,
+  "passed": true,
+  "system_blocks": 4,
+  "tool_count": 23,
+  "checks": {
+    "caller_system_removed": true,
+    "system_block_count": true,
+    "billing_and_identity": true,
+    "tools_count_23": true,
+    "tool_choice_removed": true,
+    "messages_preserved": true,
+    "cache_control_at_most_4": true,
+    "fixed_user_agent": true,
+    "auth_redacted": true,
+    "complete_tool_definitions_match_fixture": true,
+    "complete_system_matches_fixture": true,
+    "environment_present": true
+  },
+  "failures": []
+}

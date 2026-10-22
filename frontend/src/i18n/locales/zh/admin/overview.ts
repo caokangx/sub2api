@@ -1226,6 +1226,10 @@ export default {
           detector: '内置识别'
         }
       },
+      claudeCodeProfile: {
+        title: '强制 Claude Code 请求配置',
+        hint: '仅对 OAuth/setup-token 的原生 Messages 和 Count Tokens 生效：完整替换 system 与 tools、移除 tool_choice，并使用防封设置中的环境配置。客户端须能执行这些 Claude Code 工具；Fable 使用精简 system。'
+      },
       claudeCode: {
         title: 'Claude Code 客户端限制',
         tooltip:

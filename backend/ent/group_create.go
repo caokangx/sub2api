@@ -600,6 +600,20 @@ func (_c *GroupCreate) SetNillableClaudeCodeOnly(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetForceClaudeCodeProfile sets the "force_claude_code_profile" field.
+func (_c *GroupCreate) SetForceClaudeCodeProfile(v bool) *GroupCreate {
+	_c.mutation.SetForceClaudeCodeProfile(v)
+	return _c
+}
+
+// SetNillableForceClaudeCodeProfile sets the "force_claude_code_profile" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableForceClaudeCodeProfile(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetForceClaudeCodeProfile(*v)
+	}
+	return _c
+}
+
 // SetFallbackGroupID sets the "fallback_group_id" field.
 func (_c *GroupCreate) SetFallbackGroupID(v int64) *GroupCreate {
 	_c.mutation.SetFallbackGroupID(v)
@@ -1137,6 +1151,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultClaudeCodeOnly
 		_c.mutation.SetClaudeCodeOnly(v)
 	}
+	if _, ok := _c.mutation.ForceClaudeCodeProfile(); !ok {
+		v := group.DefaultForceClaudeCodeProfile
+		_c.mutation.SetForceClaudeCodeProfile(v)
+	}
 	if _, ok := _c.mutation.ModelRoutingEnabled(); !ok {
 		v := group.DefaultModelRoutingEnabled
 		_c.mutation.SetModelRoutingEnabled(v)
@@ -1352,6 +1370,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.ClaudeCodeOnly(); !ok {
 		return &ValidationError{Name: "claude_code_only", err: errors.New(`ent: missing required field "Group.claude_code_only"`)}
+	}
+	if _, ok := _c.mutation.ForceClaudeCodeProfile(); !ok {
+		return &ValidationError{Name: "force_claude_code_profile", err: errors.New(`ent: missing required field "Group.force_claude_code_profile"`)}
 	}
 	if _, ok := _c.mutation.ModelRoutingEnabled(); !ok {
 		return &ValidationError{Name: "model_routing_enabled", err: errors.New(`ent: missing required field "Group.model_routing_enabled"`)}
@@ -1629,6 +1650,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ClaudeCodeOnly(); ok {
 		_spec.SetField(group.FieldClaudeCodeOnly, field.TypeBool, value)
 		_node.ClaudeCodeOnly = value
+	}
+	if value, ok := _c.mutation.ForceClaudeCodeProfile(); ok {
+		_spec.SetField(group.FieldForceClaudeCodeProfile, field.TypeBool, value)
+		_node.ForceClaudeCodeProfile = value
 	}
 	if value, ok := _c.mutation.FallbackGroupID(); ok {
 		_spec.SetField(group.FieldFallbackGroupID, field.TypeInt64, value)
@@ -2605,6 +2630,18 @@ func (u *GroupUpsert) SetClaudeCodeOnly(v bool) *GroupUpsert {
 // UpdateClaudeCodeOnly sets the "claude_code_only" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateClaudeCodeOnly() *GroupUpsert {
 	u.SetExcluded(group.FieldClaudeCodeOnly)
+	return u
+}
+
+// SetForceClaudeCodeProfile sets the "force_claude_code_profile" field.
+func (u *GroupUpsert) SetForceClaudeCodeProfile(v bool) *GroupUpsert {
+	u.Set(group.FieldForceClaudeCodeProfile, v)
+	return u
+}
+
+// UpdateForceClaudeCodeProfile sets the "force_claude_code_profile" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateForceClaudeCodeProfile() *GroupUpsert {
+	u.SetExcluded(group.FieldForceClaudeCodeProfile)
 	return u
 }
 
@@ -3842,6 +3879,20 @@ func (u *GroupUpsertOne) SetClaudeCodeOnly(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateClaudeCodeOnly() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateClaudeCodeOnly()
+	})
+}
+
+// SetForceClaudeCodeProfile sets the "force_claude_code_profile" field.
+func (u *GroupUpsertOne) SetForceClaudeCodeProfile(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetForceClaudeCodeProfile(v)
+	})
+}
+
+// UpdateForceClaudeCodeProfile sets the "force_claude_code_profile" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateForceClaudeCodeProfile() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateForceClaudeCodeProfile()
 	})
 }
 
@@ -5302,6 +5353,20 @@ func (u *GroupUpsertBulk) SetClaudeCodeOnly(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateClaudeCodeOnly() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateClaudeCodeOnly()
+	})
+}
+
+// SetForceClaudeCodeProfile sets the "force_claude_code_profile" field.
+func (u *GroupUpsertBulk) SetForceClaudeCodeProfile(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetForceClaudeCodeProfile(v)
+	})
+}
+
+// UpdateForceClaudeCodeProfile sets the "force_claude_code_profile" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateForceClaudeCodeProfile() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateForceClaudeCodeProfile()
 	})
 }
 

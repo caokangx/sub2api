@@ -1,0 +1,11 @@
+{
+  "model": "claude-sonnet-4-6",
+  "max_tokens": 16,
+  "stream": false,
+  "messages": [
+    {
+      "role": "user",
+      "content": "PROFILE_TEST_USER_MESSAGE_MUST_REMAIN. Reply OK. Case: 03-no-system-no-tools"
+    }
+  ]
+}

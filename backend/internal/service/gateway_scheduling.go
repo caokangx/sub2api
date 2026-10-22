@@ -32,6 +32,19 @@ func (s *GatewayService) SelectAccountForModel(ctx context.Context, groupID *int
 
 // SelectAccountForModelWithExclusions selects an account supporting the requested model while excluding specified accounts.
 func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context, groupID *int64, sessionHash string, requestedModel string, excludedIDs map[int64]struct{}) (*Account, error) {
+	selection, err := s.selectAccountForModelResult(ctx, groupID, sessionHash, requestedModel, excludedIDs)
+	if err != nil {
+		return nil, err
+	}
+	return selection.Account, nil
+}
+
+// SelectAccountForModelResult preserves the resolved group for native request policies.
+func (s *GatewayService) SelectAccountForModelResult(ctx context.Context, groupID *int64, sessionHash, requestedModel string) (*AccountSelectionResult, error) {
+	return s.selectAccountForModelResult(ctx, groupID, sessionHash, requestedModel, nil)
+}
+
+func (s *GatewayService) selectAccountForModelResult(ctx context.Context, groupID *int64, sessionHash, requestedModel string, excludedIDs map[int64]struct{}) (*AccountSelectionResult, error) {
 	// 优先检查 context 中的强制平台（/antigravity 路由）
 	var platform string
 	forcePlatform, hasForcePlatform := ctx.Value(ctxkey.ForcePlatform).(string)
@@ -82,7 +95,7 @@ func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context
 		if err != nil {
 			return nil, err
 		}
-		return s.hydrateSelectedAccount(ctx, account)
+		return s.newSelectionResult(ctx, account, false, nil, nil)
 	}
 
 	// antigravity 分组、强制平台模式或无分组使用单平台选择
@@ -91,7 +104,7 @@ func (s *GatewayService) SelectAccountForModelWithExclusions(ctx context.Context
 	if err != nil {
 		return nil, err
 	}
-	return s.hydrateSelectedAccount(ctx, account)
+	return s.newSelectionResult(ctx, account, false, nil, nil)
 }
 
 // SelectAccountWithLoadAwareness selects account with load-awareness and wait plan.
@@ -1578,11 +1591,23 @@ func (s *GatewayService) newSelectionResult(ctx context.Context, account *Accoun
 		return nil, err
 	}
 	return attachSelectionProfitGate(ctx, &AccountSelectionResult{
-		Account:     hydrated,
-		Acquired:    acquired,
-		ReleaseFunc: release,
-		WaitPlan:    waitPlan,
+		EffectiveGroup: effectiveGatewayGroup(ctx),
+		Account:        hydrated,
+		Acquired:       acquired,
+		ReleaseFunc:    release,
+		WaitPlan:       waitPlan,
 	}), nil
+}
+
+func effectiveGatewayGroup(ctx context.Context) *Group {
+	if ctx == nil {
+		return nil
+	}
+	group, _ := ctx.Value(ctxkey.Group).(*Group)
+	if !IsGroupContextValid(group) {
+		return nil
+	}
+	return group
 }
 
 // filterByMinPriority 过滤出优先级最小的账号集合

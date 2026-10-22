@@ -1229,6 +1229,10 @@ export default {
           detector: 'Detector'
         }
       },
+      claudeCodeProfile: {
+        title: 'Force Claude Code request profile',
+        hint: 'For native Messages and Count Tokens with OAuth/setup-token accounts: replace system and tools, remove tool_choice, and use the Anti-Ban environment profile. Clients must support these Claude Code tools. Fable uses a minimal system prompt.'
+      },
       claudeCode: {
         title: 'Claude Code Client Restriction',
         tooltip: 'When enabled, this group only allows official Claude Code clients. Non-Claude Code requests will be rejected or fallback to the specified group.',

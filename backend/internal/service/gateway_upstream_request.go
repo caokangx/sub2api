@@ -232,6 +232,7 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		setHeaderRaw(req.Header, "User-Agent", pinnedUA)
 	}
 	applyClaudeEnvironmentHeadersFromContext(ctx, req.Header)
+	applyClaudeCodeProfileHeaders(ctx, account, req.Header)
 	filterSonnet55ToolsetBetaHeader(req.Header, body, modelID)
 
 	// === DEBUG: 打印上游转发请求（headers + body 摘要），与 CLIENT_ORIGINAL 对比 ===

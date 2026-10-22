@@ -1,0 +1,32 @@
+[
+  {
+    "case": "01-string-system",
+    "path": "/v1/messages",
+    "http_status": 502
+  },
+  {
+    "case": "02-block-system-history",
+    "path": "/v1/messages",
+    "http_status": 502
+  },
+  {
+    "case": "03-no-system-no-tools",
+    "path": "/v1/messages",
+    "http_status": 502
+  },
+  {
+    "case": "04-claude-client",
+    "path": "/v1/messages",
+    "http_status": 502
+  },
+  {
+    "case": "05-count-tokens",
+    "path": "/v1/messages/count_tokens",
+    "http_status": 0
+  },
+  {
+    "case": "06-fable",
+    "path": "/v1/messages",
+    "http_status": 502
+  }
+]

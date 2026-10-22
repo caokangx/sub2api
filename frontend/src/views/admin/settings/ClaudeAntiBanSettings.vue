@@ -160,7 +160,7 @@ const additionalDirectoriesText = ref("");
 const defaultForm = (): ClaudeAntiBanSettings => ({
   probe_interception_enabled: true,
   environment: {
-    mode: "off",
+    mode: "rewrite",
     on_unmatched: "pass",
     profile: {
       working_directory: "/Users/developer/project",

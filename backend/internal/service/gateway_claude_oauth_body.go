@@ -260,18 +260,9 @@ func normalizeClaudeOAuthRequestBody(body []byte, modelID string, opts claudeOAu
 		}
 	}
 
-	// temperature：真实 Claude Code CLI 总是发送 temperature（默认 1，客户端可覆盖）。
-	// 之前的实现直接 delete 会导致 payload 缺字段，与真实 CLI 字节级不一致。
-	// 策略：客户端传了什么就透传；没传则补默认 1。
-	// 例外：采样锁定的模型（sonnet-5-5/haiku-5-5）上 temperature+top_p 共存即 400，
-	// 客户端只传 top_p 时不得再补 temperature，否则网关自己制造 400（issue #7919）。
-	samplingLocked := claude.IsSonnet55(modelID) || claude.IsHaiku55(modelID)
-	if !gjson.GetBytes(out, "temperature").Exists() && !claude.IsOpus55(modelID) &&
-		(!samplingLocked || !gjson.GetBytes(out, "top_p").Exists()) {
-		if next, ok := setJSONValueBytes(out, "temperature", 1); ok {
-			out = next
-			modified = true
-		}
+	if next, changed := normalizeClaudeCodeTemperature(out, modelID); changed {
+		out = next
+		modified = true
 	}
 
 	// max_tokens：真实 CLI 的默认值是 128000。缺失时补齐以对齐指纹。
@@ -321,6 +312,25 @@ func normalizeClaudeOAuthRequestBody(body []byte, modelID string, opts claudeOAu
 	}
 
 	return out, modelID
+}
+
+// normalizeClaudeCodeTemperature follows Claude Code 2.1.284's main request
+// builder: !thinkingEnabled && acceptsTemperature ? override ?? 1 : undefined.
+// Use the request's thinking mode rather than the gateway process's CLI env.
+func normalizeClaudeCodeTemperature(body []byte, modelID string) ([]byte, bool) {
+	thinkingType := gjson.GetBytes(body, "thinking.type").String()
+	thinkingEnabled := thinkingType != "" && thinkingType != "disabled"
+	temperature := gjson.GetBytes(body, "temperature")
+	if thinkingEnabled || !claude.ClaudeCodeSupportsTemperature(modelID) {
+		if temperature.Exists() {
+			return deleteJSONPathBytes(body, "temperature")
+		}
+		return body, false
+	}
+	if !temperature.Exists() || temperature.Type == gjson.Null {
+		return setJSONValueBytes(body, "temperature", 1)
+	}
+	return body, false
 }
 
 func (s *GatewayService) buildOAuthMetadataUserID(parsed *ParsedRequest, account *Account, fp *Fingerprint) string {

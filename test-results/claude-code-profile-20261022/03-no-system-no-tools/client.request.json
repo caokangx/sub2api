@@ -1,0 +1,22 @@
+{
+  "method": "POST",
+  "url": "http://127.0.0.1:8080/v1/messages",
+  "headers": {
+    "x-api-key": "[redacted; temporary local test key]",
+    "content-type": "application/json",
+    "anthropic-version": "2023-06-01",
+    "user-agent": "profile-smoke/1.0",
+    "x-client-request-id": "profile-test-03-no-system-no-tools"
+  },
+  "body": {
+    "model": "claude-sonnet-4-6",
+    "max_tokens": 16,
+    "stream": false,
+    "messages": [
+      {
+        "role": "user",
+        "content": "PROFILE_TEST_USER_MESSAGE_MUST_REMAIN. Reply OK. Case: 03-no-system-no-tools"
+      }
+    ]
+  }
+}

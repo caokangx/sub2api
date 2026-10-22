@@ -22,6 +22,14 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 		s.countTokensError(c, http.StatusBadRequest, "invalid_request_error", "Request body is empty")
 		return fmt.Errorf("parse request: empty request")
 	}
+	if c != nil {
+		extra := map[string]string{"model": parsed.Model}
+		if account != nil {
+			extra["account"] = fmt.Sprintf("%d(%s)", account.ID, account.Name)
+			extra["account_type"] = account.Type
+		}
+		s.debugLogGatewaySnapshot("CLIENT_ORIGINAL_COUNT_TOKENS", c.Request.Header, parsed.Body.Bytes(), extra)
+	}
 	// Antigravity 账户不支持 count_tokens，返回 404 让客户端 fallback 到本地估算。
 	// 返回 nil 避免 handler 层记录为错误，也不设置 ops 上游错误上下文。
 	// 凭据只能走其他协议的 OAuth 账号同理，且必须在取 token、建请求之前拦下。
@@ -41,7 +49,11 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 		}
 	}
 	if account != nil && account.Platform == PlatformAnthropic {
-		if err := validateClaude55Request(parsed.Body.Bytes(), validationModel); err != nil {
+		validationBody := parsed.Body.Bytes()
+		if forceClaudeCodeProfile(ctx, account) {
+			validationBody, _ = deleteJSONPathBytes(validationBody, "tool_choice")
+		}
+		if err := validateClaude55Request(validationBody, validationModel); err != nil {
 			s.countTokensError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 			return err
 		}
@@ -83,6 +95,20 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 
 	isClaudeCodeCT := IsClaudeCodeClient(ctx) || isClaudeCodeClient(c.GetHeader("User-Agent"), parsed.MetadataUserID)
 	shouldMimicClaudeCode := account.IsOAuth() && !isClaudeCodeCT
+	forceProfile := forceClaudeCodeProfile(ctx, account)
+	if forceProfile {
+		var canonical []byte
+		var err error
+		ctx, canonical, err = s.prepareClaudeCodeProfile(ctx, body, reqModel)
+		if err != nil {
+			s.countTokensError(c, http.StatusInternalServerError, "api_error", "Failed to build Claude Code profile")
+			return err
+		}
+		if err := replaceBody(canonical); err != nil {
+			return err
+		}
+		c.Set(toolNameRewriteKey, &ToolNameRewrite{PreserveNames: true})
+	}
 
 	if shouldMimicClaudeCode {
 		var normalizedBody []byte
@@ -94,13 +120,15 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 		if err := replaceBody(s.rewriteMessageCacheControlIfEnabled(ctx, body)); err != nil {
 			return err
 		}
-		if rw := buildToolNameRewriteFromBody(body); rw != nil {
-			if err := replaceBody(applyToolNameRewriteToBody(body, rw)); err != nil {
-				return err
-			}
-		} else {
-			if err := replaceBody(applyToolsLastCacheBreakpoint(body)); err != nil {
-				return err
+		if !forceProfile {
+			if rw := buildToolNameRewriteFromBody(body); rw != nil {
+				if err := replaceBody(applyToolNameRewriteToBody(body, rw)); err != nil {
+					return err
+				}
+			} else {
+				if err := replaceBody(applyToolsLastCacheBreakpoint(body)); err != nil {
+					return err
+				}
 			}
 		}
 
@@ -469,7 +497,11 @@ func (s *GatewayService) buildCountTokensRequestAnthropicAPIKeyPassthrough(
 // buildCountTokensRequest 构建 count_tokens 上游请求
 func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Context, account *Account, body []byte, token, tokenType, modelID string, mimicClaudeCode bool) (*http.Request, []byte, error) {
 	body = stripDeferredToolCacheControl(body)
-	body = syncBillingHeaderVersion(body)
+	if forceClaudeCodeProfile(ctx, account) {
+		body = syncBillingHeaderVersionForSample(body, claudeBillingSampleFromContext(ctx, body))
+	} else {
+		body = syncBillingHeaderVersion(body)
+	}
 	// 确定目标 URL
 	targetURL := claudeAPICountTokensURL
 	baseURL := ""
@@ -609,7 +641,12 @@ func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Con
 	if pinnedUA, changed := pinClaudeCLIUserAgentVersion(getHeaderRaw(req.Header, "User-Agent")); changed {
 		setHeaderRaw(req.Header, "User-Agent", pinnedUA)
 	}
+	applyClaudeCodeProfileHeaders(ctx, account, req.Header)
 	filterSonnet55ToolsetBetaHeader(req.Header, body, modelID)
+	s.debugLogGatewaySnapshot("UPSTREAM_FORWARD_COUNT_TOKENS", req.Header, body, map[string]string{
+		"url":        req.URL.String(),
+		"token_type": tokenType,
+	})
 
 	if c != nil && tokenType == "oauth" {
 		c.Set(claudeMimicDebugInfoKey, buildClaudeMimicDebugLine(req, body, account, tokenType, mimicClaudeCode))

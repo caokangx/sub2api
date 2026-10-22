@@ -60,7 +60,7 @@ func DefaultClaudeAntiBanSettings() *ClaudeAntiBanSettings {
 	return &ClaudeAntiBanSettings{
 		ProbeInterceptionEnabled: true,
 		Environment: ClaudeEnvironmentRewriteSettings{
-			Mode:        ClaudeEnvironmentModeOff,
+			Mode:        ClaudeEnvironmentModeRewrite,
 			OnUnmatched: ClaudeEnvironmentUnmatchedPass,
 			Profile: ClaudeEnvironmentProfile{
 				WorkingDirectory:             "/Users/developer/project",

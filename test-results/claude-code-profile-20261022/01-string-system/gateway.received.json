@@ -1,0 +1,47 @@
+{
+  "captured_at": "2026-10-22 17:55:07.636",
+  "tag": "CLIENT_ORIGINAL",
+  "context": {
+    "account": "2224(local-claude-profile-capture)",
+    "account_type": "oauth",
+    "model": "claude-sonnet-4-6",
+    "stream": "false"
+  },
+  "headers": {
+    "Anthropic-Version": "2023-06-01",
+    "User-Agent": "profile-smoke/1.0",
+    "Content-Type": "application/json",
+    "X-Client-Request-Id": "profile-test-01-string-system",
+    "Accept-Encoding": "identity",
+    "Content-Length": "485",
+    "X-Api-Key": "[redacted]",
+    "Connection": "close"
+  },
+  "body": {
+    "max_tokens": 128000,
+    "messages": [
+      {
+        "content": "PROFILE_TEST_USER_MESSAGE_MUST_REMAIN. Reply OK. Case: 01-string-system",
+        "role": "user"
+      }
+    ],
+    "metadata": {},
+    "model": "claude-sonnet-4-6",
+    "stream": false,
+    "system": "PROFILE_TEST_CALLER_SYSTEM_MUST_DISAPPEAR",
+    "tools": [
+      {
+        "description": "PROFILE_TEST_CALLER_TOOL_MUST_DISAPPEAR",
+        "input_schema": {
+          "properties": {
+            "value": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "caller_private_tool"
+      }
+    ]
+  }
+}

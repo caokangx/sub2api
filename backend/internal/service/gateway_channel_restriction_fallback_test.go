@@ -47,10 +47,11 @@ func TestSelectAccountForModelWithExclusions_UsesFallbackGroupForChannelRestrict
 				Hydrated:        true,
 			},
 			fallbackID: {
-				ID:       fallbackID,
-				Platform: PlatformAnthropic,
-				Status:   StatusActive,
-				Hydrated: true,
+				ForceClaudeCodeProfile: true,
+				ID:                     fallbackID,
+				Platform:               PlatformAnthropic,
+				Status:                 StatusActive,
+				Hydrated:               true,
 			},
 		},
 	}
@@ -63,10 +64,13 @@ func TestSelectAccountForModelWithExclusions_UsesFallbackGroupForChannelRestrict
 	}
 
 	ctx := context.WithValue(context.Background(), ctxkey.Group, groupRepo.groups[groupID])
-	account, err := svc.SelectAccountForModelWithExclusions(ctx, &groupID, "", "claude-sonnet-4-6", nil)
+	selection, err := svc.SelectAccountForModelResult(ctx, &groupID, "", "claude-sonnet-4-6")
 	require.NoError(t, err)
+	account := selection.Account
 	require.NotNil(t, account)
 	require.Equal(t, int64(1), account.ID)
+	require.Equal(t, fallbackID, selection.EffectiveGroup.ID)
+	require.True(t, selection.EffectiveGroup.ForceClaudeCodeProfile)
 }
 
 func TestSelectAccountWithLoadAwareness_UsesFallbackGroupForChannelRestriction(t *testing.T) {
@@ -106,10 +110,11 @@ func TestSelectAccountWithLoadAwareness_UsesFallbackGroupForChannelRestriction(t
 				Hydrated:        true,
 			},
 			fallbackID: {
-				ID:       fallbackID,
-				Platform: PlatformAnthropic,
-				Status:   StatusActive,
-				Hydrated: true,
+				ForceClaudeCodeProfile: true,
+				ID:                     fallbackID,
+				Platform:               PlatformAnthropic,
+				Status:                 StatusActive,
+				Hydrated:               true,
 			},
 		},
 	}
@@ -127,4 +132,6 @@ func TestSelectAccountWithLoadAwareness_UsesFallbackGroupForChannelRestriction(t
 	require.NotNil(t, result)
 	require.NotNil(t, result.Account)
 	require.Equal(t, int64(1), result.Account.ID)
+	require.Equal(t, fallbackID, result.EffectiveGroup.ID)
+	require.True(t, result.EffectiveGroup.ForceClaudeCodeProfile)
 }

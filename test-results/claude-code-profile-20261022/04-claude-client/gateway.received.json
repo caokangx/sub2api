@@ -1,0 +1,49 @@
+{
+  "captured_at": "2026-10-22 17:55:42.240",
+  "tag": "CLIENT_ORIGINAL",
+  "context": {
+    "account": "2224(local-claude-profile-capture)",
+    "account_type": "oauth",
+    "model": "claude-sonnet-4-6",
+    "stream": "false"
+  },
+  "headers": {
+    "Anthropic-Version": "2023-06-01",
+    "User-Agent": "claude-cli/2.1.284 (external, cli)",
+    "Content-Type": "application/json",
+    "X-Client-Request-Id": "profile-test-04-claude-client",
+    "Accept-Encoding": "identity",
+    "Content-Length": "673",
+    "X-Api-Key": "[redacted]",
+    "Connection": "close"
+  },
+  "body": {
+    "max_tokens": 128000,
+    "messages": [
+      {
+        "content": "PROFILE_TEST_USER_MESSAGE_MUST_REMAIN. Reply OK. Case: 04-claude-client",
+        "role": "user"
+      }
+    ],
+    "metadata": {
+      "user_id": "user_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa_account_00000000-0000-0000-0000-000000000040_session_123e4567-e89b-12d3-a456-426614174000"
+    },
+    "model": "claude-sonnet-4-6",
+    "stream": false,
+    "system": "PROFILE_TEST_CALLER_SYSTEM_MUST_DISAPPEAR",
+    "tools": [
+      {
+        "description": "PROFILE_TEST_CALLER_TOOL_MUST_DISAPPEAR",
+        "input_schema": {
+          "properties": {
+            "value": {
+              "type": "string"
+            }
+          },
+          "type": "object"
+        },
+        "name": "caller_private_tool"
+      }
+    ]
+  }
+}

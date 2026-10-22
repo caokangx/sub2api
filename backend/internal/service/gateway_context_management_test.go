@@ -383,11 +383,11 @@ func TestNormalizeClaudeOAuthRequestBody_SkipsTemperatureTopUpWithTopPOnLockedMo
 	}
 }
 
-func TestNormalizeClaudeOAuthRequestBody_StillTopsUpTemperatureWithoutTopP(t *testing.T) {
+func TestNormalizeClaudeOAuthRequestBody_UnsupportedModelOmitsTemperatureWithoutTopP(t *testing.T) {
 	body := []byte(`{"model":"claude-haiku-5-5","messages":[]}`)
 	out, _ := normalizeClaudeOAuthRequestBody(body, "claude-haiku-5-5", claudeOAuthNormalizeOptions{})
-	require.Equal(t, int64(1), gjson.GetBytes(out, "temperature").Int(),
-		"无 top_p 时 temperature:1 补齐保持不变")
+	require.False(t, gjson.GetBytes(out, "temperature").Exists(),
+		"Claude Code's built-in model capability does not accept temperature")
 }
 
 func TestApplyClaudeCodeOAuthMimicryToBody_HaikuRewritesSystem(t *testing.T) {

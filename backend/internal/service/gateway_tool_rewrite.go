@@ -46,6 +46,8 @@ const dynamicToolMapThreshold = 5
 // 子串时 bytes.Replace 先被吃掉（对齐 Parrot _restore_tool_names_in_chunk 的
 // `sorted(..., key=lambda x: len(x[1]), reverse=True)`）。
 type ToolNameRewrite struct {
+	// PreserveNames disables dynamic and static response rewriting for fixed profiles.
+	PreserveNames  bool
 	Forward        map[string]string
 	Reverse        map[string]string
 	ReverseOrdered [][2]string
@@ -379,6 +381,9 @@ func reverseToolNamesIfPresent(c interface {
 	Get(string) (any, bool)
 }, chunk []byte) []byte {
 	rw := toolNameRewriteFromContext(c)
+	if rw != nil && rw.PreserveNames {
+		return chunk
+	}
 	if rw == nil && len(staticToolNameRewrites) == 0 {
 		return chunk
 	}
