@@ -95,6 +95,14 @@ func claudeSafeguardsFromContext(ctx context.Context) json.RawMessage {
 }
 
 func claudeTelemetryBodyFromContext(ctx context.Context, wireBody []byte) []byte {
+	// A forced profile already placed its rewritten safeguards on the wire.
+	// Observe that exact value rather than replacing it with the inbound snapshot.
+	var existing map[string]json.RawMessage
+	if json.Unmarshal(wireBody, &existing) == nil {
+		if _, ok := existing["safeguards"]; ok {
+			return wireBody
+		}
+	}
 	safeguards := claudeSafeguardsFromContext(ctx)
 	if len(safeguards) == 0 {
 		return wireBody

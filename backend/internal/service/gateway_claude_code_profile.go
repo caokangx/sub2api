@@ -46,6 +46,18 @@ func (s *GatewayService) prepareClaudeCodeProfile(ctx context.Context, body []by
 	}
 	profile := settings.Environment.Profile
 	ctx = context.WithValue(ctx, claudeCodeProfileEnvironmentKey{}, &profile)
+	// Native preprocessing retains safeguards outside the inference body. Forced
+	// profiles explicitly forward that caller-provided context after applying the
+	// same environment profile as system and outbound headers. Do not invent a
+	// safeguards field when the caller did not supply one.
+	if !gjson.GetBytes(body, "safeguards").Exists() {
+		if safeguards := claudeSafeguardsFromContext(ctx); len(safeguards) > 0 {
+			body, err = sjson.SetRawBytes(body, "safeguards", safeguards)
+			if err != nil {
+				return ctx, nil, fmt.Errorf("restore Claude safeguards: %w", err)
+			}
+		}
+	}
 	next, err := rewriteClaudeCodeProfile(body, model, claudeBillingSampleFromContext(ctx, body), profile)
 	return ctx, next, err
 }

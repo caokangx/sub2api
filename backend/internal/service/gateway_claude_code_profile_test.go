@@ -82,9 +82,52 @@ func TestClaudeCodeProfileUsesConfiguredEnvironmentInOffAndObserveModes(t *testi
 			require.Equal(t, "/configured/work", gjson.GetBytes(safeguards, "0.classifier_context.live_cwd").String())
 			require.Equal(t, "/configured/home", gjson.GetBytes(safeguards, "0.classifier_context.home_dir").String())
 			require.Equal(t, "configured-user", gjson.GetBytes(safeguards, "0.classifier_context.user_identity").String())
+			require.JSONEq(t, string(safeguards), gjson.GetBytes(body, "safeguards").Raw)
+			require.Equal(t, string(body), string(claudeTelemetryBodyFromContext(ctx, body)))
 			require.Equal(t, "original sample", claudeBillingSampleFromContext(ctx, body))
 		})
 	}
+}
+
+func TestClaudeCodeProfileSafeguardsForwarding(t *testing.T) {
+	for _, mode := range []string{ClaudeEnvironmentModeOff, ClaudeEnvironmentModeObserve, ClaudeEnvironmentModeRewrite} {
+		t.Run(mode, func(t *testing.T) {
+			settings := DefaultClaudeAntiBanSettings()
+			settings.ProbeInterceptionEnabled = false
+			settings.Environment.Mode = mode
+			svc := &GatewayService{settingService: &SettingService{}}
+			svc.settingService.claudeAntiBanRuntime.Store(settings)
+			input := []byte(`{"model":"claude-sonnet-4-6","messages":[{"role":"user","content":"fixture"}],"safeguards":[{"type":"dangerous_tool_use","classifier_context":{"platform":"windows","live_cwd":"C:/caller","home_dir":"C:/home","user_identity":"caller","permission_mode":"plan","restricted":true,"rules":{"deny":[{"rule":"Bash(rm *)","source":"policy"}]},"trusted_directories":{"primary":{"path":"C:/caller","resolved":["C:/caller"]}},"git_state":{"branch":"caller-branch","root":"C:/caller","status":{"clean":false}},"prior_turn_context":[{"context":{"platform":"windows","live_cwd":"C:/old"},"tool_use_ids":["tool-original"]}],"unknown_extension":{"value":42}}},{"type":"future_type","extension":"keep"}]}`)
+			preprocessed, err := PreprocessNativeClaudeMessages(input, settings)
+			require.NoError(t, err)
+			require.False(t, gjson.GetBytes(preprocessed.Body, "safeguards").Exists(), "unforced behavior remains unchanged")
+			ctx := WithClaudeMessagesPreprocessContext(context.Background(), preprocessed)
+			ctx, body, err := svc.prepareClaudeCodeProfile(ctx, preprocessed.Body, "claude-sonnet-4-6")
+			require.NoError(t, err)
+			require.Equal(t, settings.Environment.Profile.Platform, gjson.GetBytes(body, "safeguards.0.classifier_context.platform").String())
+			require.Equal(t, settings.Environment.Profile.WorkingDirectory, gjson.GetBytes(body, "safeguards.0.classifier_context.live_cwd").String())
+			require.Equal(t, settings.Environment.Profile.HomeDirectory, gjson.GetBytes(body, "safeguards.0.classifier_context.home_dir").String())
+			require.Equal(t, settings.Environment.Profile.UserIdentity, gjson.GetBytes(body, "safeguards.0.classifier_context.user_identity").String())
+			for _, field := range []string{"permission_mode", "restricted", "rules", "trusted_directories", "git_state", "prior_turn_context", "unknown_extension"} {
+				path := "safeguards.0.classifier_context." + field
+				require.JSONEq(t, gjson.GetBytes(input, path).Raw, gjson.GetBytes(body, path).Raw, field)
+			}
+			require.JSONEq(t, gjson.GetBytes(input, "safeguards.1").Raw, gjson.GetBytes(body, "safeguards.1").Raw)
+			require.Equal(t, string(body), string(claudeTelemetryBodyFromContext(ctx, body)))
+			ctx = WithClaudeCodeProfilePolicy(ctx, &Group{Platform: PlatformAnthropic, ForceClaudeCodeProfile: true})
+			_, wire, err := (&GatewayService{}).buildUpstreamRequest(ctx, nil, &Account{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeOAuth}, body, "fake-token", "oauth", "claude-sonnet-4-6", true, true)
+			require.NoError(t, err)
+			require.JSONEq(t, gjson.GetBytes(body, "safeguards").Raw, gjson.GetBytes(wire, "safeguards").Raw)
+		})
+	}
+}
+
+func TestClaudeCodeProfileDoesNotInventSafeguards(t *testing.T) {
+	svc := &GatewayService{settingService: &SettingService{}}
+	svc.settingService.claudeAntiBanRuntime.Store(DefaultClaudeAntiBanSettings())
+	_, body, err := svc.prepareClaudeCodeProfile(context.Background(), []byte(`{"messages":[{"role":"user","content":"fixture"}]}`), "claude-sonnet-4-6")
+	require.NoError(t, err)
+	require.False(t, gjson.GetBytes(body, "safeguards").Exists())
 }
 
 func TestClaudeCodeProfileReplacesCallerSystemAndToolsPreservingHistory(t *testing.T) {

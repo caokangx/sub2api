@@ -54,6 +54,8 @@ HJSON 使用标准 `hjson==3.1.0` 解析器。`request` 为主体，仅在缺失
 
 客户端不会修改消息正文，也不额外补默认 `stream`。现有网关会将省略的 `stream` 补为 `true`；明确的 `false` 仍走 JSON。probe 拦截或请求校验失败可能导致请求未到达 mock，它们会作为未通过案例保留，即使客户端收到 HTTP 200。
 
+强制覆盖路径现在会将调用方提供的 `safeguards` 放回实际出站请求，统一 `dangerous_tool_use.classifier_context` 的 `platform/live_cwd/home_dir/user_identity` 四项环境值。没有提供时不新增，普通未强制路径保留原行为。其余权限、Git、可信目录和历史上下文原样保留，详见 [字段审查](SAFEGUARDS.md)。新的回放校验包含该规则，历史运行继续按当时保存的预期配置验证。
+
 ## 结果与停启验收
 
 每轮目录 `test-results/claude-profile-replay/<run_id>/` 保存：

@@ -265,6 +265,7 @@ def snapshot(admin, directory):
     telemetry = admin.call("/admin/settings/claude-telemetry")
     write_json(directory / "telemetry-before.json", {"mode": telemetry["mode"], "runtime": telemetry["runtime"]})
     expected["telemetry_mode"] = telemetry["mode"]
+    expected["safeguards_forwarded"] = True
     write_json(directory / "provenance.json", {
         "binary_sha256": sha((ROOT / "runtime/sub2api").read_bytes()),
         "profile_system_sha256": sha((resources / "system.txt").read_bytes()),
@@ -347,6 +348,20 @@ def validate_wire(before, after, headers, expected):
                             [strip_cache(n) for n in walk(after.get("messages")) if n.get("type") == "image"],
         "authorization_redacted": h.get("authorization") == "[REDACTED]" and "x-api-key" not in h,
     }
+    if expected.get("safeguards_forwarded"):
+        wanted_safeguards = json.loads(json.dumps(before.get("safeguards")))
+        if isinstance(wanted_safeguards, list):
+            for item in wanted_safeguards:
+                if not isinstance(item, dict) or item.get("type") != "dangerous_tool_use":
+                    continue
+                context = item.get("classifier_context")
+                if isinstance(context, dict):
+                    for field, setting in {"platform": "platform", "live_cwd": "working_directory",
+                                           "home_dir": "home_directory", "user_identity": "user_identity"}.items():
+                        if profile.get(setting):
+                            context[field] = profile[setting]
+        checks["safeguards_environment_and_preserved_semantics"] = (
+            ("safeguards" in before) == ("safeguards" in after) and after.get("safeguards") == wanted_safeguards)
     return checks
 
 
@@ -419,7 +434,7 @@ def verify_run(directory):
             counts.update({path.split(".")[1].split("[")[0] for path in attempt["changed_paths"]})
     lines = [f"# Claude OAuth 本地回放 {directory.name}", "",
              f"共 {summary['total']} 条；通过 {summary['passed']} 条；未通过 {summary['failed']} 条。", "",
-             "通过要求：实际 mock 捕获、完整响应、版本化 system/tools、tool_choice 移除、身份、UA/beta、输出预算、缓存数量、消息顺序/控制字段、工具名称/ID/参数、图片一致性均满足断言。", "",
+             "通过要求：实际 mock 捕获、完整响应、版本化 system/tools、tool_choice 移除、身份、UA/beta、输出预算、缓存数量、消息顺序/控制字段、工具名称/ID/参数、图片一致性均满足断言。safeguards 按该轮 expected.json 中的转发策略校验。", "",
              "历史消息文本仍会经过现有环境/记忆路径净化；所有实际变化见每条 fields.diff.json 和 body.diff.txt。工具不宣称历史文本逐字不变，也不把 HTTP 200 单独算作通过。", "",
              "| 案例 | HTTP | 捕获次数 | 结果 |", "|---|---:|---:|---|"]
     for case in results:
