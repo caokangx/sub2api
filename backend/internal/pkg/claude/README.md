@@ -8,6 +8,13 @@ in `backend/internal/service/gateway_upstream_request.go`, profile rewriting is
 in `gateway_claude_code_profile.go`, and the Fable exception is kept in the
 profile builder.
 
+Administrators manage **Force Prompt Override** in **Settings > Claude Anti-Ban**
+by selecting Anthropic groups and saving the group selection. Existing enabled
+groups are selected automatically, including inactive groups. This UI uses the
+existing `groups.force_claude_code_profile` field and group update API; the
+protocol and database names remain unchanged. Environment settings are saved
+separately on the same page.
+
 | Family | Default | Upper | Temperature | Thinking / effort |
 | --- | ---: | ---: | --- | --- |
 | Claude 3.5 Haiku/Sonnet | 8,192 | 8,192 | yes | legacy thinking |

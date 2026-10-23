@@ -44,12 +44,15 @@ func (r *ClaudeTokenRefresher) CacheKey(account *Account) string {
 // 此处与手动刷新入口（account.IsOAuth()）保持一致，实际是否刷新由 NeedsRefresh
 // 基于 expires_at 门控，并在分布式锁保护下执行，不会造成过度刷新。
 func (r *ClaudeTokenRefresher) CanRefresh(account *Account) bool {
-	return account.Platform == PlatformAnthropic && account.IsOAuth()
+	return account != nil && !account.IsSyntheticUITest() && account.Platform == PlatformAnthropic && account.IsOAuth()
 }
 
 // NeedsRefresh 检查token是否需要刷新
 // 基于 expires_at 字段判断是否在刷新窗口内
 func (r *ClaudeTokenRefresher) NeedsRefresh(account *Account, refreshWindow time.Duration) bool {
+	if account.IsSyntheticUITest() {
+		return false
+	}
 	expiresAt := account.GetCredentialAsTime("expires_at")
 	if expiresAt == nil {
 		return false

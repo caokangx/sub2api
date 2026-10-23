@@ -17,6 +17,44 @@
         {{ t("admin.settings.claudeAntiBan.alwaysOnHint") }}
       </div>
 
+      <fieldset class="space-y-3 border-t border-gray-100 pt-5 dark:border-dark-700" :disabled="groupsLoading || groupsSaving">
+        <legend class="text-sm font-semibold text-gray-900 dark:text-white">
+          {{ t("admin.settings.claudeAntiBan.promptOverride") }}
+        </legend>
+        <p class="text-sm text-gray-600 dark:text-gray-300">
+          {{ t("admin.settings.claudeAntiBan.promptOverrideHint") }}
+        </p>
+        <ul class="list-disc space-y-1 pl-5 text-xs text-gray-500 dark:text-gray-400">
+          <li>{{ t("admin.settings.claudeAntiBan.promptOverrideSystem") }}</li>
+          <li>{{ t("admin.settings.claudeAntiBan.promptOverrideTools") }}</li>
+          <li>{{ t("admin.settings.claudeAntiBan.promptOverrideParameters") }}</li>
+        </ul>
+        <p v-if="groupsLoading" class="text-sm text-gray-500" role="status">
+          {{ t("common.loading") }}
+        </p>
+        <div v-else-if="groupsLoadFailed" class="flex items-center justify-between gap-3" role="alert">
+          <p class="text-sm text-red-600 dark:text-red-400">{{ t("admin.settings.claudeAntiBan.promptGroupsLoadFailed") }}</p>
+          <button type="button" class="btn btn-secondary btn-sm" data-testid="prompt-groups-retry" @click="loadPromptGroups">
+            {{ t("admin.settings.claudeAntiBan.retryPromptGroups") }}
+          </button>
+        </div>
+        <GroupSelector
+          v-else
+          v-model="promptGroupIds"
+          :groups="promptGroups"
+          :searchable="true"
+          data-testid="prompt-override-groups"
+        />
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          {{ t("admin.settings.claudeAntiBan.promptOverrideSelectionHint") }}
+        </p>
+        <div class="flex justify-end">
+          <button type="button" class="btn btn-primary btn-sm" :disabled="groupsLoadFailed || !promptGroupsDirty" data-testid="prompt-groups-save" @click="savePromptGroups">
+            {{ groupsSaving ? t("common.saving") : t("admin.settings.claudeAntiBan.savePromptGroups") }}
+          </button>
+        </div>
+      </fieldset>
+
       <div class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-dark-600">
         <div>
           <p class="text-sm font-medium text-gray-900 dark:text-white">
@@ -142,6 +180,9 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useI18n } from "vue-i18n";
 import Toggle from "@/components/common/Toggle.vue";
+import GroupSelector from "@/components/common/GroupSelector.vue";
+import { getAllIncludingInactive, update as updateGroup } from "@/api/admin/groups";
+import type { AdminGroup } from "@/types";
 import { useAppStore } from "@/stores";
 import { extractApiErrorMessage } from "@/utils/apiError";
 import {
@@ -156,6 +197,55 @@ const loading = ref(true);
 const saving = ref(false);
 const baseline = ref("");
 const additionalDirectoriesText = ref("");
+const promptGroups = ref<AdminGroup[]>([]);
+const promptGroupIds = ref<number[]>([]);
+const groupsLoading = ref(true);
+const groupsSaving = ref(false);
+const groupsLoadFailed = ref(false);
+const promptGroupsDirty = computed(() => {
+  const selected = new Set(promptGroupIds.value);
+  return promptGroups.value.some((group) => selected.has(group.id) !== Boolean(group.force_claude_code_profile));
+});
+
+async function loadPromptGroups(): Promise<void> {
+  groupsLoading.value = true;
+  groupsLoadFailed.value = false;
+  try {
+    promptGroups.value = (await getAllIncludingInactive()).filter((group) => group.platform === "anthropic");
+    promptGroupIds.value = promptGroups.value.filter((group) => group.force_claude_code_profile).map((group) => group.id);
+  } catch (error) {
+    groupsLoadFailed.value = true;
+    appStore.showError(extractApiErrorMessage(error, t("admin.settings.claudeAntiBan.promptGroupsLoadFailed")));
+  } finally {
+    groupsLoading.value = false;
+  }
+}
+
+async function savePromptGroups(): Promise<void> {
+  if (groupsLoading.value || groupsSaving.value || groupsLoadFailed.value || !promptGroupsDirty.value) return;
+  groupsSaving.value = true;
+  const selected = new Set(promptGroupIds.value);
+  const changes = promptGroups.value.filter((group) => selected.has(group.id) !== Boolean(group.force_claude_code_profile));
+  try {
+    const results = await Promise.allSettled(changes.map((group) => updateGroup(group.id, { force_claude_code_profile: selected.has(group.id) })));
+    const failed: string[] = [];
+    results.forEach((result, index) => {
+      const group = changes[index];
+      if (result.status === "fulfilled") {
+        group.force_claude_code_profile = result.value.force_claude_code_profile;
+      } else {
+        failed.push(group.name);
+      }
+    });
+    if (failed.length) {
+      appStore.showError(t("admin.settings.claudeAntiBan.promptGroupsSaveFailed", { groups: failed.join(", ") }));
+    } else {
+      appStore.showSuccess(t("common.saved"));
+    }
+  } finally {
+    groupsSaving.value = false;
+  }
+}
 
 const defaultForm = (): ClaudeAntiBanSettings => ({
   probe_interception_enabled: true,
@@ -229,5 +319,5 @@ async function save(): Promise<void> {
   }
 }
 
-onMounted(load);
+onMounted(() => { void load(); void loadPromptGroups(); });
 </script>

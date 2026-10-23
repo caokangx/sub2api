@@ -1,0 +1,35 @@
+# Apply together with docker-compose.dev.yml; all logs survive stop/recreate.
+services:
+  sub2api:
+    volumes:
+      - ../test-results/claude-profile-replay/runtime/sub2api:/app/sub2api:ro
+    environment:
+      NO_PROXY: ${SUB2API_DEV_NO_PROXY:-127.0.0.1,localhost,::1,postgres,redis,sub2api,192.168.0.0/16,10.0.0.0/8,172.16.0.0/12,.local},claude-profile-mock
+    networks:
+      - sub2api-network
+      - claude-replay-internal
+  claude-profile-mock:
+    image: python:3.13-alpine
+    container_name: claude-profile-mock
+    restart: unless-stopped
+    command: ["python", "-u", "/mock/mock.py"]
+    environment:
+      CAPTURE_ROOT: /captures
+      PYTHONDONTWRITEBYTECODE: "1"
+    volumes:
+      - ../scripts/claude-profile-replay:/mock:ro
+      - ../test-results/claude-profile-replay:/captures
+    networks:
+      - claude-replay-internal
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+networks:
+  claude-replay-internal:
+    internal: true

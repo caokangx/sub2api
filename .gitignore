@@ -121,7 +121,11 @@ tests
 !deploy/tests/**
 CLAUDE.md
 .claude
-scripts
+scripts/*
+!scripts/claude-profile-replay/
+test-results/claude-profile-replay/
+scripts/claude-profile-replay/.venv/
+__pycache__/
 !backend/scripts/
 !backend/scripts/resolve-version.sh
 .code-review-state

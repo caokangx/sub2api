@@ -1230,8 +1230,8 @@ export default {
         }
       },
       claudeCodeProfile: {
-        title: 'Force Claude Code request profile',
-        hint: 'For native Messages and Count Tokens with OAuth/setup-token accounts: replace system and tools, remove tool_choice, and use the Anti-Ban environment profile. Clients must support these Claude Code tools. Fable uses a minimal system prompt.'
+        title: 'Force Prompt Override',
+        hint: 'Select groups in Settings → Claude Anti-Ban to manage forced overrides of system, tools, and environment details.'
       },
       claudeCode: {
         title: 'Claude Code Client Restriction',

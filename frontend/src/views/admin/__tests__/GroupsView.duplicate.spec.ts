@@ -177,7 +177,7 @@ function mountView() {
 }
 
 describe('GroupsView duplicate action', () => {
-  it('loads and saves the Anthropic Claude Code profile policy', async () => {
+  it('leaves prompt override policy untouched when editing a group', async () => {
     const group = { ...sourceGroup, platform: 'anthropic', force_claude_code_profile: true }
     listGroups.mockResolvedValue({ items: [group], total: 1, page: 1, page_size: 20, pages: 1 })
     updateGroup.mockResolvedValue(group)
@@ -185,12 +185,11 @@ describe('GroupsView duplicate action', () => {
     await flushPromises()
     await wrapper.findAll('button').find(button => button.text() === 'common.edit')!.trigger('click')
     await flushPromises()
-    const toggle = wrapper.get('[data-testid="edit-claude-code-profile-toggle"]')
-    expect(toggle.attributes('aria-checked')).toBe('true')
-    await toggle.trigger('click')
+    expect(wrapper.find('[data-testid="edit-claude-code-profile-toggle"]').exists()).toBe(false)
     await wrapper.get('#edit-group-form').trigger('submit')
     await flushPromises()
-    expect(updateGroup).toHaveBeenCalledWith(42, expect.objectContaining({ force_claude_code_profile: false }))
+    expect(updateGroup).toHaveBeenCalledWith(42, expect.any(Object))
+    expect(updateGroup.mock.calls[0][1]).not.toHaveProperty('force_claude_code_profile')
     wrapper.unmount()
   })
 

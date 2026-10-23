@@ -1384,19 +1384,6 @@
           </div>
         </div>
 
-        <div v-if="createForm.platform === 'anthropic'" class="border-t pt-4">
-          <label class="input-label">{{
-            t("admin.groups.claudeCodeProfile.title")
-          }}</label>
-          <Toggle
-            v-model="createForm.force_claude_code_profile"
-            data-testid="create-claude-code-profile-toggle"
-          />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            {{ t("admin.groups.claudeCodeProfile.hint") }}
-          </p>
-        </div>
-
         <!-- Claude Code 客户端限制（仅 anthropic 平台） -->
         <div v-if="createForm.platform === 'anthropic'" class="border-t pt-4">
           <div class="mb-1.5 flex items-center gap-1">
@@ -3035,19 +3022,6 @@
               }}
             </span>
           </div>
-        </div>
-
-        <div v-if="editForm.platform === 'anthropic'" class="border-t pt-4">
-          <label class="input-label">{{
-            t("admin.groups.claudeCodeProfile.title")
-          }}</label>
-          <Toggle
-            v-model="editForm.force_claude_code_profile"
-            data-testid="edit-claude-code-profile-toggle"
-          />
-          <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
-            {{ t("admin.groups.claudeCodeProfile.hint") }}
-          </p>
         </div>
 
         <!-- Claude Code 客户端限制（仅 anthropic 平台） -->
@@ -5015,7 +4989,6 @@ const createForm = reactive({
   profit_safety_buffer_percent: 0,
   // Claude Code 客户端限制（仅 anthropic 平台使用）
   claude_code_only: false,
-  force_claude_code_profile: false,
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
   // OpenAI Messages 调度配置（仅 openai 平台使用）
@@ -5382,7 +5355,6 @@ const editForm = reactive({
   profit_safety_buffer_percent: 0,
   // Claude Code 客户端限制（仅 anthropic 平台使用）
   claude_code_only: false,
-  force_claude_code_profile: false,
   fallback_group_id: null as number | null,
   fallback_group_id_on_invalid_request: null as number | null,
   // OpenAI Messages 调度配置（仅 openai 平台使用）
@@ -5840,7 +5812,6 @@ const closeCreateModal = () => {
   createForm.profit_min_margin_percent = 0;
   createForm.profit_safety_buffer_percent = 0;
   createForm.claude_code_only = false;
-  createForm.force_claude_code_profile = false;
   createForm.fallback_group_id = null;
   createForm.fallback_group_id_on_invalid_request = null;
   resetMessagesDispatchFormState(createForm);
@@ -5948,8 +5919,6 @@ const handleCreateGroup = async () => {
     // 构建请求数据，包含模型路由配置
     const requestData = {
       ...createGroupForm,
-      force_claude_code_profile:
-        createForm.platform === "anthropic" && createForm.force_claude_code_profile,
       force_openai_fast: normalizeGroupOpenAIFast(
         createForm.platform,
         createForm.force_openai_fast,
@@ -6141,7 +6110,6 @@ const handleEdit = async (group: AdminGroup) => {
     group.profit_safety_buffer ?? 0,
   );
   editForm.claude_code_only = group.claude_code_only || false;
-  editForm.force_claude_code_profile = group.force_claude_code_profile ?? false;
   editForm.fallback_group_id = group.fallback_group_id;
   editForm.fallback_group_id_on_invalid_request =
     group.fallback_group_id_on_invalid_request;
@@ -6246,7 +6214,6 @@ const closeEditModal = () => {
   editForm.audio_tts_price_per_million_chars = null;
   editForm.audio_stt_price_per_hour = null;
   resetMessagesDispatchFormState(editForm);
-  editForm.force_claude_code_profile = false;
   editForm.allow_live = false;
   resetModelAllowlistState(editModelAllowlistState);
   editCodexManifestConfig.value = createCodexManifestDefaults();
@@ -6295,8 +6262,6 @@ const handleUpdateGroup = async () => {
     // 转换 fallback_group_id: null -> 0 (后端使用 0 表示清除)
     const payload = {
       ...editForm,
-      force_claude_code_profile:
-        editForm.platform === "anthropic" && editForm.force_claude_code_profile,
       force_openai_fast: normalizeGroupOpenAIFast(
         editForm.platform,
         editForm.force_openai_fast,

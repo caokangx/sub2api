@@ -165,7 +165,7 @@ func (m *ClaudeTelemetryManager) Begin(ctx context.Context, input claudetelemetr
 }
 
 func (m *ClaudeTelemetryManager) Eligible(account *Account) bool {
-	if m == nil || account == nil {
+	if m == nil || account == nil || account.IsSyntheticUITest() {
 		return false
 	}
 	m.mu.Lock()

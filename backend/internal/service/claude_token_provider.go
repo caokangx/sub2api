@@ -62,6 +62,15 @@ func (p *ClaudeTokenProvider) GetAccessToken(ctx context.Context, account *Accou
 	if account.Type == AccountTypeServiceAccount {
 		return p.getServiceAccountAccessToken(ctx, account)
 	}
+	// Synthetic channels use only their stored fake token, even when expired.
+	// Do not read a cached token or enter any credential refresh path.
+	if account.IsSyntheticUITest() {
+		token := account.GetCredential("access_token")
+		if strings.TrimSpace(token) == "" {
+			return "", errors.New("synthetic account access_token is missing")
+		}
+		return token, nil
+	}
 
 	cacheKey := ClaudeTokenCacheKey(account)
 

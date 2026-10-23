@@ -271,3 +271,26 @@ func TestGatewayClaudeTelemetryDeliveryRouteUsesAccountProxyForBothTargets(t *te
 	require.Empty(t, byPath["/first"].Header.Get("Authorization"), "custom first-party targets must never receive OAuth credentials")
 	require.Equal(t, "datadog-key", byPath["/datadog"].Header.Get("dd-api-key"))
 }
+
+func TestSyntheticOAuthNeverForwardsTelemetry(t *testing.T) {
+	_, manager, _ := newClaudeTelemetryManagerForTest(t, func(runtime *ClaudeTelemetryRuntimeConfig) {
+		runtime.Mode = ClaudeTelemetryModeForward
+		runtime.FirstParty.Enabled = true
+		runtime.FirstParty.URL = "https://telemetry.test/first"
+		runtime.Datadog.Enabled = true
+		runtime.Datadog.URL = "https://telemetry.test/datadog"
+		runtime.Datadog.APIKey = "test-key"
+	})
+	upstream := &claudeTelemetryUpstreamRecorder{}
+	gateway := &GatewayService{claudeTelemetry: manager, httpUpstream: upstream}
+	account := claudeTelemetryTestAccount()
+	account.Extra["synthetic_ui_test"] = true
+	body := claudeTelemetryTestWireBody(t, false)
+	attempt := gateway.beginClaudeTelemetryAttempt(context.Background(), newClaudeTelemetryGinContext(t),
+		account, body, claudeTelemetryTestWireRequest(t, body), "fake-token", "", nil, false, true)
+	require.Nil(t, attempt)
+	require.NoError(t, currentClaudeTelemetryExporter(manager).Flush(context.Background()))
+	require.Empty(t, upstream.snapshot())
+	delete(account.Extra, "synthetic_ui_test")
+	require.True(t, manager.Eligible(account))
+}

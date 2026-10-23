@@ -171,6 +171,9 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 	executor OAuthRefreshExecutor,
 	refreshWindow time.Duration,
 ) (*OAuthRefreshResult, error) {
+	if account.IsSyntheticUITest() {
+		return nil, errors.New("OAuth refresh is disabled for synthetic test accounts")
+	}
 	if api == nil || api.accountRepo == nil {
 		return nil, errors.New("oauth refresh account repository is not configured")
 	}
@@ -224,6 +227,9 @@ func (api *OAuthRefreshAPI) RefreshIfNeeded(
 	}
 	if freshAccount.ID != account.ID {
 		return nil, fmt.Errorf("%w: account identity mismatch", errOAuthRefreshAccountRereadFailed)
+	}
+	if freshAccount.IsSyntheticUITest() {
+		return nil, errors.New("OAuth refresh is disabled for synthetic test accounts")
 	}
 	if !freshAccount.IsActive() {
 		if requestPath {

@@ -43,6 +43,7 @@ func TestClaudeTelemetryManagerEligibleAccounts(t *testing.T) {
 		want    bool
 	}{
 		{"anthropic oauth", &Account{Platform: PlatformAnthropic, Type: AccountTypeOAuth}, true},
+		{"synthetic oauth", &Account{Platform: PlatformAnthropic, Type: AccountTypeOAuth, Extra: map[string]any{"synthetic_ui_test": true}}, false},
 		{"setup token disabled", &Account{Platform: PlatformAnthropic, Type: AccountTypeSetupToken}, false},
 		{"api key", &Account{Platform: PlatformAnthropic, Type: AccountTypeAPIKey}, false},
 		{"bedrock", &Account{Platform: PlatformAnthropic, Type: AccountTypeBedrock}, false},

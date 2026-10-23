@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { defineComponent, h } from "vue";
 import { flushPromises, mount } from "@vue/test-utils";
+import GroupSelector from "@/components/common/GroupSelector.vue";
 import ClaudeAntiBanSettings from "../ClaudeAntiBanSettings.vue";
 
 const mocks = vi.hoisted(() => ({
@@ -8,6 +9,13 @@ const mocks = vi.hoisted(() => ({
   update: vi.fn(),
   showError: vi.fn(),
   showSuccess: vi.fn(),
+  getGroups: vi.fn(),
+  updateGroup: vi.fn(),
+}));
+
+vi.mock("@/api/admin/groups", () => ({
+  getAllIncludingInactive: mocks.getGroups,
+  update: mocks.updateGroup,
 }));
 
 vi.mock("@/api/admin/settings", () => ({
@@ -16,13 +24,19 @@ vi.mock("@/api/admin/settings", () => ({
 }));
 
 vi.mock("@/stores", () => ({
+  useAuthStore: () => ({ isSimpleMode: false }),
   useAppStore: () => ({
     showError: mocks.showError,
     showSuccess: mocks.showSuccess,
   }),
 }));
 
-vi.mock("vue-i18n", () => ({
+vi.mock("@/stores/app", () => ({
+  useAppStore: () => ({ showError: mocks.showError, showSuccess: mocks.showSuccess }),
+}));
+
+vi.mock("vue-i18n", async () => ({
+  ...await vi.importActual<typeof import("vue-i18n")>("vue-i18n"),
   useI18n: () => ({ t: (key: string) => key }),
 }));
 
@@ -39,6 +53,18 @@ const ToggleStub = defineComponent({
     });
   },
 });
+
+const mountSettings = () => mount(ClaudeAntiBanSettings, {
+  global: { stubs: { Toggle: ToggleStub, GroupBadge: true, Icon: true } },
+});
+
+const groups = () => [
+  { id: 1, name: "Primary", platform: "anthropic", status: "active", force_claude_code_profile: true },
+  { id: 2, name: "Secondary", platform: "anthropic", status: "active", force_claude_code_profile: false },
+  { id: 3, name: "Inactive", platform: "anthropic", status: "inactive", force_claude_code_profile: true },
+  { id: 4, name: "OpenAI", platform: "openai", status: "active", force_claude_code_profile: false },
+  { id: 5, name: "Composite", platform: "composite", status: "active", force_claude_code_profile: false },
+];
 
 const response = () => ({
   probe_interception_enabled: true,
@@ -72,6 +98,8 @@ beforeEach(() => {
   vi.clearAllMocks();
   mocks.get.mockResolvedValue(response());
   mocks.update.mockImplementation(async (payload) => payload);
+  mocks.getGroups.mockResolvedValue(groups());
+  mocks.updateGroup.mockImplementation(async (id, payload) => ({ ...groups().find((group) => group.id === id), ...payload }));
 });
 
 describe("ClaudeAntiBanSettings", () => {
@@ -119,5 +147,78 @@ describe("ClaudeAntiBanSettings", () => {
       probe_interception_enabled: false,
       environment: expect.objectContaining({ mode: "rewrite" }),
     }));
+    expect(mocks.updateGroup).not.toHaveBeenCalled();
+  });
+
+  it("loads existing prompt override selections including inactive Anthropic groups", async () => {
+    const wrapper = mountSettings();
+    await flushPromises();
+    const selector = wrapper.getComponent(GroupSelector);
+    expect(selector.props("groups").map((group) => group.id)).toEqual([1, 2, 3]);
+    expect(selector.props("modelValue")).toEqual([1, 3]);
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="prompt-groups-save"]').element.disabled).toBe(true);
+    expect(wrapper.text()).toContain("admin.settings.claudeAntiBan.promptOverrideSystem");
+    expect(wrapper.text()).toContain("admin.settings.claudeAntiBan.promptOverrideTools");
+  });
+
+  it("saves only changed group policies through the existing group endpoint", async () => {
+    const wrapper = mountSettings();
+    await flushPromises();
+    wrapper.getComponent(GroupSelector).vm.$emit("update:modelValue", [2, 3]);
+    await wrapper.vm.$nextTick();
+    await wrapper.get('[data-testid="prompt-groups-save"]').trigger("click");
+    await flushPromises();
+    expect(mocks.updateGroup).toHaveBeenCalledTimes(2);
+    expect(mocks.updateGroup).toHaveBeenCalledWith(1, { force_claude_code_profile: false });
+    expect(mocks.updateGroup).toHaveBeenCalledWith(2, { force_claude_code_profile: true });
+    expect(mocks.update).not.toHaveBeenCalled();
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="prompt-groups-save"]').element.disabled).toBe(true);
+  });
+
+  it("allows an empty selection to disable all previously enabled groups", async () => {
+    const wrapper = mountSettings();
+    await flushPromises();
+    wrapper.getComponent(GroupSelector).vm.$emit("update:modelValue", []);
+    await wrapper.vm.$nextTick();
+    await wrapper.get('[data-testid="prompt-groups-save"]').trigger("click");
+    await flushPromises();
+    expect(mocks.updateGroup).toHaveBeenCalledTimes(2);
+    expect(mocks.updateGroup).toHaveBeenCalledWith(1, { force_claude_code_profile: false });
+    expect(mocks.updateGroup).toHaveBeenCalledWith(3, { force_claude_code_profile: false });
+  });
+
+  it("blocks group saves after a load error and supports retry", async () => {
+    mocks.getGroups.mockRejectedValueOnce(new Error("unavailable"));
+    const wrapper = mountSettings();
+    await flushPromises();
+    expect(wrapper.findComponent(GroupSelector).exists()).toBe(false);
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="prompt-groups-save"]').element.disabled).toBe(true);
+    expect(mocks.updateGroup).not.toHaveBeenCalled();
+    await wrapper.get('[data-testid="prompt-groups-retry"]').trigger("click");
+    await flushPromises();
+    expect(wrapper.getComponent(GroupSelector).props("modelValue")).toEqual([1, 3]);
+  });
+
+  it("retains failed changes for retry without resending successful group updates", async () => {
+    mocks.updateGroup.mockImplementation(async (id, payload) => {
+      if (id === 2) throw new Error("failed");
+      return { ...groups().find((group) => group.id === id), ...payload };
+    });
+    const wrapper = mountSettings();
+    await flushPromises();
+    wrapper.getComponent(GroupSelector).vm.$emit("update:modelValue", [2, 3]);
+    await wrapper.vm.$nextTick();
+    await wrapper.get('[data-testid="prompt-groups-save"]').trigger("click");
+    await flushPromises();
+    expect(mocks.showError).toHaveBeenCalled();
+    expect(mocks.showSuccess).not.toHaveBeenCalled();
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="prompt-groups-save"]').element.disabled).toBe(false);
+    mocks.updateGroup.mockClear();
+    mocks.updateGroup.mockResolvedValueOnce({ ...groups()[1], force_claude_code_profile: true });
+    await wrapper.get('[data-testid="prompt-groups-save"]').trigger("click");
+    await flushPromises();
+    expect(mocks.updateGroup).toHaveBeenCalledTimes(1);
+    expect(mocks.updateGroup).toHaveBeenCalledWith(2, { force_claude_code_profile: true });
+    expect(wrapper.get<HTMLButtonElement>('[data-testid="prompt-groups-save"]').element.disabled).toBe(true);
   });
 });

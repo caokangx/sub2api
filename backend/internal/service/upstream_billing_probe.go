@@ -1071,7 +1071,7 @@ func upstreamBillingProbeTargetIsOfficialAPI(baseURL string) bool {
 }
 
 func upstreamBillingProbeEnabled(account *Account) bool {
-	if account == nil || account.Extra == nil {
+	if account == nil || account.Extra == nil || account.IsSyntheticUITest() {
 		return false
 	}
 	enabled, ok := account.Extra[UpstreamBillingProbeEnabledExtraKey].(bool)
