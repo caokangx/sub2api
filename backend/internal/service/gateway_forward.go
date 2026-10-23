@@ -112,7 +112,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		if forceClaudeCodeProfile(ctx, account) {
 			validationBody, _ = deleteJSONPathBytes(validationBody, "tool_choice")
 		}
-		if err := validateClaude55Request(validationBody, validationModel); err != nil {
+		if err := validateNativeClaudeRequest(validationBody, claude.NormalizeModelID(validationModel), forceClaudeCodeProfile(ctx, account)); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"type": "error", "error": gin.H{"type": "invalid_request_error", "message": err.Error()}})
 			return nil, err
 		}
@@ -161,7 +161,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	// Beta policy: evaluate once; block check + cache filter set for buildUpstreamRequest.
 	// Always overwrite the cache to prevent stale values from a previous retry with a different account.
 	if account.Platform == PlatformAnthropic && c != nil {
-		policy := s.evaluateBetaPolicy(ctx, c.GetHeader("anthropic-beta"), account, parsed.Model)
+		policy := s.evaluateBetaPolicy(ctx, c.GetHeader("anthropic-beta"), account, claude.NormalizeModelID(validationModel))
 		if policy.blockErr != nil {
 			return nil, policy.blockErr
 		}
@@ -221,7 +221,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	forceProfile := forceClaudeCodeProfile(ctx, account)
 	if forceProfile {
 		var canonical []byte
-		ctx, canonical, err = s.prepareClaudeCodeProfile(ctx, body, reqModel)
+		ctx, canonical, err = s.prepareClaudeCodeProfile(ctx, body, claude.NormalizeModelID(reqModel))
 		if err != nil {
 			return nil, err
 		}
@@ -233,7 +233,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 	}
 
-	if shouldMimicClaudeCode {
+	if shouldMimicClaudeCode && !forceProfile {
 		// 与 Parrot 对齐：OAuth 账号无条件重写 system（即使客户端已发了 Claude Code
 		// 风格的 system prompt）。原因：第三方工具（opencode 等）会发 "You are Claude
 		// Code..." system prompt 但缺少 billing attribution block，导致 Anthropic
@@ -251,7 +251,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 
 		normalizeOpts := claudeOAuthNormalizeOptions{}
-		if s.identityService != nil && c != nil {
+		if !forceProfile && s.identityService != nil && c != nil {
 			fp, err := s.identityService.GetOrCreateFingerprint(ctx, account.ID, c.Request.Header)
 			if err == nil && fp != nil {
 				// metadata 透传开启时跳过 metadata 注入
@@ -346,6 +346,16 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		reqModel = mappedModel
 		parsed.Model = mappedModel
 		logger.LegacyPrintf("service.gateway", "Model mapping applied: %s -> %s (account: %s, source=%s)", originalModel, mappedModel, account.Name, mappingSource)
+	}
+	if forceProfile {
+		body = s.rewriteMessageCacheControlIfEnabled(ctx, body)
+		body, _ = normalizeClaudeCodeTemperature(body, reqModel)
+		if budgetBody, budgetErr := applyClaudeCodeProfileOutputBudget(body, reqModel); budgetErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"type": "error", "error": gin.H{"type": "invalid_request_error", "message": budgetErr.Error()}})
+			return nil, budgetErr
+		} else if err := replaceBody(budgetBody); err != nil {
+			return nil, err
+		}
 	}
 
 	if s.shouldInjectAnthropicCacheTTL1h(ctx, account) {
@@ -625,7 +635,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 				}
 				// 不是签名错误（或整流器已关闭），继续检查 budget 约束
 				errMsg := extractUpstreamErrorMessage(respBody)
-				if isThinkingBudgetConstraintError(errMsg) && s.settingService.IsBudgetRectifierEnabled(ctx) {
+				if !forceProfile && isThinkingBudgetConstraintError(errMsg) && s.settingService.IsBudgetRectifierEnabled(ctx) {
 					appendOpsUpstreamError(c, OpsUpstreamErrorEvent{
 						ProxyID:            opsUpstreamProxyID(account),
 						ProxyName:          opsUpstreamProxyName(account),

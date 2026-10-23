@@ -760,7 +760,7 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 			return gatewayForwardingSettingsResult{
 				openAITTFTMode:                   cached.openAITTFTMode,
 				fp:                               cached.fingerprintUnification,
-				mp:                               cached.metadataPassthrough,
+				mp:                               false,
 				cch:                              cached.cchSigning,
 				claudeOAuthSystemPromptInjection: cached.claudeOAuthSystemPromptInjection,
 				claudeOAuthSystemPrompt:          cached.claudeOAuthSystemPrompt,
@@ -777,7 +777,7 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 				return gatewayForwardingSettingsResult{
 					openAITTFTMode:                   cached.openAITTFTMode,
 					fp:                               cached.fingerprintUnification,
-					mp:                               cached.metadataPassthrough,
+					mp:                               false,
 					cch:                              cached.cchSigning,
 					claudeOAuthSystemPromptInjection: cached.claudeOAuthSystemPromptInjection,
 					claudeOAuthSystemPrompt:          cached.claudeOAuthSystemPrompt,
@@ -822,7 +822,8 @@ func (s *SettingService) getGatewayForwardingSettingsCached(ctx context.Context)
 		if v, ok := values[SettingKeyEnableFingerprintUnification]; ok && v != "" {
 			fp = v == "true"
 		}
-		mp := values[SettingKeyEnableMetadataPassthrough] == "true"
+		// Metadata passthrough is permanently disabled; ignore legacy values.
+		mp := false
 		cch := values[SettingKeyEnableCCHSigning] == "true"
 		systemPromptInjection := true
 		if v, ok := values[SettingKeyEnableClaudeOAuthSystemPromptInjection]; ok && v != "" {
@@ -881,7 +882,7 @@ func (s *SettingService) GetOpenAITTFTMode(ctx context.Context) string {
 // Returns (fingerprintUnification, metadataPassthrough, cchSigning).
 func (s *SettingService) GetGatewayForwardingSettings(ctx context.Context) (fingerprintUnification, metadataPassthrough, cchSigning bool) {
 	result := s.getGatewayForwardingSettingsCached(ctx)
-	return result.fp, result.mp, result.cch
+	return result.fp, false, result.cch
 }
 
 // IsAnthropicCacheTTL1hInjectionEnabled 检查是否对 Anthropic OAuth/SetupToken 请求体注入 1h cache_control ttl。

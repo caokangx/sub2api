@@ -1,0 +1,91 @@
+{
+  "version": "2.1.284",
+  "binary_sha256": "50a14c2f50f56668380fdda490167f1d3630d5cc18fb8aed3073c2c7ea7314fe",
+  "method": "static code inspection; executable not launched",
+  "evidence": [
+    {
+      "title": "CLI client default headers and session header",
+      "source": "/Users/yikangcao/.local/share/claude/versions/2.1.284",
+      "binary_offset": 183581806,
+      "code": "async function cV({apiKey:e,maxRetries:n,model:r,fetchOverride:s,source:g,querySource:h=g,agentContext:b,promptId:w,permissionContext:v,credentials:T,storageV5:C,clock:D=boe}){let F=process.env.CLAUDE_CODE_CONTAINER_ID,L=process.env.CLAUDE_CODE_REMOTE_SESSION_ID,Y=process.env.CLAUDE_AGENT_SDK_CLIENT_APP,W=gf(b)?void 0:b,Q=jsn(),J=Q?PNo(g,b):void 0,se=Q?INo(g,b):void 0,ne=Jat(),ge={\"x-app\":kt()?\"cli-bg\":\"cli\",\"User-Agent\":UI(),[Zpt]:q(),...ne,...!1,...tO(),...F&&{\"x-claude-remote-container-id\":F},...L&&{\"x-claude-remote-session-id\":L},...Y&&{\"x-client-app\":Y},...W?.agentId&&{\"x-claude-code-agent-id\":a8n(W.agentId)},...W?.parentAgentId&&{\"x-claude-code-parent-agent-id\":a8n(W.parentAgentId)},...J&&{[w4n]:J},...se&&{[E4n]:a8n(se)},...Q&&w!==void 0&&rn(w)!==null&&{[v4n]:w}};if(t(`[API:request] Creating client, ANTHROPIC_CUSTOM_HEADERS present: ${!!process.env.ANTHROPIC_CUSTOM_HEADERS}, has Authorization header: ${!!ne.Authorization}`,{level:\"verbose\"}),a.CLAUDE_CODE_ADDITIONAL_PROTECTION)ge[\"x-anthropic-additional-protection\"]=\"true\";if(Ie()===\"gateway\"&&!po()&&!VWt()){if(Dc())throw V$t(\"Cloud gateway\");throw new Yat(\"Not signed in to th"
+    },
+    {
+      "title": "Session header name",
+      "source": "/Users/yikangcao/.local/share/claude/versions/2.1.284",
+      "binary_offset": 180028164,
+      "code": "var Zpt=\"X-Claude-Code-Session-Id\";class IG extends P{header;source;constructor("
+    },
+    {
+      "title": "Billing attribution conditional fields",
+      "source": "/Users/yikangcao/.local/share/claude/versions/2.1.284",
+      "binary_offset": 180865805,
+      "code": "function NFr(e,n,i,r,s,c,d){let p=Ie();if(!(d?.ignoreEnvOptOut===!0&&p===\"firstParty\"&&By()&&!a.ANTHROPIC_UNIX_SOCKET)&&Vo(process.env.CLAUDE_CODE_ATTRIBUTION_HEADER))return\"\";let g=`${{ISSUES_EXPLAINER:\"report the issue at https://github.com/anthropics/claude-code/issues\",PACKAGE_URL:\"@anthropic-ai/claude-code\",README_URL:\"https://code.claude.com/docs/en/overview\",VERSION:\"2.1.284\",FEEDBACK_CHANNEL:\"https://github.com/anthropics/claude-code/issues\",BUILD_TIME:\"2026-09-28T02:26:10Z\",GIT_SHA:\"2b8ce618c24de26410e4bdfc4e1d592accd61f61\",HOOKS_WORKER_URL:\"/$bunfs/root/src/plugins/functionHooks/hooks-worker/hooks-worker.js\",DD_SOURCEMAP_GROUP:\"darwin\"}.VERSION}.${e}`,y=process.env.CLAUDE_CODE_ENTRYPOINT??\"unknown\",_=p===\"firstParty\"&&xs()||p===\"vertex\"?\" cch=00000;\":\"\",b=b5n(),Ue=b?` cc_workload=${b};`:\"\",Be=ek(n)&&!n.isMainSession?\" cc_is_subagent=true;\":\"\",Ke=i!==void 0&&/^req_[A-Za-z0-9_-]{1,36}$/.test(i)&&p===\"firstParty\"&&xs()?` cc_prev_req=${i};`:\"\",ze=r!==void 0&&/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(r)&&p===\"firstParty\"&&xs()?` cc_prompt_id=${r};`:\"\",Ve=typeof s===\"string\"&&/^[a-z][a-z_]{0,31}$/.test(s)&&p===\"firstParty\"&&xs()?` cc_turn_origin=${s};`:\"\",ie=c?.promptIndex,oe=c?.turnIndex,$e=ce(ie,0)&&ce(oe,1)&&p===\"firstParty\"&&xs()?` cc_prompt_index=${ie}; cc_turn_index=${oe};`:\"\",le=`x-anthropic-billing-header: cc_version=${g}; cc_entrypoint=${y};${_}${Ue}${Be}${Ke}${ze}${Ve}${$e}`;return t(`attribution header ${le}`),le}function hqn(e){return e.anthropicAuthEnabled&&Boolean(e.oauthScopes?.includes(yk))}function jMo(e){if(e.isSubscriber)return{apiKey:null,authToken:e.oauthAccessToken??null};return{apiKey:e.apiKey,authToken:null}}function ce(e,n){return typeof e===\"number\"&&Number.isInteger(e)&&e>=n&&e<=1e7}import{createHash as ue}from\"crypto\";import{closeSync as qe,constants as de,fstatSync as je,openSync as Ye,readSync as Ge}from\"fs\";import{unlink as Xe,open as Ze}from\"fs/promises\";var C=8,pe=4096,Je=\".stamp.json\",fe=f(()=>u({v:R(1),identity:o().regex(/^[0-9a-f]{64}$/),kind:z([\"org\",\"key\",\"wif\",\"token\"]),sha:o().min(1).max(128),confirmed_at:k().int().nonnegative(),hipaa_seen:A(o().regex(/^[0-9a-f]{64}$/)).max(C).default([]),hipaa_seen_incomplete:O().optional(),hipaa_ruled_out:A(o().regex(/^[0-9a-f]{64}$/)).max(C).optional()}));function w$e(e){return`${e}${Je}`}function Lce(e){return ue(\"sha256\").update(e.descriptor).digest(\"hex\")}function Iye(e){return ue(\"sha256\").update(e).digest(\"hex\").slice(0,32)}var he={seen:[],incomplete:!1,ruledOut:[]};function kFt(e){return{seen:e.hipaa_seen,incomplete:e.hipaa_seen_incomplete===!0,ruledOut:e.hipaa_ruled_out??[]}}function yqn(e,n){switch(e.kind){case\"ok\":return kFt(e.stamp);case\"absent\":return n;case\"unusable\":return{seen:n.seen,incomplete:!0,ruledOut:[]}}}function ge(e){return e.incomplete?{hipaa_seen_incomplete:!0,hipaa_"
+    },
+    {
+      "title": "Count tokens beta allowlist",
+      "source": "/Users/yikangcao/.local/share/claude/versions/2.1.284",
+      "binary_offset": 179159877,
+      "code": "R9n=new Set([imt,Y1t,k_e,XRe]);function JRe(){let e=Ie();return e===\"firstParty\""
+    },
+    {
+      "title": "Max tokens model/environment selection",
+      "source": "/Users/yikangcao/.local/share/claude/versions/2.1.284",
+      "binary_offset": 186942224,
+      "code": "function cst(e){let n=A5(e);return INe(\"CLAUDE_CODE_MAX_OUTPUT_TOKENS\",process.env.CLAUDE_CODE_MAX_OUTPUT_TOKENS,n.default,n.upperLimit).effective}function kOt(e){return\"resumable\"in e&&type"
+    },
+    {
+      "title": "Max tokens model capability",
+      "source": "/Users/yikangcao/.local/share/claude/versions/2.1.284",
+      "binary_offset": 180118578,
+      "code": "function A5(e){let n,r,s=Ue(e),g=k_(e,s),h=Ja(s)?.max_output_tokens;if(g!==void 0)r=g,n=Math.min(h?.default??Fh,g);else if(h)n=h.default,r=h.upper;else if(s===\"claude-3-opus\"||s===\"claude-3-haiku\")n=4096,r=4096;else if(s===\"claude-3-sonnet\")n=8192,r=8192;else n=Fh,r=xP;let b=Uu(e,s)??$h(s);if(b!==null)n=Math.min(b,r);let v=Nh(e);if(v?.max_tokens&&v.max_tokens>=4096)r=v.max_tokens,n=Math.min(n,r);return{default:n,upperLimit:r}}function uFo(e){let n=Ue(e);return Uu(e,n)??$h(n)??Ja(n)?.max_output_tokens?.default??A5(e).default}function pFo(e){return A5(e).upperLimit-1}function Gh(e){return e.includes(\"clau"
+    },
+    {
+      "title": "Metadata JSON serialization",
+      "source": "mac-claude-analysis/evidence/modules/module-184839320.js",
+      "line": 72,
+      "code": "function bA({agentContext:e}={}){let n={},r=process.env.CLAUDE_CODE_EXTRA_METADATA;if(r){let W=lt(r,!1);if(W&&typeof W===\"object\"&&!Array.isArray(W))n=o2e(W);else t(`CLAUDE_CODE_EXTRA_METADATA env var must be a JSON object, but was given ${r}`,{level:\"error\"})}let s={},g,h=sk(),b=Le(a.CLAUDE_CODE_REMOTE)&&qn()?Lft(e):void 0,w={...g&&{ti:g},device_id:MD(),account_uuid:Le(a.CLAUDE_CODE_REMOTE)&&a.CLAUDE_CODE_ACCOUNT_UUID||qH()?.accountUuid||Tn()?.accountUuid||\"\",session_id:q(),...h&&{parent_session_id:h},...b&&{tk:b}},D={...s,...n,...w};if((Object.keys(n).length>0||Object.keys(s).length>0)&&S(D).length>Ppe){if(D={...s,...w},S(D).length>Ppe)D=w}return{user_id:S(D)}}var c2e=[\"announced\",\"inline\"];function BRt(){return pf()}var Xon=f(()=>u({systemPrompt:A(o()),tools:A(u({name:o(),description:o(),schema:me(o(),ae()).optional(),server:o().optional()})).optional(),cliPrefix:o().optional(),reminderFold:O().optional().catch(void 0),syst"
+    },
+    {
+      "title": "Count tokens request input",
+      "source": "mac-claude-analysis/evidence/modules/module-184839320.js",
+      "line": 537,
+      "code": "async function _ke(e,n,r,s){e=Dtt(Jbe(e));let g=Ltt(n);return Xbe(e,g,async()=>{try{let h=bRe(r??st()),b=B7(h),w=Ott(e);if(Vc(h)===\"bedrock\")return pAn({model:AD(h),messages:e,tools:g,betas:b.filter((ge)=>R9n.has(ge)),containsThinking:w});let F=await cV({maxRetries:1,model:h,source:\"count_tokens\",agentContext:Mc(),credentials:s?.credentials}),W=b.filter((ge)=>R9n.has(ge)),Y=await F.beta.messages.countTokens({model:AD(h),messages:e.length>0?e:[{role:\"user\",content:\"foo\"}],tools:g,...W.length>0&&{betas:Kx(W)},...w&&{thinking:{type:\"enabled\",budget_tokens:Qbe}}});if(typeof Y.input_tokens!==\"number\")return null;return Y.input_tokens}catch(h){if(t(`countTokens API call failed: ${h instanceof Error?h.message:String(h)}`,{level:\"error\"}),po()&&h instanceof Pt&&h.status===501)return uAn(e,n,s?.credentials).catch((b)=>(t(`gateway sample count failed: ${String(b)}`,{level:\"error\"}),null));return null}})}async function uAn(e,n,r){e=Jbe(e);let s=Ltt(n);return Xbe(e,s,async()=>{let g=Ott(e),h=a.CLAUDE_CODE_USE_VERTEX&&moe(W_())===\"global\",b=g&&(a.CLAUDE_CODE_USE_BEDROCK||a.CLAUDE_CODE_USE_VERTEX)"
+    },
+    {
+      "title": "System cache boundaries",
+      "source": "mac-claude-analysis/evidence/modules/module-184839320.js",
+      "line": 64,
+      "code": "function Ipe(e,n){let r=yde(),s=e.findIndex((W)=>W===cO);if(r&&n?.skipGlobalCacheForSystemPrompt&&s===-1){i(\"tengu_sysprompt_using_tool_based_cache\",{promptBlockCount:e.length});let W,Y,ge,_e=[];for(let Ee of e){if(!Ee)continue;if(Ee===cO)continue;if(Ee.startsWith(CTe))W=Ee;else if(I6.has(Ee))Y=Ee;else if(Ee===_ut)ge=Ee;else _e.push(Ee)}let ve=[];if(W)ve.push({text:W,cacheScope:null});if(Y)ve.push({text:Y,cacheScope:\"org\"});if(ge&&W&&Y)ve.push({text:ge,cacheScope:null});let Te=_e.join(`\n\n`);if(Te)ve.push({text:Te,cacheScope:\"org\"});return ve}if(r)if(s!==-1){let W,Y,ge,_e=[],ve=[];for(let Me=0;Me<e.length;Me++){let Ne=e[Me];if(!Ne||Ne===cO)continue;if(Ne.startsWith(CTe))W=Ne;else if(I6.has(Ne))Y=Ne;else if(Ne===_ut)ge=Ne;else if(Me<s)_e.push(Ne);else ve.push(Ne)}let Te=[];if(W)Te.push({text:W,cacheScope:null});if(Y)Te.push({text:Y,cacheScope:null});if(ge&&W&&Y)Te.push({text:ge,cacheScope:null});let Ee=_e.join(`\n\n`);if(Ee)Te.push({text:Ee,cacheScope:\"global\"});let Pe=ve.join(`\n\n`);if(Pe)Te.push({text:Pe,cacheScope:\"org\"});return i(\"tengu_sysprompt_boundary_found\",{blockCount:Te.length,staticBlockLength:Ee.length,dynamicBlockLength:Pe.length}),Te}else i(\"tengu_sysprompt_missing_boundary_marker\",{promptBlockCount:e.length});let g,h,b,w=[];for(let W of e){if(!W||W===cO)continue;if(W.startsWith(CTe))g=W;else if(I6.has(W))h=W;else if(W===_ut)b=W;else w.push(W)}let D=[];if(g)D.push({text:g,cacheScope:null});if(h)D.push({text:h,cacheScope:\"org\"});if(b&&g&&h)D.push({text:b,cacheScope:null});let F=w.join(`\n\n`);if(F)D.push({text:F,cacheScope:\"org\"});return D}function bA({agentContext:e}={}){let n={},r=process.env.CLAUDE_CODE_EXTRA_METADATA;if(r){let W=lt(r,!1);if(W&&typeof W===\"object\"&&!Array.isArray(W))n=o2e(W);else t(`CLAUDE_CODE_EXTRA_METADATA env var must be a JSON object, but was given ${r}`,{level:\"error\"})}let s={},g,h=sk(),b=Le(a.CLAUDE_CODE_REMOTE)&&qn()?Lft(e):void 0,w={...g&&{ti:g},device_id:MD(),account_uuid:Le(a.CLAUDE_CODE_REMOTE)&&a.CLAUDE_CODE_ACCOUNT_UUID||qH()?.accountUuid||Tn()?.accountUuid||\"\",session_id:q(),...h&&{parent_session_id:h}"
+    },
+    {
+      "title": "System cache control rendering",
+      "source": "mac-claude-analysis/evidence/modules/module-184839320.js",
+      "line": 1843,
+      "code": "function hRo(e,n,r){return Ipe(e,{skipGlobalCacheForSystemPrompt:r?.skipGlobalCacheForSystemPrompt}).map((s)=>({type:\"text\",text:s.text,...n&&s.cacheScope!==null&&{cache_control:pW({scope:s.cacheScope,ttl:r?.cacheTtl})}}))}async function eI({systemPrompt:e=ri([]),userPrompt:n,outputFormat:"
+    },
+    {
+      "title": "Cache TTL selection",
+      "source": "mac-claude-analysis/evidence/modules/module-184839320.js",
+      "line": 1841,
+      "code": "function pW({scope:e,ttl:n}={}){return{type:\"ephemeral\",...n&&{ttl:n},...e===\"global\"&&{scope:e}}}function bOt(e,{agentCacheTtlOverride:n,ignoreOverage:r=!1}={}){let s=ut(),g=s&&!r&&na().isUsingOverage===!0,h=bRt(e,n,g);if(h!==void 0)return h;if(!s||g)return{ttl:\"5m\",reason:\"default\"};let b=w5r();if(b===null)b=x(\"tengu_prompt_cache_1h_config\",{allowlist:[...NIe]}).allowlist??[],E5r(b);return FIe(e,b)?{ttl:\"1h\",reason:\"subscriber\"}:{ttl:\"5m\",reason:\"default\"}}function zO(e,n){return bOt(e,n).ttl===\"1h\"}function SCo(e,n,r){if(e?.type!==\"disabled\")return e;let s=Object.keys(e).filter((g)=>g!==\"type\");if(s.length===0)return e;if(r)i(\"tengu_thinking_disabled_sanitized\",{hadDisplay:s.includes(\"display\")?y(\"true\"):y(\"false\"),extraKeyCount:s.length,querySour"
+    },
+    {
+      "title": "Message cache control rendering",
+      "source": "mac-claude-analysis/evidence/modules/module-184839320.js",
+      "line": 1841,
+      "code": "function ECo(e,n=!1,r,s){if(n)if(typeof e.message.content===\"string\")return{role:\"user\",content:[{type:\"text\",text:e.message.content,...r&&{cache_control:pW({ttl:s})}}]};else{let g=cOt(e.message.content);return{role:\"user\",content:g.map((h,b)=>({...h,...b===g.length-1?r?{cache_control:pW({ttl:s})}:{}:{}}))}}return{role:\"user\",content:Array.isArray(e.message.content)?cOt(e.message.content):e.message.content}}function cOt(e){let n;for(let r=0;r<e.length;r++){let s=e[r];if(s.type===\"text\"&&(typeof s.text!==\"string\"||s.text.trim()===\"\"))n??=e.slice(0,r);else n?.push(s)}if(n===void 0)return[...e];return n.length>0?n:[{type:\"text\",text:Qu}]}function Zre(e,n,"
+    },
+    {
+      "title": "Main request max tokens and thinking",
+      "source": "mac-claude-analysis/evidence/modules/module-184839320.js",
+      "line": 1843,
+      "code": "let sg=cst(Ee),aS=Math.min(Un?.maxTokensOverride||h.maxOutputTokensOverride||sg,sg),fE=a.CLAUDE_CODE_DISABLE_THINKING,Gk=r.type!==\"disabled\"&&!fE,lS=()=>We.thinking.rejectsDisabled||ze!==void 0&&o_e(ze),ed=Gk&&J$n(Ee),Rh=!ed?void 0:r.display===\"highlights\"&&SGt()?\"omitted\":r.display,Dd=void 0;if(Gk&&We.thinking.supported)if(Y4n({runtimeOverride:Lbn(h.model),resolvedModel:Ee,canonicalModel:Fe})===\"adaptive\")Dd={type:\"adaptive\",display:Rh};else{let _c=pFo(Ee);if(r.type===\"enabled\"&&r.budgetTokens!==void 0)_c=r.budgetTokens;_c=Math.max(1024,Math.min(aS-1,_c)),Dd={budget_tokens:_c,type:\"enabled\",display:Rh}}else if(r.type===\"disabled\"&&Ie()===\"firstParty\"&&!fE&&We.thinking.supported&&!lS())Dd={type:\"disabled\"};let zw;if(tE){if(!Jo.includes(oN))Jo.push(oN);if(Vre(li,oN,qr===\"bedrock\"),Mx!==void 0&&(Dd?.type===\"adaptive\"||Dd?.type===\"enabled\")&&!(\"thinking\"in li))"
+    },
+    {
+      "title": "Main request starts with streaming",
+      "source": "mac-claude-analysis/evidence/modules/module-184839320.js",
+      "line": 1843,
+      "code": "let fi=await Ms.beta.messages.create({...Ya,...Bu!==void 0&&{fallback_credit_token:Bu},stream:!0},{signal:g,...Object.keys(al).length>0&&{headers:al}}).withResponse().catch((ba)=>{throw qU(),ba});if(dp(\"query_response_headers_received\"),bs(h.querySource)===\"main\")setTimeout(QCt,0"
+    }
+  ]
+}

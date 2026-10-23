@@ -53,7 +53,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 		if forceClaudeCodeProfile(ctx, account) {
 			validationBody, _ = deleteJSONPathBytes(validationBody, "tool_choice")
 		}
-		if err := validateClaude55Request(validationBody, validationModel); err != nil {
+		if err := validateNativeClaudeRequest(validationBody, claude.NormalizeModelID(validationModel), forceClaudeCodeProfile(ctx, account)); err != nil {
 			s.countTokensError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
 			return err
 		}
@@ -99,7 +99,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 	if forceProfile {
 		var canonical []byte
 		var err error
-		ctx, canonical, err = s.prepareClaudeCodeProfile(ctx, body, reqModel)
+		ctx, canonical, err = s.prepareClaudeCodeProfile(ctx, body, claude.NormalizeModelID(reqModel))
 		if err != nil {
 			s.countTokensError(c, http.StatusInternalServerError, "api_error", "Failed to build Claude Code profile")
 			return err
@@ -110,7 +110,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 		c.Set(toolNameRewriteKey, &ToolNameRewrite{PreserveNames: true})
 	}
 
-	if shouldMimicClaudeCode {
+	if shouldMimicClaudeCode && !forceProfile {
 		var normalizedBody []byte
 		normalizedBody, reqModel = normalizeClaudeOAuthRequestBody(body, reqModel, claudeOAuthNormalizeOptions{})
 		if err := replaceBody(normalizedBody); err != nil {
@@ -169,6 +169,21 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 			logger.LegacyPrintf("service.gateway", "CountTokens model mapping applied: %s -> %s (account: %s, source=%s)", originalReqModel, mappedModel, account.Name, mappingSource)
 		}
 	}
+	if forceProfile {
+		body = s.rewriteMessageCacheControlIfEnabled(ctx, body)
+		body, _ = normalizeClaudeCodeTemperature(body, reqModel)
+		if budgetBody, budgetErr := applyClaudeCodeProfileOutputBudget(body, reqModel); budgetErr != nil {
+			s.countTokensError(c, http.StatusBadRequest, "invalid_request_error", budgetErr.Error())
+			return budgetErr
+		} else if err := replaceBody(budgetBody); err != nil {
+			return err
+		}
+	}
+	if s.shouldInjectAnthropicCacheTTL1h(ctx, account) {
+		if err := replaceBody(injectAnthropicCacheControlTTL1h(body)); err != nil {
+			return err
+		}
+	}
 
 	// 获取凭证
 	token, tokenType, err := s.GetAccessToken(ctx, account)
@@ -180,7 +195,12 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 	// 构建上游请求
 	upstreamReq, wireBody, err := s.buildCountTokensRequest(ctx, c, account, body, token, tokenType, reqModel, shouldMimicClaudeCode)
 	if err != nil {
-		s.countTokensError(c, http.StatusInternalServerError, "api_error", "Failed to build request")
+		var blocked *BetaBlockedError
+		if errors.As(err, &blocked) {
+			s.countTokensError(c, http.StatusBadRequest, "invalid_request_error", blocked.Message)
+		} else {
+			s.countTokensError(c, http.StatusInternalServerError, "api_error", "Failed to build request")
+		}
 		return err
 	}
 	// 先记录首发 wire body；如果后面进入 400 retry，retry 会基于未签名的逻辑 body 重新构建。
@@ -531,25 +551,25 @@ func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Con
 		clientHeaders = c.Request.Header
 	}
 
-	// OAuth 账号：应用统一指纹和重写 userID（受设置开关控制）
-	// 如果启用了会话ID伪装，会在重写后替换 session 部分为固定值
-	ctEnableFP, ctEnableMPT := true, false
+	ctEnableFP := true
 	if s.settingService != nil {
-		ctEnableFP, ctEnableMPT, _ = s.settingService.GetGatewayForwardingSettings(ctx)
+		ctEnableFP, _, _ = s.settingService.GetGatewayForwardingSettings(ctx)
 	}
 	var ctFingerprint *Fingerprint
 	if account.IsOAuth() && s.identityService != nil {
-		fp, err := s.identityService.GetOrCreateFingerprint(ctx, account.ID, clientHeaders)
-		if err == nil {
-			ctFingerprint = fp
-			if !ctEnableMPT {
-				accountUUID := account.GetExtraString("account_uuid")
-				if accountUUID != "" && fp.ClientID != "" {
-					if newBody, err := s.identityService.RewriteUserIDWithMasking(ctx, body, account, accountUUID, fp.ClientID, fp.UserAgent); err == nil && len(newBody) > 0 {
-						body = newBody
-					}
-				}
+		ctFingerprint, _ = s.identityService.GetOrCreateFingerprint(ctx, account.ID, clientHeaders)
+	}
+	oauthSessionID := ""
+	if forceClaudeCodeProfile(ctx, account) {
+		body, oauthSessionID = s.rewriteAnthropicOAuthIdentity(ctx, c, account, body, ctFingerprint, true)
+	} else if account.IsOAuth() && s.identityService != nil && ctFingerprint != nil {
+		if accountUUID := claudeAccountUUID(account); accountUUID != "" && ctFingerprint.ClientID != "" {
+			if next, err := s.identityService.RewriteUserIDWithMasking(ctx, body, account, accountUUID, ctFingerprint.ClientID, ctFingerprint.UserAgent); err == nil {
+				body = next
 			}
+		}
+		if metadata := ParseMetadataUserID(gjson.GetBytes(body, "metadata.user_id").String()); metadata != nil {
+			oauthSessionID = metadata.SessionID
 		}
 	}
 
@@ -561,6 +581,14 @@ func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Con
 	finalBetaHeader, finalBetaShouldSet := s.computeFinalCountTokensAnthropicBeta(
 		tokenType, mimicClaudeCode, modelID, clientHeaders, body, ctEffectiveDropSet,
 	)
+	if forceClaudeCodeProfile(ctx, account) {
+		var betaErr error
+		finalBetaHeader, betaErr = s.finalClaudeCodeProfileBeta(ctx, account, modelID, body, getHeaderRaw(clientHeaders, "anthropic-beta"), true)
+		if betaErr != nil {
+			return nil, nil, betaErr
+		}
+		finalBetaShouldSet, mimicClaudeCode = true, true
+	}
 
 	// 账号覆写了 anthropic-beta 时，覆写值即最终上游值：净化以覆写值为准
 	if beta, ok := account.HeaderOverrideValue("anthropic-beta"); ok {
@@ -627,13 +655,8 @@ func (s *GatewayService) buildCountTokensRequest(ctx context.Context, c *gin.Con
 		setHeaderRaw(req.Header, "anthropic-beta", finalBetaHeader)
 	}
 
-	// 同步 X-Claude-Code-Session-Id 头：取 body 中已处理的 metadata.user_id 的 session_id 覆盖
-	if sessionHeader := getHeaderRaw(req.Header, "X-Claude-Code-Session-Id"); sessionHeader != "" {
-		if uid := gjson.GetBytes(body, "metadata.user_id").String(); uid != "" {
-			if parsed := ParseMetadataUserID(uid); parsed != nil {
-				setHeaderRaw(req.Header, "X-Claude-Code-Session-Id", parsed.SessionID)
-			}
-		}
+	if forceClaudeCodeProfile(ctx, account) || getHeaderRaw(req.Header, "X-Claude-Code-Session-Id") != "" {
+		syncAnthropicOAuthSessionHeader(req.Header, oauthSessionID)
 	}
 
 	// 账号级请求头覆写（仅 anthropic/openai api_key 账号启用时生效；OAuth 路径 no-op）
@@ -671,6 +694,9 @@ func sanitizeCountTokensRequestBody(body []byte) []byte {
 		// max_tokens is a generation parameter; OAuth mimicry may inject it to
 		// resemble Claude Code messages requests, so it must never reach this endpoint.
 		"max_tokens",
+		"speed",
+		"output_config",
+		"context_management",
 	} {
 		if gjson.GetBytes(out, path).Exists() {
 			if next, ok := deleteJSONPathBytes(out, path); ok {

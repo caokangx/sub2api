@@ -11,7 +11,6 @@ import (
 
 	"github.com/Wei-Shaw/sub2api/internal/domain"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
-	"github.com/Wei-Shaw/sub2api/internal/pkg/logger"
 	"github.com/Wei-Shaw/sub2api/internal/util/urlvalidator"
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
@@ -86,34 +85,30 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		clientHeaders = c.Request.Header
 	}
 
-	// OAuth账号：应用统一指纹和metadata重写（受设置开关控制）
 	var fingerprint *Fingerprint
 	enableFP, enableMPT := true, false
 	if s.settingService != nil {
-		enableFP, enableMPT, _ = s.settingService.GetGatewayForwardingSettings(ctx)
+		enableFP, _, _ = s.settingService.GetGatewayForwardingSettings(ctx)
 	}
+	var identityFingerprint *Fingerprint
 	if account.IsOAuth() && s.identityService != nil {
-		// 1. 获取或创建指纹（包含随机生成的ClientID）
-		fp, err := s.identityService.GetOrCreateFingerprint(ctx, account.ID, clientHeaders)
-		if err != nil {
-			logger.LegacyPrintf("service.gateway", "Warning: failed to get fingerprint for account %d: %v", account.ID, err)
-			// 失败时降级为透传原始headers
-		} else {
-			if enableFP {
-				fingerprint = fp
+		identityFingerprint, _ = s.identityService.GetOrCreateFingerprint(ctx, account.ID, clientHeaders)
+	}
+	if enableFP {
+		fingerprint = identityFingerprint
+	}
+	oauthSessionID := ""
+	if forceClaudeCodeProfile(ctx, account) {
+		body, oauthSessionID = s.rewriteAnthropicOAuthIdentity(ctx, c, account, body, identityFingerprint, false)
+	} else if account.IsOAuth() && s.identityService != nil && identityFingerprint != nil {
+		accountUUID := claudeAccountUUID(account)
+		if accountUUID != "" && identityFingerprint.ClientID != "" {
+			if next, err := s.identityService.RewriteUserIDWithMasking(ctx, body, account, accountUUID, identityFingerprint.ClientID, identityFingerprint.UserAgent); err == nil {
+				body = next
 			}
-
-			// 2. 重写metadata.user_id（需要指纹中的ClientID和账号的account_uuid）
-			// 如果启用了会话ID伪装，会在重写后替换 session 部分为固定值
-			// 当 metadata 透传开启时跳过重写
-			if !enableMPT {
-				accountUUID := account.GetExtraString("account_uuid")
-				if accountUUID != "" && fp.ClientID != "" {
-					if newBody, err := s.identityService.RewriteUserIDWithMasking(ctx, body, account, accountUUID, fp.ClientID, fp.UserAgent); err == nil && len(newBody) > 0 {
-						body = newBody
-					}
-				}
-			}
+		}
+		if metadata := ParseMetadataUserID(gjson.GetBytes(body, "metadata.user_id").String()); metadata != nil {
+			oauthSessionID = metadata.SessionID
 		}
 	}
 
@@ -137,6 +132,14 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 	finalBetaHeader, finalBetaShouldSet := s.computeFinalAnthropicBeta(
 		tokenType, mimicClaudeCode, modelID, clientHeaders, body, effectiveDropSet,
 	)
+	if forceClaudeCodeProfile(ctx, account) {
+		var betaErr error
+		finalBetaHeader, betaErr = s.finalClaudeCodeProfileBeta(ctx, account, modelID, body, getHeaderRaw(clientHeaders, "anthropic-beta"), false)
+		if betaErr != nil {
+			return nil, nil, betaErr
+		}
+		finalBetaShouldSet, mimicClaudeCode = true, true
+	}
 
 	// 账号覆写了 anthropic-beta 时，覆写值即最终上游值（由下方 ApplyHeaderOverrides 写入）：
 	// body 能力净化必须以覆写值为准，否则 header/body 不对称会被上游 400。
@@ -216,13 +219,8 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		setHeaderRaw(req.Header, "anthropic-beta", finalBetaHeader)
 	}
 
-	// 同步 X-Claude-Code-Session-Id 头：取 body 中已处理的 metadata.user_id 的 session_id 覆盖
-	if sessionHeader := getHeaderRaw(req.Header, "X-Claude-Code-Session-Id"); sessionHeader != "" {
-		if uid := gjson.GetBytes(body, "metadata.user_id").String(); uid != "" {
-			if parsed := ParseMetadataUserID(uid); parsed != nil {
-				setHeaderRaw(req.Header, "X-Claude-Code-Session-Id", parsed.SessionID)
-			}
-		}
+	if forceClaudeCodeProfile(ctx, account) || getHeaderRaw(req.Header, "X-Claude-Code-Session-Id") != "" {
+		syncAnthropicOAuthSessionHeader(req.Header, oauthSessionID)
 	}
 
 	// 账号级请求头覆写（仅 anthropic/openai api_key 账号启用时生效；OAuth 路径 no-op）。

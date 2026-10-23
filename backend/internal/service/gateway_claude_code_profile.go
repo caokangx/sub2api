@@ -61,6 +61,7 @@ func rewriteClaudeCodeProfile(body []byte, model, billingSample string, profile 
 	if err != nil {
 		return nil, err
 	}
+	billing = mergeClaudeBillingOptional(billing, body)
 	blocks := []anthropicSystemTextBlockPayload{
 		{Type: "text", Text: billing},
 		{Type: "text", Text: claudeCodeSystemPrompt},
@@ -105,6 +106,31 @@ func rewriteClaudeCodeProfile(body []byte, model, billingSample string, profile 
 	}
 	next, _ = normalizeClaudeCodeTemperature(next, model)
 	return enforceCacheControlLimit(applyToolsLastCacheBreakpoint(next)), nil
+}
+
+func applyClaudeCodeProfileOutputBudget(body []byte, model string) ([]byte, error) {
+	defaultTokens, upperTokens := claude.OutputBudget(model)
+	requested := defaultTokens
+	if budget := gjson.GetBytes(body, "thinking.budget_tokens"); gjson.GetBytes(body, "thinking.type").String() == "enabled" && budget.Exists() {
+		if budget.Type != gjson.Number || budget.Float() != float64(budget.Int()) || budget.Float() < 1024 || budget.Float() >= float64(upperTokens) {
+			return nil, fmt.Errorf("thinking.budget_tokens must be an integer from 1024 to less than model output limit %d", upperTokens)
+		}
+		value := int(budget.Int())
+		if value > 0 && value+1 > requested {
+			requested = value + 1
+		}
+		if value > upperTokens {
+			return nil, fmt.Errorf("thinking.budget_tokens %d exceeds model max_tokens limit %d", value, upperTokens)
+		}
+	}
+	if requested > upperTokens {
+		return nil, fmt.Errorf("thinking budget requires max_tokens %d, exceeding model limit %d", requested, upperTokens)
+	}
+	next, err := sjson.SetBytes(body, "max_tokens", requested)
+	if err != nil {
+		return nil, err
+	}
+	return next, nil
 }
 
 func renderClaudeCodeProfileEnvironment(profile ClaudeEnvironmentProfile) string {

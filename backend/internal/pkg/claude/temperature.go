@@ -1,13 +1,11 @@
 package claude
 
-import "strings"
-
 // ClaudeCodeSupportsTemperature mirrors Claude Code 2.1.284's built-in
 // acceptsTemperature capability (J4n): Claude 3 and catalog entries before
 // Opus 4.7. Unknown/custom models do not opt in implicitly.
 func ClaudeCodeSupportsTemperature(model string) bool {
-	id := normalizeEffortModelID(strings.TrimSuffix(strings.ToLower(strings.TrimSpace(model)), "[1m]"))
-	if strings.Contains(id, "claude-3-") {
+	id := CanonicalModelID(model)
+	if len(id) >= 9 && id[:9] == "claude-3-" {
 		return true
 	}
 	switch id {

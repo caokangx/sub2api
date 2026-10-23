@@ -499,6 +499,10 @@ func (h *SettingHandler) UpdateSettings(c *gin.Context) {
 		response.BadRequest(c, "Invalid request: "+err.Error())
 		return
 	}
+	if req.EnableMetadataPassthrough != nil && *req.EnableMetadataPassthrough {
+		response.BadRequest(c, "metadata passthrough has been disabled")
+		return
+	}
 	auditReq := settingsAuditRequest(req)
 	omitted := omittedSettingKeys(sentFields)
 

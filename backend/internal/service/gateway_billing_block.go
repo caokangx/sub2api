@@ -143,10 +143,8 @@ func extractFirstUserText(body []byte) string {
 //
 //	x-anthropic-billing-header: cc_version=2.1.284.{fp}; cc_entrypoint=cli;
 //
-// 注意：新版 Claude Code CLI 已不再发送 cch=... 签名字段（见 issue #3358）。我们
-// 随之去掉了 cch 段——继续注入它反而会让伪装请求偏离真实 CLI 流量。cc_version +
-// cc_entrypoint=cli 仍保留：它们是客户端识别（claude_code_validator）与 Anthropic
-// 第一方判定都依赖的稳定信号。
+// Claude Code 2.1.284 has conditional cch branches. This gateway deliberately
+// does not synthesize or retain cch; the server owns version and entrypoint.
 //
 // 此 block 不带 cache_control（与真实 CLI 一致；cache breakpoint 由后续的
 // Claude Code prompt block 承担）。

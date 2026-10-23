@@ -21,6 +21,7 @@ var (
 		"model": {}, "messages": {}, "system": {}, "tools": {}, "metadata": {},
 		"max_tokens": {}, "thinking": {}, "output_config": {}, "stream": {},
 		"context_management": {}, "safeguards": {}, "temperature": {},
+		"speed": {}, "top_p": {}, "top_k": {},
 		"stop_sequences": {}, "tool_choice": {},
 	}
 	claude45ModelPattern = regexp.MustCompile(`^claude-(?:haiku|sonnet|opus)-4-5(?:-|$)`)
@@ -183,6 +184,11 @@ func PreprocessNativeClaudeMessages(
 			Code:    "unsupported_body_fields",
 			Message: "请求体包含不支持的顶层字段：" + strings.Join(quoted, ", "),
 		}
+	}
+	// max_tokens is intentionally excluded here: legacy native preprocessing
+	// overwrites it, and forced profiles replace it after final model selection.
+	if err := validateNativeClaudeFields(body, true); err != nil {
+		return ClaudeMessagesPreprocessResult{}, &ClaudeMessagesPreprocessError{Status: 400, Code: "invalid_request_body", Message: err.Error()}
 	}
 	delete(decoded, "tool_choice")
 	var originalMaxTokens *int

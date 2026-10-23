@@ -1,0 +1,136 @@
+[
+  {
+    "case": "01-string-system",
+    "session_header_present": false,
+    "betas": [
+      "claude-code-20250219",
+      "oauth-2025-04-20",
+      "interleaved-thinking-2025-05-14",
+      "prompt-caching-scope-2026-01-05",
+      "effort-2025-11-24",
+      "context-management-2025-06-27",
+      "thinking-binding-controls-2026-08-01",
+      "mid-conversation-output-config-2026-07-01",
+      "extended-cache-ttl-2025-04-11"
+    ],
+    "metadata_user_id_format": "JSON-encoded string",
+    "sent_max_tokens": 16,
+    "outgoing_max_tokens": 128000,
+    "thinking": null,
+    "stream": false,
+    "ToolSearch_declared": false,
+    "EndConversation_declared": false,
+    "message_cache_control_present": false
+  },
+  {
+    "case": "02-block-system-history",
+    "session_header_present": false,
+    "betas": [
+      "claude-code-20250219",
+      "oauth-2025-04-20",
+      "interleaved-thinking-2025-05-14",
+      "prompt-caching-scope-2026-01-05",
+      "effort-2025-11-24",
+      "context-management-2025-06-27",
+      "thinking-binding-controls-2026-08-01",
+      "mid-conversation-output-config-2026-07-01",
+      "extended-cache-ttl-2025-04-11"
+    ],
+    "metadata_user_id_format": "JSON-encoded string",
+    "sent_max_tokens": 16,
+    "outgoing_max_tokens": 128000,
+    "thinking": null,
+    "stream": false,
+    "ToolSearch_declared": false,
+    "EndConversation_declared": false,
+    "message_cache_control_present": false
+  },
+  {
+    "case": "03-no-system-no-tools",
+    "session_header_present": false,
+    "betas": [
+      "claude-code-20250219",
+      "oauth-2025-04-20",
+      "interleaved-thinking-2025-05-14",
+      "prompt-caching-scope-2026-01-05",
+      "effort-2025-11-24",
+      "context-management-2025-06-27",
+      "thinking-binding-controls-2026-08-01",
+      "mid-conversation-output-config-2026-07-01",
+      "extended-cache-ttl-2025-04-11"
+    ],
+    "metadata_user_id_format": "JSON-encoded string",
+    "sent_max_tokens": 16,
+    "outgoing_max_tokens": 128000,
+    "thinking": null,
+    "stream": false,
+    "ToolSearch_declared": false,
+    "EndConversation_declared": false,
+    "message_cache_control_present": false
+  },
+  {
+    "case": "04-claude-client",
+    "session_header_present": false,
+    "betas": [
+      "claude-code-20250219",
+      "oauth-2025-04-20",
+      "interleaved-thinking-2025-05-14",
+      "fine-grained-tool-streaming-2025-05-14"
+    ],
+    "metadata_user_id_format": "legacy user_... string",
+    "sent_max_tokens": 16,
+    "outgoing_max_tokens": 128000,
+    "thinking": null,
+    "stream": false,
+    "ToolSearch_declared": false,
+    "EndConversation_declared": false,
+    "message_cache_control_present": false
+  },
+  {
+    "case": "05-count-tokens",
+    "session_header_present": false,
+    "betas": [
+      "claude-code-20250219",
+      "oauth-2025-04-20",
+      "interleaved-thinking-2025-05-14",
+      "prompt-caching-scope-2026-01-05",
+      "effort-2025-11-24",
+      "context-management-2025-06-27",
+      "thinking-binding-controls-2026-08-01",
+      "mid-conversation-output-config-2026-07-01",
+      "extended-cache-ttl-2025-04-11",
+      "token-counting-2024-11-01"
+    ],
+    "metadata_user_id_format": "absent",
+    "sent_max_tokens": 16,
+    "outgoing_max_tokens": null,
+    "thinking": null,
+    "stream": null,
+    "ToolSearch_declared": false,
+    "EndConversation_declared": false,
+    "message_cache_control_present": false
+  },
+  {
+    "case": "06-fable",
+    "session_header_present": false,
+    "betas": [
+      "claude-code-20250219",
+      "oauth-2025-04-20",
+      "interleaved-thinking-2025-05-14",
+      "prompt-caching-scope-2026-01-05",
+      "effort-2025-11-24",
+      "context-management-2025-06-27",
+      "thinking-binding-controls-2026-08-01",
+      "mid-conversation-output-config-2026-07-01",
+      "extended-cache-ttl-2025-04-11"
+    ],
+    "metadata_user_id_format": "JSON-encoded string",
+    "sent_max_tokens": 16,
+    "outgoing_max_tokens": 128000,
+    "thinking": null,
+    "stream": false,
+    "ToolSearch_declared": false,
+    "EndConversation_declared": false,
+    "message_cache_control_present": false
+  }
+]

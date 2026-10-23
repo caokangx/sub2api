@@ -5412,27 +5412,6 @@
                 <Toggle v-model="form.enable_fingerprint_unification" />
               </div>
 
-              <!-- Metadata Passthrough -->
-              <div class="flex items-center justify-between">
-                <div>
-                  <label
-                    class="text-sm font-medium text-gray-700 dark:text-gray-300"
-                  >
-                    {{
-                      t("admin.settings.gatewayForwarding.metadataPassthrough")
-                    }}
-                  </label>
-                  <p class="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                    {{
-                      t(
-                        "admin.settings.gatewayForwarding.metadataPassthroughHint",
-                      )
-                    }}
-                  </p>
-                </div>
-                <Toggle v-model="form.enable_metadata_passthrough" />
-              </div>
-
               <!-- CCH Signing -->
               <div class="flex items-center justify-between">
                 <div>
@@ -11615,7 +11594,7 @@ async function saveSettings() {
       openai_ttft_mode:
         form.openai_ttft_mode === "visible" ? "visible" : "semantic",
       enable_fingerprint_unification: form.enable_fingerprint_unification,
-      enable_metadata_passthrough: form.enable_metadata_passthrough,
+      enable_metadata_passthrough: false,
       enable_cch_signing: form.enable_cch_signing,
       enable_claude_oauth_system_prompt_injection:
         form.enable_claude_oauth_system_prompt_injection,
