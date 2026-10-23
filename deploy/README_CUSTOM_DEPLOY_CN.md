@@ -291,21 +291,24 @@ scp deploy/docker-compose.local.yml \
 
 ### 3. 更新前备份数据库
 
-```bash
-ssh bwg-ssh '
-  cd /opt/sub2api
-  mkdir -p backups
-  sudo docker exec sub2api-postgres \
-    pg_dump -U sub2api -Fc sub2api \
-    > "backups/sub2api-$(date +%Y%m%d-%H%M%S).dump"
-'
-```
-
-确认备份文件不是空文件：
+服务器只保留最近一次备份：新备份生成并校验通过后，删除 `backups/` 下的其余内容。
 
 ```bash
-ssh bwg-ssh 'ls -lh /opt/sub2api/backups'
+ssh bwg-ssh "IMAGE_TAG=${IMAGE_TAG} bash -s" <<'EOF'
+set -e
+cd /opt/sub2api
+mkdir -p backups
+latest="backups/sub2api-$(date +%Y%m%d-%H%M%S)-pre-${IMAGE_TAG}.dump"
+sudo docker exec sub2api-postgres \
+  pg_dump -U sub2api -Fc sub2api > "$latest"
+test -s "$latest"
+sudo docker exec -i sub2api-postgres pg_restore -l < "$latest" > /dev/null
+find backups -mindepth 1 -maxdepth 1 ! -path "$latest" -exec rm -rf {} +
+ls -lh backups
+EOF
 ```
+
+备份失败或校验不通过时，`set -e` 会中止脚本，旧备份不会被删除。
 
 Sub2API 的数据库迁移是单向的。包含数据库迁移的版本不能只靠切换旧镜像完整回滚，必要时需要同时恢复数据库备份。
 
@@ -420,7 +423,7 @@ ssh bwg-ssh '
 
 1. 不要在 Sub2API 管理后台使用官方“在线更新”，否则可能将二开程序替换为官方版本。
 2. 生产部署只使用已经提交的 Git Commit，不直接部署未提交的本地修改。
-3. 每次升级前备份 PostgreSQL，尤其是在同步上游数据库迁移之后。
+3. 每次升级前备份 PostgreSQL，尤其是在同步上游数据库迁移之后；服务器只保留最近一次备份。
 4. 不要覆盖服务器上的 `.env`、`data`、`postgres_data` 和 `redis_data`。
 5. 不要把 PostgreSQL、Redis 端口直接暴露到公网。
 6. 建议通过 Caddy 或 Nginx 配置域名和 HTTPS，不建议长期暴露 `8080`。
