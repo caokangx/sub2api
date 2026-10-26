@@ -37,6 +37,9 @@ func RegisterAdminRoutes(
 		// 仪表盘
 		registerDashboardRoutes(admin, h)
 
+		// 签名真假校验（转发到管理员填写的网关）
+		registerSignatureVerifyRoutes(admin, h)
+
 		// 用户管理
 		registerUserManagementRoutes(admin, h)
 
@@ -157,6 +160,10 @@ func registerAuditLogRoutes(admin *gin.RouterGroup, h *handler.Handlers, _ middl
 		// 清空需现场 TOTP 校验（在 handler 内强制），不复用 step-up sudo 窗口
 		auditLogs.POST("/clear", h.Admin.AuditLog.Clear)
 	}
+}
+
+func registerSignatureVerifyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	admin.POST("/signature-verify/messages", h.Admin.SignatureVerify.Messages)
 }
 
 func registerAdminComplianceRoutes(admin *gin.RouterGroup, h *handler.Handlers) {

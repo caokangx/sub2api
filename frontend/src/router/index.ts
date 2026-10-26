@@ -439,6 +439,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/signature-decoder',
+    name: 'AdminSignatureDecoder',
+    component: () => import('@/views/admin/SignatureDecoderView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Signature Decoder',
+      titleKey: 'admin.signatureDecoder.title'
+    }
+  },
+  {
     path: '/admin/users',
     name: 'AdminUsers',
     component: () => import('@/views/admin/UsersView.vue'),
