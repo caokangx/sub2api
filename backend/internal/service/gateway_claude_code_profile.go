@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
@@ -79,14 +80,18 @@ func rewriteClaudeCodeProfile(body []byte, model, billingSample string, profile 
 		{Type: "text", Text: claudeCodeSystemPrompt},
 	}
 	// Fable rejects the expanded harness; keep its existing identity-only policy.
-	if !isAnthropicFableModel(claude.NormalizeModelID(model)) {
+	fable := isAnthropicFableModel(claude.NormalizeModelID(model))
+	if !fable {
 		text := strings.ReplaceAll(strings.TrimSpace(claudeCodeProfileSystem), "{{MEMORY_DIRECTORY}}", profile.MemoryDirectory)
 		blocks = append(blocks,
 			anthropicSystemTextBlockPayload{Type: "text", Text: text, CacheControl: &anthropicCacheControlPayload{Type: "ephemeral"}},
-			anthropicSystemTextBlockPayload{Type: "text", Text: renderClaudeCodeProfileEnvironment(profile), CacheControl: &anthropicCacheControlPayload{Type: "ephemeral"}},
 		)
 	}
-	system, err := json.Marshal(blocks)
+	system, err := marshalProfileJSON(blocks)
+	if err != nil {
+		return nil, err
+	}
+	tools, err := claudeCodeProfileToolsWithClientMCP(body)
 	if err != nil {
 		return nil, err
 	}
@@ -94,9 +99,15 @@ func rewriteClaudeCodeProfile(body []byte, model, billingSample string, profile 
 	if err != nil {
 		return nil, err
 	}
-	next, err = sjson.SetRawBytes(next, "tools", claudeCodeProfileTools)
+	next, err = sjson.SetRawBytes(next, "tools", tools)
 	if err != nil {
 		return nil, err
+	}
+	if !fable {
+		next, err = injectClaudeCodeProfileAttachments(next, model, profile)
+		if err != nil {
+			return nil, err
+		}
 	}
 	next, err = sjson.DeleteBytes(next, "tool_choice")
 	if err != nil {
@@ -145,19 +156,47 @@ func applyClaudeCodeProfileOutputBudget(body []byte, model string) ([]byte, erro
 	return next, nil
 }
 
-func renderClaudeCodeProfileEnvironment(profile ClaudeEnvironmentProfile) string {
-	var out strings.Builder
-	fmt.Fprintf(&out, "# Environment\nYou have been invoked in the following environment:\n - Primary working directory: %s\n - Is a git repository: %t\n - Platform: %s\n - Shell: %s\n - OS Version: %s\n", profile.WorkingDirectory, profile.GitRepository, profile.Platform, profile.Shell, profile.OSVersion)
-	if len(profile.AdditionalWorkingDirectories) > 0 {
-		out.WriteString(" - Additional working directories:\n")
-		for _, directory := range profile.AdditionalWorkingDirectories {
-			fmt.Fprintf(&out, "   - %s\n", directory)
+// claudeCodeProfileToolsWithClientMCP appends the caller's mcp__ tools, sorted and
+// deduplicated by name, after the fixed built-in set. defer_loading is dropped
+// because the fixed set has no ToolSearch, and cache_control is dropped so the
+// breakpoint is placed once by applyToolsLastCacheBreakpoint.
+func claudeCodeProfileToolsWithClientMCP(body []byte) ([]byte, error) {
+	mcp := map[string]json.RawMessage{}
+	var names []string
+	var walkErr error
+	gjson.GetBytes(body, "tools").ForEach(func(_, tool gjson.Result) bool {
+		name := tool.Get("name").String()
+		if !strings.HasPrefix(name, "mcp__") {
+			return true
 		}
+		if _, dup := mcp[name]; dup {
+			return true
+		}
+		raw := []byte(tool.Raw)
+		for _, field := range []string{"cache_control", "defer_loading"} {
+			if raw, walkErr = sjson.DeleteBytes(raw, field); walkErr != nil {
+				return false
+			}
+		}
+		mcp[name] = raw
+		names = append(names, name)
+		return true
+	})
+	if walkErr != nil {
+		return nil, walkErr
 	}
-	if profile.GitRepository {
-		fmt.Fprintf(&out, "\ngitStatus:\nCurrent branch: %s\nMain branch: %s\nGit user: %s\nStatus:\n%s\nRecent commits:\n%s\n", profile.CurrentBranch, profile.MainBranch, profile.GitUser, profile.GitStatus, strings.Join(profile.RecentCommits, "\n"))
+	if len(names) == 0 {
+		return claudeCodeProfileTools, nil
 	}
-	return strings.TrimSpace(out.String())
+	var tools []json.RawMessage
+	if err := json.Unmarshal(claudeCodeProfileTools, &tools); err != nil {
+		return nil, err
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		tools = append(tools, mcp[name])
+	}
+	return marshalProfileJSON(tools)
 }
 
 func applyClaudeCodeProfileHeaders(ctx context.Context, account *Account, headers http.Header) {

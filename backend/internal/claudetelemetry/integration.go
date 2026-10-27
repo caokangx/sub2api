@@ -130,6 +130,9 @@ func (i *Integration) Begin(_ context.Context, input BeginInput) (*Request, erro
 	if eventContext.Environment.VersionBase == "" {
 		eventContext.Environment.VersionBase = CompatibilityProfile
 	}
+	if eventContext.Environment.BuildTime == "" {
+		eventContext.Environment.BuildTime = CompatibilityBuildTime
+	}
 	if eventContext.Provider == "" {
 		eventContext.Provider = i.config.Provider
 	}
@@ -376,17 +379,18 @@ func requestEvents(body requestBody, req *Request, retry bool, summaries []toolR
 	query := compactMap(map[string]any{
 		"model": req.context.Model, "messagesLength": len(body.Messages),
 		"temperature": temperature(body), "provider": req.context.Provider,
-		"betas": req.context.Betas, "permissionMode": req.permissionMode,
+		"buildAgeMins": buildAgeMinutes(req.context.Environment.BuildTime, req.startedAt),
+		"betas":        req.context.Betas, "permissionMode": req.permissionMode,
 		"querySource": req.querySource, "queryChainId": req.queryChainID,
 		"queryDepth": req.queryDepth, "previousRequestId": req.mutation.PreviousRequestID,
 		"thinkingType": valueOr(body.Thinking.Type, "disabled"),
 		"effortValue":  body.OutputConfig.Effort,
 	})
 	events = append(events,
-		draft("tengu_api_query", query, mixedProvenance(
+		draft("tengu_api_query", query, withDerived(mixedProvenance(
 			[]string{"querySource", "queryChainId", "queryDepth"},
 			[]string{"model", "messagesLength", "temperature", "provider", "betas", "permissionMode", "previousRequestId", "thinkingType", "effortValue"},
-		)),
+		), "buildAgeMins")),
 		draft("tengu_api_cache_breakpoints", cache, observedFields("totalMessageCount", "cachingEnabled", "markerCount")),
 	)
 	return events
@@ -422,6 +426,7 @@ func completionEvents(req *Request, observation Observation, requestID string, e
 			"durationMs":          duration.Milliseconds(), "attempt": req.retryCount + 1,
 			"ttftMs":         ttftAt.Sub(req.startedAt).Milliseconds(),
 			"firstContentMs": optionalDuration(observation.FirstContentAt, req.startedAt),
+			"buildAgeMins":   buildAgeMinutes(req.context.Environment.BuildTime, endedAt),
 			"provider":       req.context.Provider, "requestId": requestID,
 			"stop_reason": observation.StopReason, "querySource": req.querySource,
 			"queryChainId": req.queryChainID, "queryDepth": req.queryDepth,
@@ -438,7 +443,7 @@ func completionEvents(req *Request, observation Observation, requestID string, e
 			"inputTextCharLength":    req.input.TextCharLength,
 			"timeSinceLastApiCallMs": optionalBetween(req.startedAt, req.mutation.LastAPICallAt),
 			"turn_origin":            turnOrigin(req),
-		}), mixedProvenance(
+		}), withDerived(mixedProvenance(
 			[]string{"querySource", "queryChainId", "queryDepth", "turn_origin"},
 			[]string{"model", "betas", "messageCount", "inputTokens", "outputTokens", "cachedInputTokens",
 				"uncachedInputTokens", "durationMs", "attempt", "ttftMs", "firstContentMs", "provider",
@@ -446,7 +451,7 @@ func completionEvents(req *Request, observation Observation, requestID string, e
 				"toolsCharLength", "systemCharLength", "effort_level", "textContentLength",
 				"thinkingContentLength", "toolUseContentLengths", "imageBlockCount", "imageTotalBytes",
 				"documentBlockCount", "documentTotalBytes", "inputTextCharLength", "timeSinceLastApiCallMs"},
-		)),
+		), "buildAgeMins")),
 	}
 	if len(observation.ToolUses) > 0 {
 		completionType := "tool_use_single"
@@ -504,6 +509,13 @@ func mixedProvenance(inferred, observed []string) FieldProvenance {
 		out[field] = Inferred
 	}
 	return out
+}
+
+func withDerived(provenance FieldProvenance, fields ...string) FieldProvenance {
+	for _, field := range fields {
+		provenance[field] = Derived
+	}
+	return provenance
 }
 
 func contains(values []string, target string) bool {

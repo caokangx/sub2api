@@ -44,7 +44,11 @@ func TestClaudeCodeTemperatureNormalization(t *testing.T) {
 				if tt.present {
 					require.Equal(t, tt.want, temperature.Float())
 				}
-				require.Equal(t, gjson.GetBytes(body, "messages").Raw, gjson.GetBytes(out, "messages").Raw)
+				if forceProfile {
+					requireProfileMessages(t, body, out)
+				} else {
+					require.Equal(t, gjson.GetBytes(body, "messages").Raw, gjson.GetBytes(out, "messages").Raw)
+				}
 				require.Equal(t, gjson.GetBytes(body, "thinking").Raw, gjson.GetBytes(out, "thinking").Raw)
 				require.Equal(t, gjson.GetBytes(body, "top_p").Raw, gjson.GetBytes(out, "top_p").Raw)
 			}

@@ -12,6 +12,7 @@ import (
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/claudetelemetry"
+	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/tlsfingerprint"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
@@ -144,10 +145,41 @@ func TestGatewayClaudeTelemetryBeginUsesFinalIdentityAndNeverRecordsAuthorizatio
 	require.Contains(t, payload, "org-from-credentials")
 	require.Contains(t, payload, "device-from-wire")
 	require.Contains(t, payload, "session-from-wire")
-	require.Contains(t, payload, `"platform":"Linux"`)
+	require.Contains(t, payload, `"platform":"linux"`)
+	require.Contains(t, payload, `"platform_raw":"linux"`)
+	require.Contains(t, payload, `"build_time":"`+claude.CLICurrentBuildTime+`"`)
+	require.NotContains(t, payload, `"shell"`)
 	require.NotContains(t, payload, "account-from-wire")
 	require.NotContains(t, payload, "OAUTH_TOKEN_MUST_NOT_BE_RECORDED")
 	require.NotContains(t, payload, request.Header.Get("Authorization"))
+}
+
+func TestGatewayClaudeTelemetryOmitsMissingIdentityAndUsesProfileShell(t *testing.T) {
+	_, manager, runtime := newClaudeTelemetryManagerForTest(t, nil)
+	gateway := &GatewayService{claudeTelemetry: manager, httpUpstream: &claudeTelemetryUpstreamRecorder{}}
+	account := &Account{ID: 48, Platform: PlatformAnthropic, Type: AccountTypeOAuth}
+	body := []byte(`{"model":"claude-test","messages":[{"role":"user","content":"hi"}]}`)
+	request := claudeTelemetryTestWireRequest(t, body)
+	request.Header.Del("X-Claude-Code-Session-Id")
+	request.Header.Set("x-stainless-os", "MacOS")
+	ctx := context.WithValue(context.Background(), claudeCodeProfileEnvironmentKey{},
+		&ClaudeEnvironmentProfile{Shell: "/bin/zsh"})
+
+	c := newClaudeTelemetryGinContext(t)
+	attempt := gateway.beginClaudeTelemetryAttempt(ctx, c, account, body, request, "oauth-token", "", nil, false, true)
+	require.NotNil(t, attempt)
+	observeClaudeTelemetryJSON(c, []byte(`{"type":"message","id":"msg-json","model":"claude-test","stop_reason":"end_turn","usage":{},"content":[]}`))
+	finishClaudeTelemetryAttempt(context.Background(), attempt, "request-json")
+	require.NoError(t, currentClaudeTelemetryExporter(manager).Flush(context.Background()))
+
+	recorded, err := os.ReadFile(runtime.RecordFile)
+	require.NoError(t, err)
+	payload := string(recorded)
+	require.Contains(t, payload, `"platform":"darwin"`)
+	require.Contains(t, payload, `"shell":"zsh"`)
+	for _, field := range []string{"account_uuid", "organization_uuid", "device_id", "session_id"} {
+		require.NotContains(t, payload, `"`+field+`"`)
+	}
 }
 
 func TestGatewayClaudeTelemetryObservesSSEAndJSONSuccess(t *testing.T) {

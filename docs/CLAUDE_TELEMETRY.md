@@ -42,7 +42,8 @@ Sub2API 服务器的 CPU、内存或 uptime 冒充 Claude Code 客户端进程�
 插件、Skill、MCP 生命周期、GrowthBook、本地文件和更新器事件不重建。
 
 system prompt 哈希仍可对已知候选做匹配；NDJSON 中也可能包含稳定的 account、org、
-device 和 session 标识，应按敏感日志保护。
+device 和 session 标识，应按敏感日志保护。账号与最终 wire body 都没有提供的标识直接
+省略，不合成替代值。
 
 ## 批处理与交付
 

@@ -161,6 +161,7 @@ func TestProfileCachePreservesRealMultiturnBreakpoints(t *testing.T) {
 	_, messages, tools, system := collectCacheControlPaths(got)
 	require.LessOrEqual(t, len(messages)+len(tools)+len(system), 4)
 	require.NotEmpty(t, messages)
+	requireProfileMessages(t, body, got)
 	require.Equal(t, "private", gjson.GetBytes(got, "messages.1.content.0.name").String())
 	require.EqualValues(t, 1, gjson.GetBytes(got, "messages.1.content.0.input.x").Int())
 	noCache, _ := sjson.DeleteBytes(body, "messages.0.content.0.cache_control")

@@ -146,8 +146,8 @@ func applyClaudeEnvironmentHeadersFromContext(ctx context.Context, headers http.
 		return
 	}
 	for key, value := range map[string]string{
-		"x-stainless-os":              profile.Platform,
-		"x-stainless-arch":            profile.Arch,
+		"x-stainless-os":              stainlessOSName(profile.Platform),
+		"x-stainless-arch":            stainlessArchName(profile.Arch),
 		"x-stainless-runtime":         profile.Runtime,
 		"x-stainless-runtime-version": profile.RuntimeVersion,
 		"x-stainless-package-version": profile.PackageVersion,
@@ -156,6 +156,48 @@ func applyClaudeEnvironmentHeadersFromContext(ctx context.Context, headers http.
 		if value != "" {
 			setHeaderRaw(headers, key, value)
 		}
+	}
+}
+
+// stainlessOSName mirrors the Anthropic SDK's X-Stainless-OS normalization:
+// the header carries "MacOS"/"Linux"/"Windows", never Node's process.platform.
+func stainlessOSName(platform string) string {
+	value := strings.ToLower(strings.TrimSpace(platform))
+	switch {
+	case value == "":
+		return ""
+	case strings.Contains(value, "ios"):
+		return "iOS"
+	case value == "android":
+		return "Android"
+	case value == "darwin":
+		return "MacOS"
+	case value == "win32":
+		return "Windows"
+	case value == "freebsd":
+		return "FreeBSD"
+	case value == "openbsd":
+		return "OpenBSD"
+	case value == "linux":
+		return "Linux"
+	default:
+		return "Other:" + value
+	}
+}
+
+// stainlessArchName mirrors the Anthropic SDK's X-Stainless-Arch normalization.
+func stainlessArchName(arch string) string {
+	switch value := strings.TrimSpace(arch); value {
+	case "":
+		return ""
+	case "x32", "arm":
+		return value
+	case "x86_64", "x64":
+		return "x64"
+	case "aarch64", "arm64":
+		return "arm64"
+	default:
+		return "other:" + value
 	}
 }
 

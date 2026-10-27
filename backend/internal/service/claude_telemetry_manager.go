@@ -116,7 +116,6 @@ func toClaudeTelemetryConfig(runtime *ClaudeTelemetryRuntimeConfig) claudeteleme
 		FlushOnExit:       runtime.FlushOnExit,
 		Sampling:          runtime.Sampling.EventRates,
 		SamplingDefault:   &defaultRate,
-		Provider:          "anthropic",
 	}
 }
 

@@ -74,7 +74,7 @@ func TestClaudeCodeProfileUsesConfiguredEnvironmentInOffAndObserveModes(t *testi
 			})
 			ctx, body, err := svc.prepareClaudeCodeProfile(ctx, []byte(`{"messages":[{"role":"user","content":"rewritten sample"}]}`), "claude-sonnet-4-6")
 			require.NoError(t, err)
-			require.Contains(t, gjson.GetBytes(body, "system.3.text").String(), "/configured/work")
+			require.Contains(t, profileReminderText(t, body, "# Environment"), " - Primary working directory: /configured/work")
 			billing, err := buildBillingAttributionTextForSample("original sample")
 			require.NoError(t, err)
 			require.Equal(t, billing, gjson.GetBytes(body, "system.0.text").String())
@@ -140,11 +140,13 @@ func TestClaudeCodeProfileReplacesCallerSystemAndToolsPreservingHistory(t *testi
 	require.True(t, json.Valid(out))
 	require.NotContains(t, string(out), "PRIVATE_SYSTEM")
 	require.False(t, gjson.GetBytes(out, "tool_choice").Exists())
-	require.Equal(t, gjson.GetBytes(body, "messages").Raw, gjson.GetBytes(out, "messages").Raw)
+	requireProfileMessages(t, body, out)
 	require.Len(t, gjson.GetBytes(out, "tools").Array(), 23)
 	require.Equal(t, "Agent", gjson.GetBytes(out, "tools.0.name").String())
+	require.Len(t, gjson.GetBytes(out, "system").Array(), 3)
 	require.Contains(t, gjson.GetBytes(out, "system.2.text").String(), profile.MemoryDirectory)
-	require.Contains(t, gjson.GetBytes(out, "system.3.text").String(), profile.WorkingDirectory)
+	require.NotContains(t, gjson.GetBytes(out, "system").Raw, profile.WorkingDirectory)
+	require.Contains(t, profileReminderText(t, out, "# Environment"), profile.WorkingDirectory)
 	require.NotContains(t, string(out), "{{")
 	_, messages, tools, system := collectCacheControlPaths(out)
 	require.LessOrEqual(t, len(messages)+len(tools)+len(system), maxCacheControlBlocks)
@@ -154,7 +156,52 @@ func TestClaudeCodeProfileReplacesCallerSystemAndToolsPreservingHistory(t *testi
 	fable, err := rewriteClaudeCodeProfile(body, "claude-fable-5-1", "hello", profile)
 	require.NoError(t, err)
 	require.Len(t, gjson.GetBytes(fable, "system").Array(), 2)
+	require.Equal(t, gjson.GetBytes(body, "messages").Raw, gjson.GetBytes(fable, "messages").Raw)
 	require.Equal(t, gjson.GetBytes(out, "tools").Raw, gjson.GetBytes(fable, "tools").Raw)
+}
+
+// requireProfileMessages asserts out keeps every message of in byte-for-byte,
+// except that the first user message gains the profile reminders ahead of its
+// original content.
+func requireProfileMessages(t *testing.T, in, out []byte) {
+	t.Helper()
+	inMessages := gjson.GetBytes(in, "messages").Array()
+	outMessages := gjson.GetBytes(out, "messages").Array()
+	require.Len(t, outMessages, len(inMessages))
+	for i := 1; i < len(inMessages); i++ {
+		require.Equal(t, inMessages[i].Raw, outMessages[i].Raw)
+	}
+	content := outMessages[0].Get("content").Array()
+	reminders := 0
+	for reminders < len(content) && profileReminderPattern.MatchString(content[reminders].Get("text").String()) {
+		reminders++
+	}
+	require.GreaterOrEqual(t, reminders, 2, "environment and model reminders lead the first user message")
+	kept := content[reminders:]
+	original := inMessages[0].Get("content")
+	if original.Type == gjson.String {
+		require.Len(t, kept, 1)
+		require.Equal(t, original.String(), kept[0].Get("text").String())
+		return
+	}
+	require.Len(t, kept, len(original.Array()))
+	for i, block := range original.Array() {
+		require.JSONEq(t, block.Raw, kept[i].Raw)
+	}
+}
+
+// profileReminderText returns the first user message reminder whose body starts
+// with marker, without the <system-reminder> wrapper.
+func profileReminderText(t *testing.T, body []byte, marker string) string {
+	t.Helper()
+	for _, block := range gjson.GetBytes(body, "messages.0.content").Array() {
+		text := block.Get("text").String()
+		if inner, ok := strings.CutPrefix(text, "<system-reminder>\n"); ok && strings.HasPrefix(inner, marker) {
+			return strings.TrimSuffix(inner, "\n</system-reminder>")
+		}
+	}
+	require.Failf(t, "reminder not found", "marker %q", marker)
+	return ""
 }
 
 func TestClaudeCodeProfileNativeWireParity(t *testing.T) {
@@ -218,8 +265,9 @@ func TestClaudeCodeProfileNativeWireParity(t *testing.T) {
 						require.NotContains(t, string(wire), "PRIVATE_SYSTEM")
 						require.False(t, gjson.GetBytes(wire, "temperature").Exists(), "thinking requests must omit temperature")
 						require.False(t, gjson.GetBytes(wire, "tool_choice").Exists())
-						require.Equal(t, gjson.GetBytes(body, "messages").Raw, gjson.GetBytes(wire, "messages").Raw)
-						require.Equal(t, "linux", getHeaderRaw(upstream.lastReq.Header, "x-stainless-os"))
+						requireProfileMessages(t, body, wire)
+						require.Contains(t, profileReminderText(t, wire, "# Environment"), " - Platform: linux")
+						require.Equal(t, "Linux", getHeaderRaw(upstream.lastReq.Header, "x-stainless-os"))
 						require.Equal(t, claude.DefaultUserAgent(), getHeaderRaw(upstream.lastReq.Header, "User-Agent"))
 						mapping, _ := c.Get(toolNameRewriteKey)
 						require.True(t, mapping.(*ToolNameRewrite).PreserveNames)

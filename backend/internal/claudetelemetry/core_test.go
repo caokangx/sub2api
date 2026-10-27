@@ -20,7 +20,6 @@ func TestEligibleAccountAndIdentityProvenance(t *testing.T) {
 	input := IdentityInput{
 		MetadataUserID: `{"account_uuid":"embedded-account","device_id":"device","session_id":"session"}`,
 		AccountUUID:    "db-account", OrganizationUUID: "db-org",
-		HMACSeed: []byte("01234567890123456789012345678901"),
 	}
 	identity, source := ResolveIdentity(input)
 	require.Equal(t, "db-account", identity.AccountUUID)
@@ -29,16 +28,46 @@ func TestEligibleAccountAndIdentityProvenance(t *testing.T) {
 	require.Equal(t, "session", identity.SessionID)
 	require.Equal(t, Observed, source["account_uuid"])
 
-	fallback := IdentityInput{
-		AccountFallback: "account-7", DeviceFallback: "api-key-9",
-		SessionFallback: "request-session", HMACSeed: input.HMACSeed,
+	embeddedOnly, _ := ResolveIdentity(IdentityInput{MetadataUserID: input.MetadataUserID})
+	require.Equal(t, "embedded-account", embeddedOnly.AccountUUID)
+
+	headerSession, _ := ResolveIdentity(IdentityInput{SessionIDHeader: "header-session"})
+	require.Equal(t, "header-session", headerSession.SessionID)
+
+	missing, missingSource := ResolveIdentity(IdentityInput{})
+	require.Equal(t, Identity{}, missing)
+	require.Empty(t, missingSource)
+
+	built, err := buildEvent(time.Unix(1, 0), EventContext{Identity: missing}, "tengu_api_success", nil, nil)
+	require.NoError(t, err)
+	require.NotEmpty(t, built.Datadog)
+	serialized := string(mustJSON(built.FirstParty))
+	for _, field := range []string{"account_uuid", "organization_uuid", "device_id", "session_id"} {
+		require.NotContains(t, serialized, field)
 	}
-	first, firstSource := ResolveIdentity(fallback)
-	second, _ := ResolveIdentity(fallback)
-	require.Equal(t, first, second)
-	require.NotEmpty(t, first.AccountUUID)
-	require.Equal(t, Derived, firstSource["device_id"])
-	require.NotContains(t, mustJSON(first), "account-7")
+	require.NotContains(t, built.Datadog, "user_bucket")
+}
+
+func TestNormalizePlatformAndShellMatchClaudeCode(t *testing.T) {
+	for input, expected := range map[string]string{
+		"MacOS": "darwin", "darwin": "darwin", "Linux": "linux", "Windows": "win32",
+		"win32": "win32", "FreeBSD": "freebsd", "Unknown": "", "Other:haiku": "", "": "",
+	} {
+		require.Equal(t, expected, NormalizePlatform(input), input)
+	}
+	for input, expected := range map[string]string{
+		"zsh": "zsh", "/bin/bash": "bash", `C:\Windows\System32\cmd.exe`: "cmd",
+		"/usr/local/bin/custom-shell": "other", "": "",
+	} {
+		require.Equal(t, expected, NormalizeShell(input), input)
+	}
+}
+
+func TestBuildAgeMinutesUsesCompiledBuildTime(t *testing.T) {
+	built, err := time.Parse(time.RFC3339, CompatibilityBuildTime)
+	require.NoError(t, err)
+	require.EqualValues(t, 90, buildAgeMinutes(CompatibilityBuildTime, built.Add(90*time.Minute+59*time.Second)))
+	require.Nil(t, buildAgeMinutes("", built))
 }
 
 func TestTitleClassificationRequiresExplicitSourceOrStrongSignal(t *testing.T) {
@@ -143,7 +172,7 @@ func testEventContext() EventContext {
 			Platform: "darwin", PlatformRaw: "darwin", Arch: "arm64",
 			Version: CompatibilityProfile, VersionBase: CompatibilityProfile,
 		},
-		Provider: "anthropic", SubscriptionType: "pro", Interactive: &interactive,
+		Provider: ProviderFirstParty, SubscriptionType: "pro", Interactive: &interactive,
 		Route: DeliveryRoute{Key: "account-route", Token: "secret-route-token"},
 	}
 }

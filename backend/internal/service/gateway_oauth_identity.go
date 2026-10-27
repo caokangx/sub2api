@@ -80,7 +80,7 @@ func (s *GatewayService) rewriteAnthropicOAuthIdentity(ctx context.Context, c *g
 		}
 	}
 	if session == "" {
-		session = generateSessionUUID(buildStableSessionSeed(account.ID, device, extractFirstUserText(body)))
+		session = generateSessionUUID(buildStableSessionSeed(account.ID, device, firstUserTextForBilling(body)))
 	}
 	uid := FormatMetadataUserID(device, claudeAccountUUID(account), session, claude.CLICurrentVersion)
 	// Reuse the account's established masking policy, but never derive a

@@ -76,6 +76,26 @@ func TestIntegrationEventSequenceAndPrivacy(t *testing.T) {
 	require.Equal(t, utf16Length("SYSTEM_SECRET_ALPHA")+utf16Length("SYSTEM_SECRET_BETA"),
 		success.event.Metadata["systemCharLength"])
 	require.Equal(t, 5, success.event.Metadata["inputTokens"])
+	require.Equal(t, CompatibilityBuildTime, success.event.FirstParty.EventData.Environment.BuildTime)
+	query := findQueuedEvent(t, events, "tengu_api_query")
+	for _, item := range []*exportItem{query, success} {
+		require.Equal(t, ProviderFirstParty, item.event.Metadata["provider"])
+		require.IsType(t, int64(0), item.event.Metadata["buildAgeMins"])
+		require.Equal(t, Derived, item.event.Provenance["buildAgeMins"])
+	}
+}
+
+func TestIntegrationDefaultsProviderToFirstParty(t *testing.T) {
+	integration, _ := newTestIntegration(t)
+	eventContext := testEventContext()
+	eventContext.Provider = ""
+	request, err := integration.Begin(context.Background(), BeginInput{
+		EventContext: eventContext, ObserverMode: ObserveJSON,
+		RequestBody: []byte(`{"model":"claude-test","messages":[{"role":"user","content":"hi"}]}`),
+	})
+	require.NoError(t, err)
+	require.Equal(t, ProviderFirstParty, request.context.Provider)
+	integration.Abort(request)
 }
 
 func TestIntegrationRetryFingerprintPromptSuggestionAndToolDedup(t *testing.T) {

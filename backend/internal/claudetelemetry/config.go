@@ -11,7 +11,11 @@ import (
 )
 
 const (
-	CompatibilityProfile = claude.CLICurrentVersion
+	CompatibilityProfile   = claude.CLICurrentVersion
+	CompatibilityBuildTime = claude.CLICurrentBuildTime
+	// ProviderFirstParty is Claude Code's API provider name for Anthropic's own
+	// API, including OAuth subscription accounts.
+	ProviderFirstParty   = "firstParty"
 	defaultFirstPartyURL = "https://api.anthropic.com/api/event_logging/v2/batch"
 	defaultDatadogURL    = "https://http-intake.logs.us5.datadoghq.com/api/v2/logs"
 )
@@ -89,7 +93,7 @@ func DefaultConfig() Config {
 		SessionTTL:        30 * time.Minute,
 		SessionCapacity:   4096,
 		SlowFirstByte:     30 * time.Second,
-		Provider:          "anthropic",
+		Provider:          ProviderFirstParty,
 	}
 }
 

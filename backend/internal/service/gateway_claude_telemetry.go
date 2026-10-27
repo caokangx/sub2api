@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"crypto/sha256"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -75,16 +74,11 @@ func (s *GatewayService) beginClaudeTelemetryAttempt(
 		account.GetCredential("organization_uuid"),
 		account.GetCredential("org_uuid"),
 	)
-	hmacSeed := sha256.Sum256([]byte("sub2api:claude-telemetry:" + token))
 	identity, sources := claudetelemetry.ResolveIdentity(claudetelemetry.IdentityInput{
 		MetadataUserID:   metadataUserID,
 		AccountUUID:      accountUUID,
 		OrganizationUUID: organizationUUID,
 		SessionIDHeader:  getHeaderRaw(wireRequest.Header, "X-Claude-Code-Session-Id"),
-		AccountFallback:  strconv.FormatInt(account.ID, 10),
-		DeviceFallback:   strconv.FormatInt(account.ID, 10) + ":" + metadataUserID,
-		SessionFallback:  strconv.FormatInt(account.ID, 10) + ":" + metadataUserID,
-		HMACSeed:         hmacSeed[:],
 	})
 	if parsed := ParseMetadataUserID(metadataUserID); parsed != nil {
 		identity.DeviceID = parsed.DeviceID
@@ -94,16 +88,20 @@ func (s *GatewayService) beginClaudeTelemetryAttempt(
 	}
 
 	headers := wireRequest.Header
+	platform := claudetelemetry.NormalizePlatform(getHeaderRaw(headers, "x-stainless-os"))
 	environment := claudetelemetry.ClientEnvironment{
-		Platform:    getHeaderRaw(headers, "x-stainless-os"),
-		PlatformRaw: getHeaderRaw(headers, "x-stainless-os"),
+		Platform:    platform,
+		PlatformRaw: platform,
 		Arch:        getHeaderRaw(headers, "x-stainless-arch"),
 		NodeVersion: getHeaderRaw(headers, "x-stainless-runtime-version"),
 		Runtime:     getHeaderRaw(headers, "x-stainless-runtime"),
 		Terminal:    getHeaderRaw(headers, "x-claude-code-terminal"),
-		Shell:       getHeaderRaw(headers, "x-claude-code-shell"),
 		Version:     ClaudeTelemetryProfile,
 		VersionBase: ClaudeTelemetryProfile,
+		BuildTime:   claudetelemetry.CompatibilityBuildTime,
+	}
+	if profile := claudeEnvironmentProfileFromContext(ctx); profile != nil {
+		environment.Shell = claudetelemetry.NormalizeShell(profile.Shell)
 	}
 	route := claudetelemetry.DeliveryRoute{
 		Key:   fmt.Sprintf("anthropic:%d:%s", account.ID, proxyURL),
@@ -132,7 +130,7 @@ func (s *GatewayService) beginClaudeTelemetryAttempt(
 				account.GetCredential("subscription_type"),
 				account.GetCredential("plan_type"),
 			),
-			Provider: "anthropic", Route: route,
+			Route: route,
 		},
 		RequestBody: wireBody, IsClaudeCode: isClaudeCode,
 		RetryCount: retryCount, ObserverMode: mode,

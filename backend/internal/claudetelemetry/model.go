@@ -1,7 +1,6 @@
 package claudetelemetry
 
 import (
-	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
@@ -57,13 +56,6 @@ type IdentityInput struct {
 	AccountUUID      string
 	OrganizationUUID string
 	SessionIDHeader  string
-
-	// Stable fallback material should contain opaque internal IDs, never raw
-	// credentials. It is HMACed and is not included in telemetry.
-	AccountFallback string
-	DeviceFallback  string
-	SessionFallback string
-	HMACSeed        []byte
 }
 
 type identityMetadata struct {
@@ -72,64 +64,29 @@ type identityMetadata struct {
 	SessionID   string `json:"session_id"`
 }
 
+// ResolveIdentity never synthesizes identifiers: a field that neither the
+// account nor the wire request provides stays empty and is omitted from events.
 func ResolveIdentity(in IdentityInput) (Identity, FieldProvenance) {
 	var embedded identityMetadata
 	_ = json.Unmarshal([]byte(in.MetadataUserID), &embedded)
+	identity := Identity{
+		AccountUUID:      valueOr(in.AccountUUID, embedded.AccountUUID),
+		OrganizationUUID: in.OrganizationUUID,
+		DeviceID:         embedded.DeviceID,
+		SessionID:        valueOr(embedded.SessionID, in.SessionIDHeader),
+	}
 	provenance := FieldProvenance{}
-	identity := Identity{}
-
-	if in.AccountUUID != "" {
-		identity.AccountUUID = in.AccountUUID
-		provenance["account_uuid"] = Observed
-	} else if embedded.AccountUUID != "" {
-		identity.AccountUUID = embedded.AccountUUID
-		provenance["account_uuid"] = Observed
-	} else {
-		identity.AccountUUID = stableID(in.HMACSeed, "account", in.AccountFallback, true)
-		provenance["account_uuid"] = Derived
-	}
-	if in.OrganizationUUID != "" {
-		identity.OrganizationUUID = in.OrganizationUUID
-		provenance["organization_uuid"] = Observed
-	} else {
-		identity.OrganizationUUID = stableID(in.HMACSeed, "organization", in.AccountFallback, true)
-		provenance["organization_uuid"] = Derived
-	}
-	if embedded.DeviceID != "" {
-		identity.DeviceID = embedded.DeviceID
-		provenance["device_id"] = Observed
-	} else {
-		identity.DeviceID = stableID(in.HMACSeed, "device", in.DeviceFallback, false)
-		provenance["device_id"] = Derived
-	}
-	switch {
-	case embedded.SessionID != "":
-		identity.SessionID = embedded.SessionID
-		provenance["session_id"] = Observed
-	case in.SessionIDHeader != "":
-		identity.SessionID = in.SessionIDHeader
-		provenance["session_id"] = Observed
-	default:
-		identity.SessionID = stableID(in.HMACSeed, "session", in.SessionFallback, true)
-		provenance["session_id"] = Derived
+	for field, value := range map[string]string{
+		"account_uuid":      identity.AccountUUID,
+		"organization_uuid": identity.OrganizationUUID,
+		"device_id":         identity.DeviceID,
+		"session_id":        identity.SessionID,
+	} {
+		if value != "" {
+			provenance[field] = Observed
+		}
 	}
 	return identity, provenance
-}
-
-func stableID(seed []byte, kind, value string, uuid bool) string {
-	if len(seed) == 0 {
-		seed = []byte("sub2api-claude-telemetry-missing-seed")
-	}
-	mac := hmac.New(sha256.New, seed)
-	_, _ = mac.Write([]byte(kind + "\x00" + value))
-	sum := mac.Sum(nil)
-	if !uuid {
-		return hex.EncodeToString(sum)
-	}
-	sum[6] = (sum[6] & 0x0f) | 0x40
-	sum[8] = (sum[8] & 0x3f) | 0x80
-	text := hex.EncodeToString(sum[:16])
-	return fmt.Sprintf("%s-%s-%s-%s-%s", text[:8], text[8:12], text[12:16], text[16:20], text[20:])
 }
 
 type ClientEnvironment struct {
@@ -145,6 +102,60 @@ type ClientEnvironment struct {
 	BuildTime             string `json:"build_time,omitempty"`
 	DeploymentEnvironment string `json:"deployment_environment,omitempty"`
 	IsCI                  *bool  `json:"is_ci,omitempty"`
+}
+
+// NormalizePlatform maps Stainless OS names (for example "MacOS") to Node's
+// process.platform values, which Claude Code reports as env.platform.
+func NormalizePlatform(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "macos", "darwin":
+		return "darwin"
+	case "linux":
+		return "linux"
+	case "windows", "win32":
+		return "win32"
+	case "freebsd":
+		return "freebsd"
+	case "openbsd":
+		return "openbsd"
+	case "android":
+		return "android"
+	default:
+		return ""
+	}
+}
+
+var knownShells = map[string]struct{}{
+	"zsh": {}, "bash": {}, "fish": {}, "sh": {}, "dash": {}, "ash": {}, "ksh": {},
+	"tcsh": {}, "csh": {}, "nu": {}, "nushell": {}, "pwsh": {}, "powershell": {},
+	"cmd": {}, "elvish": {}, "xonsh": {}, "ion": {},
+}
+
+// NormalizeShell reproduces Claude Code's shell bucketing: the executable
+// basename when it is a known shell, otherwise "other".
+func NormalizeShell(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return ""
+	}
+	if index := strings.LastIndexAny(value, `/\`); index >= 0 {
+		value = value[index+1:]
+	}
+	value = strings.TrimSuffix(strings.ToLower(value), ".exe")
+	if _, ok := knownShells[value]; ok {
+		return value
+	}
+	return "other"
+}
+
+// buildAgeMinutes mirrors Claude Code's buildAgeMins: whole minutes since the
+// compiled-in BUILD_TIME.
+func buildAgeMinutes(buildTime string, now time.Time) any {
+	built, err := time.Parse(time.RFC3339, buildTime)
+	if err != nil {
+		return nil
+	}
+	return int64(now.Sub(built) / time.Minute)
 }
 
 type EventContext struct {

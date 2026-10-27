@@ -101,9 +101,24 @@ func TestPreprocessNativeClaudeMessagesBillingUsesInboundSampleBeforeRewrite(t *
 	ctx := WithClaudeMessagesPreprocessContext(context.Background(), result)
 	headers := http.Header{}
 	applyClaudeEnvironmentHeadersFromContext(ctx, headers)
-	require.Equal(t, "darwin", getHeaderRaw(headers, "x-stainless-os"))
+	require.Equal(t, "MacOS", getHeaderRaw(headers, "x-stainless-os"))
 	require.Equal(t, "arm64", getHeaderRaw(headers, "x-stainless-arch"))
 	require.Equal(t, "zsh", getHeaderRaw(headers, "x-claude-code-shell"))
+}
+
+func TestStainlessPlatformHeaderNames(t *testing.T) {
+	for platform, want := range map[string]string{
+		"darwin": "MacOS", "linux": "Linux", "win32": "Windows",
+		"freebsd": "FreeBSD", "android": "Android", "sunos": "Other:sunos", "": "",
+	} {
+		require.Equal(t, want, stainlessOSName(platform), platform)
+	}
+	for arch, want := range map[string]string{
+		"x64": "x64", "x86_64": "x64", "arm64": "arm64", "aarch64": "arm64",
+		"arm": "arm", "x32": "x32", "riscv64": "other:riscv64", "": "",
+	} {
+		require.Equal(t, want, stainlessArchName(arch), arch)
+	}
 }
 
 func TestPreprocessNativeClaudeMessagesProbeBodyIsValidJSON(t *testing.T) {
