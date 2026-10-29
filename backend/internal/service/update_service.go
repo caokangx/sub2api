@@ -25,6 +25,8 @@ import (
 var (
 	ErrNoUpdateAvailable         = infraerrors.Conflict("ALREADY_UP_TO_DATE", "no update available; current version is latest")
 	ErrRollbackVersionNotAllowed = infraerrors.BadRequest("ROLLBACK_VERSION_NOT_ALLOWED", "version is not in the allowed rollback list")
+	// 非 release 构建（含二开镜像）下载上游发布包会覆盖本地改动，只能重新构建部署。
+	ErrOnlineUpdateDisabled = infraerrors.Forbidden("ONLINE_UPDATE_DISABLED", "online update is disabled for non-release builds; rebuild and redeploy from source instead")
 )
 
 const (
@@ -160,9 +162,16 @@ func (s *UpdateService) CheckUpdate(ctx context.Context, force bool) (*UpdateInf
 	return info, nil
 }
 
+func (s *UpdateService) onlineUpdateAllowed() bool {
+	return s.buildType == "release"
+}
+
 // PerformUpdate downloads and applies the update
 // Uses atomic file replacement pattern for safe in-place updates
 func (s *UpdateService) PerformUpdate(ctx context.Context) error {
+	if !s.onlineUpdateAllowed() {
+		return ErrOnlineUpdateDisabled
+	}
 	info, err := s.CheckUpdate(ctx, true)
 	if err != nil {
 		return err
@@ -327,6 +336,9 @@ func (s *UpdateService) ListRollbackVersions(ctx context.Context) ([]RollbackVer
 // The target must be one of the versions returned by ListRollbackVersions;
 // anything else (including the current version) is rejected.
 func (s *UpdateService) RollbackToVersion(ctx context.Context, version string) error {
+	if !s.onlineUpdateAllowed() {
+		return ErrOnlineUpdateDisabled
+	}
 	target := strings.TrimPrefix(strings.TrimSpace(version), "v")
 	if target == "" {
 		return ErrRollbackVersionNotAllowed
