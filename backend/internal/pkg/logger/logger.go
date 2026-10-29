@@ -30,6 +30,9 @@ const (
 	// OpsSystemLogSkipField keeps an event in the standard logger while
 	// preventing the database-backed Ops system-log sink from indexing it.
 	OpsSystemLogSkipField = "ops_system_log_skip"
+	// OpsSystemLogIndexField forces an event below warn level into the ops
+	// system log index. Use it only for low-volume, one-off business events.
+	OpsSystemLogIndexField = "ops_system_log_index"
 )
 
 type Sink interface {

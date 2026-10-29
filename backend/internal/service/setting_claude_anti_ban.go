@@ -51,9 +51,18 @@ type ClaudeEnvironmentRewriteSettings struct {
 	Profile     ClaudeEnvironmentProfile `json:"profile"`
 }
 
+// ClaudeThinkingStripSettings 控制转发前删除历史 thinking 块。
+// ForceStripPercent 是按会话抽签的比例：即使签名全部合法，
+// 也有该比例的会话被整体删除 thinking。
+type ClaudeThinkingStripSettings struct {
+	Enabled           bool `json:"enabled"`
+	ForceStripPercent int  `json:"force_strip_percent"`
+}
+
 type ClaudeAntiBanSettings struct {
 	ProbeInterceptionEnabled bool                             `json:"probe_interception_enabled"`
 	Environment              ClaudeEnvironmentRewriteSettings `json:"environment"`
+	ThinkingStrip            ClaudeThinkingStripSettings      `json:"thinking_strip"`
 }
 
 func DefaultClaudeAntiBanSettings() *ClaudeAntiBanSettings {
@@ -180,6 +189,9 @@ func validateClaudeAntiBanSettings(settings *ClaudeAntiBanSettings) error {
 	default:
 		return errors.New("environment.profile.git_status must be clean or unavailable")
 	}
+	if settings.ThinkingStrip.ForceStripPercent < 0 || settings.ThinkingStrip.ForceStripPercent > 100 {
+		return errors.New("thinking_strip.force_strip_percent must be between 0 and 100")
+	}
 	if len(profile.AdditionalWorkingDirectories) > 20 || len(profile.RecentCommits) > 20 {
 		return errors.New("environment profile lists support at most 20 entries")
 	}
@@ -240,6 +252,21 @@ func (s *SettingService) GetClaudeAntiBanSettings(ctx context.Context) (*ClaudeA
 	}
 	s.claudeAntiBanRuntime.Store(cloneClaudeAntiBanSettings(settings))
 	return cloneClaudeAntiBanSettings(settings), nil
+}
+
+// ClaudeThinkingStripRuntime 返回删除 thinking 块的当前配置，供网关热路径读取。
+func (s *SettingService) ClaudeThinkingStripRuntime(ctx context.Context) ClaudeThinkingStripSettings {
+	if s == nil {
+		return ClaudeThinkingStripSettings{}
+	}
+	if current := s.claudeAntiBanRuntime.Load(); current != nil {
+		return current.ThinkingStrip
+	}
+	settings, err := s.GetClaudeAntiBanSettings(ctx)
+	if err != nil || settings == nil {
+		return ClaudeThinkingStripSettings{}
+	}
+	return settings.ThinkingStrip
 }
 
 func (s *SettingService) SaveClaudeAntiBanSettings(ctx context.Context, incoming *ClaudeAntiBanSettings) (*ClaudeAntiBanSettings, error) {

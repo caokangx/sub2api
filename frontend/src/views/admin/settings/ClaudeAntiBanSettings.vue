@@ -17,44 +17,6 @@
         {{ t("admin.settings.claudeAntiBan.alwaysOnHint") }}
       </div>
 
-      <fieldset class="space-y-3 border-t border-gray-100 pt-5 dark:border-dark-700" :disabled="groupsLoading || groupsSaving">
-        <legend class="text-sm font-semibold text-gray-900 dark:text-white">
-          {{ t("admin.settings.claudeAntiBan.promptOverride") }}
-        </legend>
-        <p class="text-sm text-gray-600 dark:text-gray-300">
-          {{ t("admin.settings.claudeAntiBan.promptOverrideHint") }}
-        </p>
-        <ul class="list-disc space-y-1 pl-5 text-xs text-gray-500 dark:text-gray-400">
-          <li>{{ t("admin.settings.claudeAntiBan.promptOverrideSystem") }}</li>
-          <li>{{ t("admin.settings.claudeAntiBan.promptOverrideTools") }}</li>
-          <li>{{ t("admin.settings.claudeAntiBan.promptOverrideParameters") }}</li>
-        </ul>
-        <p v-if="groupsLoading" class="text-sm text-gray-500" role="status">
-          {{ t("common.loading") }}
-        </p>
-        <div v-else-if="groupsLoadFailed" class="flex items-center justify-between gap-3" role="alert">
-          <p class="text-sm text-red-600 dark:text-red-400">{{ t("admin.settings.claudeAntiBan.promptGroupsLoadFailed") }}</p>
-          <button type="button" class="btn btn-secondary btn-sm" data-testid="prompt-groups-retry" @click="loadPromptGroups">
-            {{ t("admin.settings.claudeAntiBan.retryPromptGroups") }}
-          </button>
-        </div>
-        <GroupSelector
-          v-else
-          v-model="promptGroupIds"
-          :groups="promptGroups"
-          :searchable="true"
-          data-testid="prompt-override-groups"
-        />
-        <p class="text-xs text-gray-500 dark:text-gray-400">
-          {{ t("admin.settings.claudeAntiBan.promptOverrideSelectionHint") }}
-        </p>
-        <div class="flex justify-end">
-          <button type="button" class="btn btn-primary btn-sm" :disabled="groupsLoadFailed || !promptGroupsDirty" data-testid="prompt-groups-save" @click="savePromptGroups">
-            {{ groupsSaving ? t("common.saving") : t("admin.settings.claudeAntiBan.savePromptGroups") }}
-          </button>
-        </div>
-      </fieldset>
-
       <div class="flex items-center justify-between rounded-lg border border-gray-200 p-4 dark:border-dark-600">
         <div>
           <p class="text-sm font-medium text-gray-900 dark:text-white">
@@ -67,99 +29,189 @@
         <Toggle v-model="form.probe_interception_enabled" data-testid="anti-ban-probe" />
       </div>
 
-      <fieldset class="space-y-4 border-t border-gray-100 pt-5 dark:border-dark-700">
-        <legend class="text-sm font-semibold text-gray-900 dark:text-white">
-          {{ t("admin.settings.claudeAntiBan.environment") }}
-        </legend>
-        <div class="grid gap-4 md:grid-cols-2">
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.mode") }}</span>
-            <select v-model="form.environment.mode" class="input" data-testid="anti-ban-mode">
-              <option value="off">{{ t("admin.settings.claudeAntiBan.modes.off") }}</option>
-              <option value="observe">{{ t("admin.settings.claudeAntiBan.modes.observe") }}</option>
-              <option value="rewrite">{{ t("admin.settings.claudeAntiBan.modes.rewrite") }}</option>
-            </select>
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.onUnmatched") }}</span>
-            <select v-model="form.environment.on_unmatched" class="input">
-              <option value="pass">{{ t("admin.settings.claudeAntiBan.unmatched.pass") }}</option>
-              <option value="reject">{{ t("admin.settings.claudeAntiBan.unmatched.reject") }}</option>
-            </select>
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.workingDirectory") }}</span>
-            <input v-model.trim="form.environment.profile.working_directory" class="input font-mono" data-testid="anti-ban-working-directory" />
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.memoryDirectory") }}</span>
-            <input v-model.trim="form.environment.profile.memory_directory" class="input font-mono" />
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.homeDirectory") }}</span>
-            <input v-model.trim="form.environment.profile.home_directory" class="input font-mono" />
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.osVersion") }}</span>
-            <input v-model.trim="form.environment.profile.os_version" class="input font-mono" data-testid="anti-ban-os-version" />
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.platform") }}</span>
-            <select v-model="form.environment.profile.platform" class="input">
-              <option value="darwin">darwin</option>
-              <option value="linux">linux</option>
-              <option value="win32">win32</option>
-            </select>
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.shell") }}</span>
-            <select v-model="form.environment.profile.shell" class="input">
-              <option value="zsh">zsh</option>
-              <option value="bash">bash</option>
-              <option value="fish">fish</option>
-              <option value="powershell">powershell</option>
-              <option value="cmd">cmd</option>
-            </select>
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.arch") }}</span>
-            <input v-model.trim="form.environment.profile.arch" class="input font-mono" />
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.runtime") }}</span>
-            <input v-model.trim="form.environment.profile.runtime" class="input font-mono" />
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.runtimeVersion") }}</span>
-            <input v-model.trim="form.environment.profile.runtime_version" class="input font-mono" />
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.packageVersion") }}</span>
-            <input v-model.trim="form.environment.profile.package_version" class="input font-mono" />
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.gitUser") }}</span>
-            <input v-model.trim="form.environment.profile.git_user" class="input" />
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.userIdentity") }}</span>
-            <input v-model.trim="form.environment.profile.user_identity" class="input" />
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.currentBranch") }}</span>
-            <input v-model.trim="form.environment.profile.current_branch" class="input" />
-          </label>
-          <label>
-            <span class="input-label">{{ t("admin.settings.claudeAntiBan.mainBranch") }}</span>
-            <input v-model.trim="form.environment.profile.main_branch" class="input" />
+      <section class="rounded-xl border border-gray-200 dark:border-dark-600" data-testid="anti-ban-module-prompt">
+        <header class="rounded-t-xl border-b border-gray-100 bg-gray-50 px-5 py-4 dark:border-dark-700 dark:bg-dark-800/60">
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+            {{ t("admin.settings.claudeAntiBan.modules.promptOverride.title") }}
+          </h3>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ t("admin.settings.claudeAntiBan.modules.promptOverride.description") }}
+          </p>
+        </header>
+        <div class="space-y-6 p-5">
+          <fieldset class="space-y-3" :disabled="groupsLoading || groupsSaving">
+            <legend class="text-sm font-semibold text-gray-900 dark:text-white">
+              {{ t("admin.settings.claudeAntiBan.promptOverride") }}
+            </legend>
+            <p class="text-sm text-gray-600 dark:text-gray-300">
+              {{ t("admin.settings.claudeAntiBan.promptOverrideHint") }}
+            </p>
+            <ul class="list-disc space-y-1 pl-5 text-xs text-gray-500 dark:text-gray-400">
+              <li>{{ t("admin.settings.claudeAntiBan.promptOverrideSystem") }}</li>
+              <li>{{ t("admin.settings.claudeAntiBan.promptOverrideTools") }}</li>
+              <li>{{ t("admin.settings.claudeAntiBan.promptOverrideParameters") }}</li>
+            </ul>
+            <p v-if="groupsLoading" class="text-sm text-gray-500" role="status">
+              {{ t("common.loading") }}
+            </p>
+            <div v-else-if="groupsLoadFailed" class="flex items-center justify-between gap-3" role="alert">
+              <p class="text-sm text-red-600 dark:text-red-400">{{ t("admin.settings.claudeAntiBan.promptGroupsLoadFailed") }}</p>
+              <button type="button" class="btn btn-secondary btn-sm" data-testid="prompt-groups-retry" @click="loadPromptGroups">
+                {{ t("admin.settings.claudeAntiBan.retryPromptGroups") }}
+              </button>
+            </div>
+            <GroupSelector
+              v-else
+              v-model="promptGroupIds"
+              :groups="promptGroups"
+              :searchable="true"
+              data-testid="prompt-override-groups"
+            />
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t("admin.settings.claudeAntiBan.promptOverrideSelectionHint") }}
+            </p>
+            <div class="flex justify-end">
+              <button type="button" class="btn btn-primary btn-sm" :disabled="groupsLoadFailed || !promptGroupsDirty" data-testid="prompt-groups-save" @click="savePromptGroups">
+                {{ groupsSaving ? t("common.saving") : t("admin.settings.claudeAntiBan.savePromptGroups") }}
+              </button>
+            </div>
+          </fieldset>
+
+          <fieldset class="space-y-4 border-t border-gray-100 pt-5 dark:border-dark-700">
+            <legend class="text-sm font-semibold text-gray-900 dark:text-white">
+              {{ t("admin.settings.claudeAntiBan.environment") }}
+            </legend>
+            <div class="grid gap-4 md:grid-cols-2">
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.mode") }}</span>
+                <select v-model="form.environment.mode" class="input" data-testid="anti-ban-mode">
+                  <option value="off">{{ t("admin.settings.claudeAntiBan.modes.off") }}</option>
+                  <option value="observe">{{ t("admin.settings.claudeAntiBan.modes.observe") }}</option>
+                  <option value="rewrite">{{ t("admin.settings.claudeAntiBan.modes.rewrite") }}</option>
+                </select>
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.onUnmatched") }}</span>
+                <select v-model="form.environment.on_unmatched" class="input">
+                  <option value="pass">{{ t("admin.settings.claudeAntiBan.unmatched.pass") }}</option>
+                  <option value="reject">{{ t("admin.settings.claudeAntiBan.unmatched.reject") }}</option>
+                </select>
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.workingDirectory") }}</span>
+                <input v-model.trim="form.environment.profile.working_directory" class="input font-mono" data-testid="anti-ban-working-directory" />
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.memoryDirectory") }}</span>
+                <input v-model.trim="form.environment.profile.memory_directory" class="input font-mono" />
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.homeDirectory") }}</span>
+                <input v-model.trim="form.environment.profile.home_directory" class="input font-mono" />
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.osVersion") }}</span>
+                <input v-model.trim="form.environment.profile.os_version" class="input font-mono" data-testid="anti-ban-os-version" />
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.platform") }}</span>
+                <select v-model="form.environment.profile.platform" class="input">
+                  <option value="darwin">darwin</option>
+                  <option value="linux">linux</option>
+                  <option value="win32">win32</option>
+                </select>
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.shell") }}</span>
+                <select v-model="form.environment.profile.shell" class="input">
+                  <option value="zsh">zsh</option>
+                  <option value="bash">bash</option>
+                  <option value="fish">fish</option>
+                  <option value="powershell">powershell</option>
+                  <option value="cmd">cmd</option>
+                </select>
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.arch") }}</span>
+                <input v-model.trim="form.environment.profile.arch" class="input font-mono" />
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.runtime") }}</span>
+                <input v-model.trim="form.environment.profile.runtime" class="input font-mono" />
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.runtimeVersion") }}</span>
+                <input v-model.trim="form.environment.profile.runtime_version" class="input font-mono" />
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.packageVersion") }}</span>
+                <input v-model.trim="form.environment.profile.package_version" class="input font-mono" />
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.gitUser") }}</span>
+                <input v-model.trim="form.environment.profile.git_user" class="input" />
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.userIdentity") }}</span>
+                <input v-model.trim="form.environment.profile.user_identity" class="input" />
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.currentBranch") }}</span>
+                <input v-model.trim="form.environment.profile.current_branch" class="input" />
+              </label>
+              <label>
+                <span class="input-label">{{ t("admin.settings.claudeAntiBan.mainBranch") }}</span>
+                <input v-model.trim="form.environment.profile.main_branch" class="input" />
+              </label>
+            </div>
+            <label class="block">
+              <span class="input-label">{{ t("admin.settings.claudeAntiBan.additionalDirectories") }}</span>
+              <textarea v-model="additionalDirectoriesText" rows="3" class="input font-mono text-xs" />
+              <span class="input-hint">{{ t("admin.settings.claudeAntiBan.additionalDirectoriesHint") }}</span>
+            </label>
+          </fieldset>
+        </div>
+      </section>
+
+      <section class="rounded-xl border border-gray-200 dark:border-dark-600" data-testid="anti-ban-module-thinking-strip">
+        <header class="rounded-t-xl border-b border-gray-100 bg-gray-50 px-5 py-4 dark:border-dark-700 dark:bg-dark-800/60">
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+            {{ t("admin.settings.claudeAntiBan.modules.thinkingStrip.title") }}
+          </h3>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ t("admin.settings.claudeAntiBan.modules.thinkingStrip.description") }}
+          </p>
+        </header>
+        <div class="space-y-4 p-5">
+          <div class="flex items-center justify-between gap-4">
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">
+                {{ t("admin.settings.claudeAntiBan.thinkingStrip.enable") }}
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t("admin.settings.claudeAntiBan.thinkingStrip.hint") }}
+              </p>
+            </div>
+            <Toggle v-model="form.thinking_strip.enabled" data-testid="anti-ban-thinking-strip" />
+          </div>
+          <label class="block border-t border-gray-100 pt-4 dark:border-dark-700">
+            <span class="input-label">{{ t("admin.settings.claudeAntiBan.thinkingStrip.forcePercent") }}</span>
+            <input
+              v-model.number="form.thinking_strip.force_strip_percent"
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              class="input w-40"
+              :disabled="!form.thinking_strip.enabled"
+              data-testid="anti-ban-thinking-strip-percent"
+            />
+            <span class="mt-1 block text-xs text-gray-500 dark:text-gray-400">
+              {{ t("admin.settings.claudeAntiBan.thinkingStrip.forcePercentHint") }}
+            </span>
           </label>
         </div>
-        <label class="block">
-          <span class="input-label">{{ t("admin.settings.claudeAntiBan.additionalDirectories") }}</span>
-          <textarea v-model="additionalDirectoriesText" rows="3" class="input font-mono text-xs" />
-          <span class="input-hint">{{ t("admin.settings.claudeAntiBan.additionalDirectoriesHint") }}</span>
-        </label>
-      </fieldset>
+      </section>
 
       <div class="flex justify-end border-t border-gray-100 pt-4 dark:border-dark-700">
         <button
@@ -273,6 +325,10 @@ const defaultForm = (): ClaudeAntiBanSettings => ({
       package_version: "0.112.1",
     },
   },
+  thinking_strip: {
+    enabled: false,
+    force_strip_percent: 0,
+  },
 });
 const form = reactive<ClaudeAntiBanSettings>(defaultForm());
 
@@ -304,6 +360,8 @@ async function save(): Promise<void> {
         .split(/\r?\n/)
         .map((item) => item.trim())
         .filter(Boolean);
+    const percent = Math.round(Number(form.thinking_strip.force_strip_percent) || 0);
+    form.thinking_strip.force_strip_percent = Math.min(100, Math.max(0, percent));
     const updated = await updateClaudeAntiBanSettings(
       JSON.parse(JSON.stringify(form)) as ClaudeAntiBanSettings,
     );

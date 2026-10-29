@@ -855,6 +855,10 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 	useNoopDeltaKeepalive := c != nil && c.Request != nil && shouldUseClaudeCodeNoopDeltaKeepalive(c.GetHeader("User-Agent"))
 	noopDeltaKeepaliveBlockIndex := -1
 	noopDeltaKeepaliveDeltaType := ""
+	var thinkingSigTracker *thinkingSignatureTracker
+	if s.thinkingStrip != nil && thinkingStripApplies(account) {
+		thinkingSigTracker = newThinkingSignatureTracker()
+	}
 
 	pendingEventLines := make([]string, 0, 4)
 
@@ -914,6 +918,12 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 			eventName = eventType
 		}
 		eventChanged := false
+		// 在把 content_block_stop 写给客户端之前同步登记签名，保证客户端下一轮请求到达时已可校验。
+		if thinkingSigTracker != nil {
+			if signatures := thinkingSigTracker.observe(eventType, event); len(signatures) > 0 {
+				s.thinkingStrip.RegisterIssued(ctx, account, signatures...)
+			}
+		}
 
 		if useNoopDeltaKeepalive {
 			switch eventType {
@@ -1413,6 +1423,9 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 		observer = beginUpstreamResponseModelObservation(c)
 	}
 	observer.ObserveAnthropic(body)
+	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
+		s.thinkingStrip.RegisterIssuedFromResponse(ctx, account, body)
+	}
 
 	// 解析usage
 	var response struct {

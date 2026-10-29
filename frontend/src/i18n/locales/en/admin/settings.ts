@@ -485,6 +485,22 @@ export default {
         mainBranch: 'Main branch',
         additionalDirectories: 'Additional working directories',
         additionalDirectoriesHint: 'One absolute path per line. Leave empty to remove this section from recognized environment blocks.',
+        modules: {
+          promptOverride: {
+            title: 'Method 1: Override the system prompt',
+            description: 'Make requests look like the official Claude Code: force-replace system, tools and related prompts per group, and rewrite the client environment.',
+          },
+          thinkingStrip: {
+            title: 'Method 2: Strip thinking blocks',
+            description: 'Remove historical thinking blocks before forwarding, so signatures issued by other accounts are never sent to the current one.',
+          },
+        },
+        thinkingStrip: {
+          enable: 'Enable',
+          hint: 'Anthropic OAuth / Setup Token only. If any historical thinking block in a request was not issued by the selected account (unknown signatures count as foreign), all thinking blocks in that request are removed, and every later request of the same session keeps removing them.',
+          forcePercent: 'Forced strip ratio (%)',
+          forcePercentHint: '0–100. Drawn once per session the first time it carries valid thinking blocks; a hit strips thinking for the rest of that session. Requests without a session ID never take part in the draw.',
+        },
       },
       claudeTelemetry: {
         title: 'Claude Telemetry',

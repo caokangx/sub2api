@@ -478,6 +478,22 @@ export default {
         mainBranch: '主分支',
         additionalDirectories: '附加工作目录',
         additionalDirectoriesHint: '每行一个绝对路径；留空会从识别到的环境块中删除该段。',
+        modules: {
+          promptOverride: {
+            title: '方法一：覆盖系统提示词',
+            description: '把请求伪装成官方 Claude Code：按分组强制替换 system、tools 等提示词，并覆写客户端环境信息。'
+          },
+          thinkingStrip: {
+            title: '方法二：删除 thinking 块',
+            description: '转发前删除历史消息中的 thinking 块，避免把其他账号签发的签名带给当前账号。'
+          }
+        },
+        thinkingStrip: {
+          enable: '启用',
+          hint: '仅对 Anthropic OAuth / Setup Token 账号生效。请求历史中只要有一个 thinking 块不是本次选中的账号签发的（查不到的签名也按此处理），就删除该请求中的全部 thinking 块，并且同一会话的后续请求也一直删除。',
+          forcePercent: '强制删除比例（%）',
+          forcePercentHint: '0–100。每个会话在第一次带上合法 thinking 时抽签一次，抽中后该会话此后一直删除；没有会话 ID 的请求不参与抽签。',
+        },
       },
       claudeTelemetry: {
         title: 'Claude 遥测',

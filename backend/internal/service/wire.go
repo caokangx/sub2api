@@ -192,8 +192,9 @@ func ProvideGatewayService(
 	balanceNotifyService *BalanceNotifyService,
 	userPlatformQuotaRepo UserPlatformQuotaRepository,
 	claudeTelemetry *ClaudeTelemetryManager,
+	thinkingSignatureCache ThinkingSignatureCache,
 ) *GatewayService {
-	return NewGatewayService(
+	svc := NewGatewayService(
 		accountRepo, groupRepo, usageLogRepo, usageBillingRepo, userRepo,
 		userSubRepo, userGroupRateRepo, cache, cfg, schedulerSnapshot,
 		concurrencyService, billingService, rateLimitService, billingCacheService,
@@ -202,6 +203,8 @@ func ProvideGatewayService(
 		tlsFPProfileService, channelService, resolver, compositeResolver,
 		balanceNotifyService, userPlatformQuotaRepo, claudeTelemetry,
 	)
+	svc.SetThinkingStripPolicy(NewThinkingStripPolicy(thinkingSignatureCache, settingService))
+	return svc
 }
 
 // ProvideOpenAITokenProvider creates OpenAITokenProvider with OAuthRefreshAPI injection

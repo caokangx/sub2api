@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/Wei-Shaw/sub2api/internal/config"
@@ -34,6 +35,50 @@ func TestClaudeAntiBanSettingsDefaultsAndSave(t *testing.T) {
 	got, err := reloaded.GetClaudeAntiBanSettings(ctx)
 	require.NoError(t, err)
 	require.Equal(t, saved, got)
+}
+
+func TestClaudeAntiBanThinkingStripDefaultsAndRoundTrip(t *testing.T) {
+	repo := newClaudeTelemetrySettingRepo()
+	settings := NewSettingService(repo, &config.Config{})
+	ctx := context.Background()
+
+	initial, err := settings.GetClaudeAntiBanSettings(ctx)
+	require.NoError(t, err)
+	require.False(t, initial.ThinkingStrip.Enabled)
+	require.Zero(t, initial.ThinkingStrip.ForceStripPercent)
+
+	initial.ThinkingStrip = ClaudeThinkingStripSettings{Enabled: true, ForceStripPercent: 35}
+	_, err = settings.SaveClaudeAntiBanSettings(ctx, initial)
+	require.NoError(t, err)
+	require.Equal(t, initial.ThinkingStrip, settings.ClaudeThinkingStripRuntime(ctx))
+
+	reloaded := NewSettingService(repo, &config.Config{})
+	require.Equal(t, initial.ThinkingStrip, reloaded.ClaudeThinkingStripRuntime(ctx))
+}
+
+func TestClaudeAntiBanThinkingStripLegacyJSONUsesDefaults(t *testing.T) {
+	repo := newClaudeTelemetrySettingRepo()
+	ctx := context.Background()
+	legacy := DefaultClaudeAntiBanSettings()
+	encoded, err := json.Marshal(map[string]any{
+		"probe_interception_enabled": legacy.ProbeInterceptionEnabled,
+		"environment":                legacy.Environment,
+	})
+	require.NoError(t, err)
+	require.NoError(t, repo.Set(ctx, SettingKeyClaudeAntiBanSettings, string(encoded)))
+
+	got := NewSettingService(repo, &config.Config{}).ClaudeThinkingStripRuntime(ctx)
+	require.Equal(t, ClaudeThinkingStripSettings{}, got)
+}
+
+func TestClaudeAntiBanThinkingStripRejectsOutOfRangePercent(t *testing.T) {
+	settings := NewSettingService(newClaudeTelemetrySettingRepo(), &config.Config{})
+	for _, percent := range []int{-1, 101} {
+		input := DefaultClaudeAntiBanSettings()
+		input.ThinkingStrip = ClaudeThinkingStripSettings{Enabled: true, ForceStripPercent: percent}
+		_, err := settings.SaveClaudeAntiBanSettings(context.Background(), input)
+		require.Error(t, err, "percent=%d", percent)
+	}
 }
 
 func TestClaudeAntiBanSettingsRejectInvalidProfile(t *testing.T) {

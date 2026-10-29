@@ -1483,6 +1483,12 @@ export interface ClaudeEnvironmentProfile {
   package_version: string;
 }
 
+export interface ClaudeThinkingStripSettings {
+  enabled: boolean;
+  /** 0-100，按会话抽签的强制删除比例。 */
+  force_strip_percent: number;
+}
+
 export interface ClaudeAntiBanSettings {
   probe_interception_enabled: boolean;
   environment: {
@@ -1490,6 +1496,7 @@ export interface ClaudeAntiBanSettings {
     on_unmatched: ClaudeEnvironmentUnmatchedMode;
     profile: ClaudeEnvironmentProfile;
   };
+  thinking_strip: ClaudeThinkingStripSettings;
 }
 
 export async function getClaudeAntiBanSettings(): Promise<ClaudeAntiBanSettings> {

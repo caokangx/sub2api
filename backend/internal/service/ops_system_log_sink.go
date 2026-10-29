@@ -162,6 +162,9 @@ func (s *OpsSystemLogSink) shouldIndex(event *logger.LogEvent) bool {
 		if skip, _ := event.Fields[logger.OpsSystemLogSkipField].(bool); skip {
 			return false
 		}
+		if index, _ := event.Fields[logger.OpsSystemLogIndexField].(bool); index {
+			return true
+		}
 	}
 	level := strings.ToLower(strings.TrimSpace(event.Level))
 	switch level {

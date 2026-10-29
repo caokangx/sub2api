@@ -73,6 +73,22 @@ func TestOpsSystemLogSink_ShouldIndex(t *testing.T) {
 			event: &logger.LogEvent{Level: "info", Component: "app"},
 			want:  false,
 		},
+		{
+			name: "info opted into index",
+			event: &logger.LogEvent{
+				Level:  "info",
+				Fields: map[string]any{"component": "service.thinking_strip", logger.OpsSystemLogIndexField: true},
+			},
+			want: true,
+		},
+		{
+			name: "skip wins over index",
+			event: &logger.LogEvent{
+				Level:  "info",
+				Fields: map[string]any{logger.OpsSystemLogIndexField: true, logger.OpsSystemLogSkipField: true},
+			},
+			want: false,
+		},
 	}
 
 	for _, tc := range cases {

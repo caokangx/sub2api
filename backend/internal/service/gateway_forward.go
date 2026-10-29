@@ -395,6 +395,15 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	if err := replaceBody(FilterWebSearchHistoryBlocks(body, reqModel)); err != nil {
 		return nil, err
 	}
+	// 防封：历史 thinking 签名不全属于本账号（或会话已被标记）时整体删除 thinking 块。
+	// Forward 每次 failover 都以新账号重新进入，因此按本次账号判定。
+	if s.thinkingStrip != nil {
+		if stripped, decision := s.thinkingStrip.Apply(ctx, c, account, parsed, body, ThinkingStripModeMessages); decision.Stripped {
+			if err := replaceBody(stripped); err != nil {
+				return nil, err
+			}
+		}
+	}
 	// Pre-filter: remove thinking blocks with missing/invalid signatures before forwarding.
 	// Clients (e.g. Claude Code) sometimes send multi-turn conversations where a historical
 	// assistant message contains a thinking block that is missing the required "signature" field,

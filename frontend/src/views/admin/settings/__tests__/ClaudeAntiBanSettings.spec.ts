@@ -150,6 +150,52 @@ describe("ClaudeAntiBanSettings", () => {
     expect(mocks.updateGroup).not.toHaveBeenCalled();
   });
 
+  it("groups prompt override and thinking strip into separate method modules", async () => {
+    const wrapper = mountSettings();
+    await flushPromises();
+
+    const promptModule = wrapper.get('[data-testid="anti-ban-module-prompt"]');
+    expect(promptModule.text()).toContain("admin.settings.claudeAntiBan.modules.promptOverride.title");
+    expect(promptModule.find('[data-testid="prompt-override-groups"]').exists()).toBe(true);
+    expect(promptModule.find('[data-testid="anti-ban-mode"]').exists()).toBe(true);
+    expect(promptModule.find('[data-testid="anti-ban-thinking-strip"]').exists()).toBe(false);
+
+    const thinkingModule = wrapper.get('[data-testid="anti-ban-module-thinking-strip"]');
+    expect(thinkingModule.text()).toContain("admin.settings.claudeAntiBan.modules.thinkingStrip.title");
+    expect(thinkingModule.find('[data-testid="anti-ban-thinking-strip"]').exists()).toBe(true);
+    expect(thinkingModule.find('[data-testid="anti-ban-thinking-strip-percent"]').exists()).toBe(true);
+  });
+
+  it("defaults thinking strip to disabled when the server omits it", async () => {
+    const wrapper = mountSettings();
+    await flushPromises();
+
+    expect(wrapper.get<HTMLInputElement>('[data-testid="anti-ban-thinking-strip"]').element.checked).toBe(false);
+    const percent = wrapper.get<HTMLInputElement>('[data-testid="anti-ban-thinking-strip-percent"]');
+    expect(percent.element.value).toBe("0");
+    expect(percent.element.disabled).toBe(true);
+  });
+
+  it("saves thinking strip settings and clamps the ratio", async () => {
+    mocks.get.mockResolvedValue({
+      ...response(),
+      thinking_strip: { enabled: true, force_strip_percent: 20 },
+    });
+    const wrapper = mountSettings();
+    await flushPromises();
+
+    const percent = wrapper.get<HTMLInputElement>('[data-testid="anti-ban-thinking-strip-percent"]');
+    expect(percent.element.value).toBe("20");
+    expect(percent.element.disabled).toBe(false);
+    await percent.setValue("150");
+    await wrapper.get('[data-testid="anti-ban-save"]').trigger("click");
+    await flushPromises();
+
+    expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
+      thinking_strip: { enabled: true, force_strip_percent: 100 },
+    }));
+  });
+
   it("loads existing prompt override selections including inactive Anthropic groups", async () => {
     const wrapper = mountSettings();
     await flushPromises();

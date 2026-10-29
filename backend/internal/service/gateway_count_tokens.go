@@ -179,6 +179,14 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 			return err
 		}
 	}
+	// 与 Forward 保持一致的 thinking 删除判定，但只读：不写会话状态，也不抽签。
+	if s.thinkingStrip != nil {
+		if stripped, decision := s.thinkingStrip.Apply(ctx, c, account, parsed, body, ThinkingStripModeCountTokens); decision.Stripped {
+			if err := replaceBody(stripped); err != nil {
+				return err
+			}
+		}
+	}
 	if s.shouldInjectAnthropicCacheTTL1h(ctx, account) {
 		if err := replaceBody(injectAnthropicCacheControlTTL1h(body)); err != nil {
 			return err

@@ -809,6 +809,7 @@ type GatewayService struct {
 	balanceNotifyService  *BalanceNotifyService
 	userPlatformQuotaRepo UserPlatformQuotaRepository
 	claudeTelemetry       *ClaudeTelemetryManager
+	thinkingStrip         *ThinkingStripPolicy
 }
 
 // NewGatewayService creates a new GatewayService
