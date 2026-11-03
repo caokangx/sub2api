@@ -131,6 +131,25 @@ func TestSanitizeAnthropicBodyForBetaTokens_ThinkingBlockBindingStrippedWhenBeta
 	require.Equal(t, "summarized", gjson.GetBytes(out, "thinking.display").String())
 }
 
+func TestSanitizeAnthropicBodyForBetaTokens_ThinkingDisplayUpdatesAndSafeguards(t *testing.T) {
+	body := []byte(`{"model":"claude-opus-5-5","thinking":{"type":"adaptive","display":"updates"},"safeguards":[{"type":"dangerous_tool_use"}],"messages":[]}`)
+
+	out, changed := sanitizeAnthropicBodyForBetaTokens(body, claude.BetaThinkingDisplayUpdates+","+claude.BetaDangerousToolUse)
+	require.False(t, changed)
+	require.Equal(t, string(body), string(out))
+
+	out, changed = sanitizeAnthropicBodyForBetaTokens(body, claude.BetaClaudeCode)
+	require.True(t, changed)
+	require.Equal(t, "adaptive", gjson.GetBytes(out, "thinking.type").String())
+	require.Equal(t, "summarized", gjson.GetBytes(out, "thinking.display").String())
+	require.False(t, gjson.GetBytes(out, "safeguards").Exists())
+
+	omitted := []byte(`{"thinking":{"type":"adaptive","display":"omitted"},"messages":[]}`)
+	out, changed = sanitizeAnthropicBodyForBetaTokens(omitted, claude.BetaClaudeCode)
+	require.False(t, changed)
+	require.Equal(t, string(omitted), string(out))
+}
+
 // ★ 关键回归断言：能力维度 sanitize 解决了 "真 CC + haiku" 路径的过度删除问题。
 // 真实 Claude Code CLI 2.1.87+ 客户端 header 含 context-management beta；
 // 即使 model 是 haiku，sanitize 也不应剥离功能字段。

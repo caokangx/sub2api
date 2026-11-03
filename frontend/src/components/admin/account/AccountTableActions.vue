@@ -6,7 +6,14 @@
     </button>
     <slot name="after"></slot>
     <slot name="beforeCreate"></slot>
-    <button @click="$emit('create')" class="btn btn-primary">{{ t('admin.accounts.createAccount') }}</button>
+    <button
+      @click="$emit('create')"
+      :disabled="readonly"
+      :title="readonly ? t('admin.accounts.readonlyHint') : undefined"
+      class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {{ t('admin.accounts.createAccount') }}
+    </button>
     <slot name="afterCreate"></slot>
   </div>
 </template>
@@ -15,7 +22,7 @@
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 
-defineProps(['loading'])
+defineProps<{ loading?: boolean; readonly?: boolean }>()
 defineEmits(['refresh', 'create'])
 
 const { t } = useI18n()

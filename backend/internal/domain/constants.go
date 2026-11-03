@@ -14,6 +14,9 @@ const (
 const (
 	RoleAdmin = "admin"
 	RoleUser  = "user"
+	// RoleReadonlyAdmin 只读管理员：保留普通用户前台能力，后台仅可只读查看
+	// Anthropic OAuth / Setup Token 账号。
+	RoleReadonlyAdmin = "readonly_admin"
 )
 
 // Platform constants

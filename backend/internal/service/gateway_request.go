@@ -980,6 +980,11 @@ func removeThinkingDependentContextStrategies(body []byte) []byte {
 // claude package 的该常量含义。
 const anthropicBetaContextManagementToken = "context-management-2025-06-27"
 
+const (
+	anthropicThinkingDisplayUpdates    = "updates"
+	anthropicThinkingDisplaySummarized = "summarized"
+)
+
 // sanitizeAnthropicBodyForBetaTokens 是对 Anthropic 直连路径上 body↔beta header
 // **能力维度**对称约束的统一实现，与 Bedrock 路径的
 // `sanitizeBedrockFieldsForBetaTokens` 对称。
@@ -1010,6 +1015,14 @@ const anthropicBetaContextManagementToken = "context-management-2025-06-27"
 //     `thinking-binding-controls-2026-08-01` beta 保护
 //   - 缺 token 时上游拒收：
 //     "thinking.adaptive.block_binding: Extra inputs are not permitted"
+//
+// thinking.display / safeguards 场景：
+//   - 新版 Claude Code CLI 会发送 thinking.display="updates"（受
+//     `thinking-display-updates-2026-08-18` 保护）与 body.safeguards（受
+//     `dangerous-tool-use-2026-09-03` 保护）
+//   - 缺 token 时上游分别拒收：
+//     "thinking.adaptive.display: Input should be 'summarized', 'omitted'"
+//     "safeguards: Extra inputs are not permitted"
 //
 // message-level output_config 场景：
 //   - pi-ai（Harness 使用的 Anthropic provider）会为 opus5 生成形如
@@ -1047,6 +1060,22 @@ func sanitizeAnthropicBodyForBetaTokens(body []byte, anthropicBetaHeader string)
 	// thinking.block_binding：需要 thinking-binding-controls beta。
 	if b, deleted := stripAnthropicBodyFieldUnlessBeta(
 		body, "thinking.block_binding", anthropicBetaHeader, claude.BetaThinkingBindingControls,
+	); deleted {
+		body, changed = b, true
+	}
+
+	// thinking.display="updates"：需要 thinking-display-updates beta，缺失时降级为
+	// 上游默认接受的 summarized，而不是删除整个 thinking 配置。
+	if gjson.GetBytes(body, "thinking.display").String() == anthropicThinkingDisplayUpdates &&
+		!anthropicBetaTokensContains(anthropicBetaHeader, claude.BetaThinkingDisplayUpdates) {
+		if b, err := sjson.SetBytes(body, "thinking.display", anthropicThinkingDisplaySummarized); err == nil {
+			body, changed = b, true
+		}
+	}
+
+	// safeguards：需要 dangerous-tool-use beta。
+	if b, deleted := stripAnthropicBodyFieldUnlessBeta(
+		body, "safeguards", anthropicBetaHeader, claude.BetaDangerousToolUse,
 	); deleted {
 		body, changed = b, true
 	}

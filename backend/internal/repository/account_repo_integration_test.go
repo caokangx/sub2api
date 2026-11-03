@@ -444,6 +444,24 @@ func (s *AccountRepoSuite) TestListWithFilters() {
 			},
 		},
 		{
+			name: "filter_by_multiple_types",
+			setup: func(client *dbent.Client) {
+				mustCreateAccount(s.T(), client, &service.Account{Name: "m1", Platform: service.PlatformAnthropic, Type: service.AccountTypeOAuth})
+				mustCreateAccount(s.T(), client, &service.Account{Name: "m2", Platform: service.PlatformAnthropic, Type: service.AccountTypeSetupToken})
+				mustCreateAccount(s.T(), client, &service.Account{Name: "m3", Platform: service.PlatformAnthropic, Type: service.AccountTypeAPIKey})
+				mustCreateAccount(s.T(), client, &service.Account{Name: "m4", Platform: service.PlatformOpenAI, Type: service.AccountTypeOAuth})
+			},
+			platform:  service.PlatformAnthropic,
+			accType:   service.AccountTypeOAuth + "," + service.AccountTypeSetupToken,
+			wantCount: 2,
+			validate: func(accounts []service.Account) {
+				for _, a := range accounts {
+					s.Require().Equal(service.PlatformAnthropic, a.Platform)
+					s.Require().Contains([]string{service.AccountTypeOAuth, service.AccountTypeSetupToken}, a.Type)
+				}
+			},
+		},
+		{
 			name: "filter_by_status",
 			setup: func(client *dbent.Client) {
 				mustCreateAccount(s.T(), client, &service.Account{Name: "s1", Status: service.StatusActive})

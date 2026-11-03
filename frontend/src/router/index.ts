@@ -531,6 +531,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
+      allowReadonlyAdmin: true,
       title: 'Account Management',
       titleKey: 'admin.accounts.title',
       descriptionKey: 'admin.accounts.description'
@@ -896,6 +897,10 @@ router.beforeEach(async (to, _from, next) => {
 
   // Check admin requirement
   if (requiresAdmin && !authStore.isAdmin) {
+    if (authStore.isReadonlyAdmin && to.meta.allowReadonlyAdmin === true) {
+      next()
+      return
+    }
     // User is authenticated but not admin, redirect to user dashboard
     next('/dashboard')
     return

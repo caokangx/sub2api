@@ -201,8 +201,8 @@ func validateJWTForAdmin(
 		return false
 	}
 
-	// 检查管理员权限
-	if !user.IsAdmin() {
+	// 检查管理员权限；只读管理员仅能访问 readonlyAdminAllowedRoutes
+	if !user.IsAdmin() && !user.IsReadonlyAdmin() {
 		AbortWithError(c, 403, "FORBIDDEN", "Admin access required")
 		return false
 	}
@@ -216,5 +216,5 @@ func validateJWTForAdmin(
 	c.Set(ContextKeySessionID, claims.SessionID)
 	c.Set("auth_method", "jwt")
 
-	return true
+	return enforceReadonlyAdminScope(c)
 }

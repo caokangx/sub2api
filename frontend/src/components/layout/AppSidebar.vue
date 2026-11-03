@@ -127,7 +127,7 @@
       </template>
 
       <!-- Regular User View -->
-      <template v-else-if="!appStore.backendModeEnabled">
+      <template v-else-if="!appStore.backendModeEnabled || isReadonlyAdmin">
         <div class="sidebar-section">
           <router-link
             v-for="item in userNavItems"
@@ -249,6 +249,7 @@ const { canUseBatchImage, refreshBatchImageAccess } = useBatchImageAccess()
 const sidebarCollapsed = computed(() => appStore.sidebarCollapsed)
 const mobileOpen = computed(() => appStore.mobileOpen)
 const isAdmin = computed(() => authStore.isAdmin)
+const isReadonlyAdmin = computed(() => authStore.isReadonlyAdmin)
 const sidebarNavRef = ref<HTMLElement | null>(null)
 const isDark = ref(document.documentElement.classList.contains('dark'))
 
@@ -766,7 +767,15 @@ function finalizeNav(items: NavItem[]): NavItem[] {
 }
 
 // User navigation items (for regular users)
-const userNavItems = computed((): NavItem[] => finalizeNav(buildSelfNavItems(true)))
+// 只读管理员在用户菜单基础上额外看到「账号管理」；Backend 模式下前台页面不可用，只保留该入口。
+const userNavItems = computed((): NavItem[] => {
+  if (!isReadonlyAdmin.value) return finalizeNav(buildSelfNavItems(true))
+  const accountsItem: NavItem = { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon }
+  if (appStore.backendModeEnabled) return [accountsItem]
+  const items = finalizeNav(buildSelfNavItems(true))
+  items.splice(1, 0, accountsItem)
+  return items
+})
 
 // Personal navigation items (for admin's "My Account" section, without Dashboard).
 // Admins access 可用渠道 from this section just like regular users — there is no

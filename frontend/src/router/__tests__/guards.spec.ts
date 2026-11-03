@@ -51,6 +51,7 @@ vi.mock('@/api/auth', () => ({
 interface MockAuthState {
   isAuthenticated: boolean
   isAdmin: boolean
+  isReadonlyAdmin?: boolean
   isSimpleMode: boolean
   backendModeEnabled: boolean
   hasPendingAuthSession: boolean
@@ -109,8 +110,11 @@ function simulateGuard(
     return '/login'
   }
 
-  // 需要管理员但不是管理员
+  // 需要管理员但不是管理员（只读管理员可进入显式放行的页面）
   if (requiresAdmin && !authState.isAdmin) {
+    if (authState.isReadonlyAdmin && toMeta.allowReadonlyAdmin === true) {
+      return null
+    }
     return '/dashboard'
   }
 
@@ -251,6 +255,43 @@ describe('路由守卫逻辑', () => {
     it('访问用户页面允许通过', () => {
       const redirect = simulateGuard('/dashboard', {}, authState)
       expect(redirect).toBeNull()
+    })
+  })
+
+  // --- 只读管理员 ---
+
+  describe('只读管理员', () => {
+    const authState: MockAuthState = {
+      isAuthenticated: true,
+      isAdmin: false,
+      isReadonlyAdmin: true,
+      isSimpleMode: false,
+      backendModeEnabled: false,
+      hasPendingAuthSession: false,
+    }
+    const accountsMeta = { requiresAdmin: true, allowReadonlyAdmin: true }
+
+    it('访问 /admin/accounts 允许通过', () => {
+      expect(simulateGuard('/admin/accounts', accountsMeta, authState)).toBeNull()
+    })
+
+    it('访问其他管理页面被拒绝，重定向到 /dashboard', () => {
+      expect(simulateGuard('/admin/dashboard', { requiresAdmin: true }, authState)).toBe('/dashboard')
+      expect(simulateGuard('/admin/users', { requiresAdmin: true }, authState)).toBe('/dashboard')
+    })
+
+    it('访问用户页面允许通过', () => {
+      expect(simulateGuard('/dashboard', {}, authState)).toBeNull()
+    })
+
+    it('Backend 模式下仍可访问 /admin/accounts', () => {
+      expect(simulateGuard('/admin/accounts', accountsMeta, { ...authState, backendModeEnabled: true })).toBeNull()
+    })
+
+    it('普通用户即使命中 allowReadonlyAdmin 页面也被拒绝', () => {
+      expect(
+        simulateGuard('/admin/accounts', accountsMeta, { ...authState, isReadonlyAdmin: false })
+      ).toBe('/dashboard')
     })
   })
 

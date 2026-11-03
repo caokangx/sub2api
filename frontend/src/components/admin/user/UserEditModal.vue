@@ -103,7 +103,8 @@ const { t } = useI18n(); const appStore = useAppStore(); const { copyToClipboard
 const submitting = ref(false); const passwordCopied = ref(false)
 const roleOptions = computed(() => [
   { value: 'user', label: t('admin.users.roles.user') },
-  { value: 'admin', label: t('admin.users.roles.admin') }
+  { value: 'admin', label: t('admin.users.roles.admin') },
+  { value: 'readonly_admin', label: t('admin.users.roles.readonly_admin') }
 ])
 const form = reactive({
   email: '',

@@ -127,6 +127,32 @@ func TestAdminService_UpdateUser_DemoteAdminAllowedWhenOthersExist(t *testing.T)
 	require.Equal(t, RoleUser, repo.lastUpdated.Role, "存在其他管理员时允许降级")
 }
 
+func TestAdminService_CreateUser_WithReadonlyAdminRole(t *testing.T) {
+	repo := &userRepoStub{nextID: 33}
+	svc := &adminServiceImpl{userRepo: repo}
+
+	user, err := svc.CreateUser(context.Background(), &CreateUserInput{
+		Email:    "readonly@test.com",
+		Password: "strong-pass",
+		Role:     RoleReadonlyAdmin,
+	})
+	require.NoError(t, err)
+	require.Equal(t, RoleReadonlyAdmin, user.Role)
+	require.True(t, user.IsReadonlyAdmin())
+	require.False(t, user.IsAdmin(), "只读管理员不应被视为完整管理员")
+}
+
+func TestAdminService_UpdateUser_DemoteLastAdminToReadonlyRejected(t *testing.T) {
+	base := &userRepoStub{user: &User{ID: 42, Email: "a@example.com", Role: RoleAdmin}}
+	repo := &roleGuardUserRepoStub{rpmUserRepoStub: &rpmUserRepoStub{userRepoStub: base}, adminTotal: 1}
+	svc := &adminServiceImpl{userRepo: repo, redeemCodeRepo: &redeemRepoStub{}}
+
+	_, err := svc.UpdateUser(context.Background(), 42, &UpdateUserInput{Role: RoleReadonlyAdmin})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "last admin")
+	require.Nil(t, repo.lastUpdated)
+}
+
 func TestAdminService_UpdateUser_PromoteDoesNotCountAdmins(t *testing.T) {
 	base := &userRepoStub{user: &User{ID: 42, Email: "u@example.com", Role: RoleUser}}
 	repo := &roleGuardUserRepoStub{rpmUserRepoStub: &rpmUserRepoStub{userRepoStub: base}, adminTotal: 1}

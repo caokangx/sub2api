@@ -553,6 +553,10 @@ func (h *GroupHandler) GetAll(c *gin.Context) {
 	}
 	platform := c.Query("platform")
 	includeInactive := c.Query("include_inactive") == "true"
+	if isReadonlyAdminRequest(c) {
+		platform = service.PlatformAnthropic
+		includeInactive = false
+	}
 
 	var groups []service.Group
 	var err error

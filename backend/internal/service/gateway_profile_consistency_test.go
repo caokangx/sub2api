@@ -56,6 +56,23 @@ func TestProfileBetaUsesFeaturesAndEndpoint(t *testing.T) {
 	require.NotContains(t, resolveClaudeCodeProfileBeta("claude-sonnet-4-6", body, got, false, map[string]struct{}{claude.BetaExtendedCacheTTL: {}}), claude.BetaExtendedCacheTTL)
 }
 
+func TestProfileBetaForwardsThinkingDisplayAndSafeguardsBetas(t *testing.T) {
+	clientBeta := claude.BetaThinkingDisplayUpdates + "," + claude.BetaDangerousToolUse
+	body := []byte(`{"thinking":{"type":"adaptive","display":"updates"},"safeguards":[{"type":"dangerous_tool_use"}],"messages":[]}`)
+	got := resolveClaudeCodeProfileBeta("claude-opus-5-5", body, clientBeta, false, nil)
+	require.True(t, containsBetaToken(got, claude.BetaThinkingDisplayUpdates))
+	require.True(t, containsBetaToken(got, claude.BetaDangerousToolUse))
+
+	unused := []byte(`{"thinking":{"type":"adaptive","display":"summarized"},"messages":[]}`)
+	got = resolveClaudeCodeProfileBeta("claude-opus-5-5", unused, clientBeta, false, nil)
+	require.False(t, containsBetaToken(got, claude.BetaThinkingDisplayUpdates))
+	require.False(t, containsBetaToken(got, claude.BetaDangerousToolUse))
+
+	got = resolveClaudeCodeProfileBeta("claude-opus-5-5", body, "", false, nil)
+	require.False(t, containsBetaToken(got, claude.BetaThinkingDisplayUpdates))
+	require.False(t, containsBetaToken(got, claude.BetaDangerousToolUse))
+}
+
 func TestProfileBetaWireIndependentOfUA(t *testing.T) {
 	svc := &GatewayService{cfg: &config.Config{}}
 	account := newAnthropicOAuthAccountForPartialUsageTest()

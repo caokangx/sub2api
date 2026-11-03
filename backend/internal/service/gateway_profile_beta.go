@@ -27,6 +27,8 @@ func resolveClaudeCodeProfileBeta(model string, body []byte, clientBeta string, 
 		add(claude.BetaEffort, effort && gjson.GetBytes(body, "output_config.effort").Exists())
 		add(claude.BetaThinkingBindingControls, enabled && gjson.GetBytes(body, "thinking.block_binding").Exists())
 		add(claude.BetaRedactThinking, enabled && containsBetaToken(clientBeta, claude.BetaRedactThinking))
+		add(claude.BetaThinkingDisplayUpdates, enabled && gjson.GetBytes(body, "thinking.display").String() == anthropicThinkingDisplayUpdates && containsBetaToken(clientBeta, claude.BetaThinkingDisplayUpdates))
+		add(claude.BetaDangerousToolUse, gjson.GetBytes(body, "safeguards").Exists() && containsBetaToken(clientBeta, claude.BetaDangerousToolUse))
 		add(claude.BetaFastMode, effort && gjson.GetBytes(body, "speed").String() == "fast")
 		add(claude.BetaExtendedCacheTTL, profileHasCacheFeature(body, "ttl", "1h"))
 		add(claude.BetaPromptCachingScope, profileHasCacheFeature(body, "scope", "global"))

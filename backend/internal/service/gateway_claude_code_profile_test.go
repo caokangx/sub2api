@@ -115,9 +115,19 @@ func TestClaudeCodeProfileSafeguardsForwarding(t *testing.T) {
 			require.JSONEq(t, gjson.GetBytes(input, "safeguards.1").Raw, gjson.GetBytes(body, "safeguards.1").Raw)
 			require.Equal(t, string(body), string(claudeTelemetryBodyFromContext(ctx, body)))
 			ctx = WithClaudeCodeProfilePolicy(ctx, &Group{Platform: PlatformAnthropic, ForceClaudeCodeProfile: true})
-			_, wire, err := (&GatewayService{}).buildUpstreamRequest(ctx, nil, &Account{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeOAuth}, body, "fake-token", "oauth", "claude-sonnet-4-6", true, true)
+			account := &Account{ID: 1, Platform: PlatformAnthropic, Type: AccountTypeOAuth}
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
+			c.Request.Header.Set("anthropic-beta", claude.BetaDangerousToolUse)
+			req, wire, err := (&GatewayService{}).buildUpstreamRequest(ctx, c, account, body, "fake-token", "oauth", "claude-sonnet-4-6", true, true)
 			require.NoError(t, err)
 			require.JSONEq(t, gjson.GetBytes(body, "safeguards").Raw, gjson.GetBytes(wire, "safeguards").Raw)
+			require.True(t, containsBetaToken(getHeaderRaw(req.Header, "anthropic-beta"), claude.BetaDangerousToolUse))
+
+			req, wire, err = (&GatewayService{}).buildUpstreamRequest(ctx, nil, account, body, "fake-token", "oauth", "claude-sonnet-4-6", true, true)
+			require.NoError(t, err)
+			require.False(t, gjson.GetBytes(wire, "safeguards").Exists(), "safeguards require the dangerous-tool-use beta upstream")
+			require.False(t, containsBetaToken(getHeaderRaw(req.Header, "anthropic-beta"), claude.BetaDangerousToolUse))
 		})
 	}
 }

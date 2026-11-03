@@ -1010,7 +1010,12 @@ func (r *accountRepository) accountListFilteredQuery(platform, accountType, stat
 		q = q.Where(dbaccount.PlatformEQ(platform))
 	}
 	if accountType != "" {
-		q = q.Where(dbaccount.TypeEQ(accountType))
+		// 逗号分隔表示多类型（如只读管理员的 "oauth,setup-token"），账号类型值本身不含逗号。
+		if strings.Contains(accountType, ",") {
+			q = q.Where(dbaccount.TypeIn(strings.Split(accountType, ",")...))
+		} else {
+			q = q.Where(dbaccount.TypeEQ(accountType))
+		}
 	}
 	if status != "" {
 		switch status {

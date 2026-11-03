@@ -12,7 +12,7 @@
       type="button"
       class="flex h-full w-6 items-center justify-center rounded-l-lg text-gray-500 opacity-0 transition hover:bg-gray-200/70 hover:text-primary-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent disabled:hover:text-gray-300 dark:disabled:text-dark-600 dark:disabled:hover:text-dark-600 group-hover/priority:opacity-100 group-focus-within/priority:opacity-100 dark:text-gray-400 dark:hover:bg-dark-600 dark:hover:text-primary-400 [@media(hover:none)]:opacity-100"
       :class="{ '!opacity-100': editing || dirty }"
-      :disabled="saving || draft <= MIN_PRIORITY"
+      :disabled="readonly || saving || draft <= MIN_PRIORITY"
       :title="t('admin.accounts.priorityQuick.raise')"
       :aria-label="t('admin.accounts.priorityQuick.raise')"
       data-testid="account-priority-decrement"
@@ -43,8 +43,8 @@
       type="button"
       class="relative flex h-full min-w-[2rem] items-center justify-center px-1 font-mono text-sm tabular-nums transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500"
       :class="dirty ? 'font-semibold text-primary-600 dark:text-primary-400' : 'text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'"
-      :disabled="saving"
-      :title="t('admin.accounts.priorityQuick.editHint')"
+      :disabled="readonly || saving"
+      :title="readonly ? undefined : t('admin.accounts.priorityQuick.editHint')"
       data-testid="account-priority-value"
       @click="startEditing"
     >
@@ -60,7 +60,7 @@
       type="button"
       class="flex h-full w-6 items-center justify-center rounded-r-lg text-gray-500 opacity-0 transition hover:bg-gray-200/70 hover:text-primary-600 focus:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 disabled:cursor-not-allowed disabled:text-gray-300 disabled:hover:bg-transparent disabled:hover:text-gray-300 dark:disabled:text-dark-600 dark:disabled:hover:text-dark-600 group-hover/priority:opacity-100 group-focus-within/priority:opacity-100 dark:text-gray-400 dark:hover:bg-dark-600 dark:hover:text-primary-400 [@media(hover:none)]:opacity-100"
       :class="{ '!opacity-100': editing || dirty }"
-      :disabled="saving || draft >= MAX_PRIORITY"
+      :disabled="readonly || saving || draft >= MAX_PRIORITY"
       :title="t('admin.accounts.priorityQuick.lower')"
       :aria-label="t('admin.accounts.priorityQuick.lower')"
       data-testid="account-priority-increment"
@@ -85,7 +85,7 @@ const MAX_PRIORITY = 9999
 // 连续点击时合并为一次保存，避免每次 +/- 都打一次接口
 const SAVE_DEBOUNCE_MS = 450
 
-const props = defineProps<{ account: Account }>()
+const props = defineProps<{ account: Account; readonly?: boolean }>()
 const emit = defineEmits<{
   (e: 'updated', account: Account): void
   (e: 'error', message: string): void

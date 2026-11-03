@@ -676,6 +676,17 @@ func (h *AccountHandler) List(c *gin.Context) {
 		}
 	}
 
+	readonlyAdmin := isReadonlyAdminRequest(c)
+	if readonlyAdmin {
+		var inScope bool
+		platform, accountType, inScope = scopeReadonlyAdminAccountFilters(accountType)
+		if !inScope {
+			response.Paginated(c, []AccountWithConcurrency{}, 0, page, pageSize)
+			return
+		}
+		includeSchedulerScore = false
+	}
+
 	accounts, total, err := h.adminService.ListAccounts(c.Request.Context(), page, pageSize, platform, accountType, status, search, groupID, privacyMode, sortBy, sortOrder)
 	if err != nil {
 		response.ErrorFrom(c, err)
@@ -807,6 +818,9 @@ func (h *AccountHandler) List(c *gin.Context) {
 			if h.isSimpleMode() {
 				accountResponse.GroupIDs = filterSimpleModeGroupIDs(accountResponse.GroupIDs, simpleModeCompositeServiceGroupIDs(acc))
 			}
+		}
+		if readonlyAdmin {
+			redactAccountForReadonlyAdmin(accountResponse)
 		}
 		item := AccountWithConcurrency{
 			Account:            accountResponse,
@@ -951,6 +965,11 @@ func (h *AccountHandler) GetByID(c *gin.Context) {
 		response.ErrorFrom(c, err)
 		return
 	}
+	readonlyAdmin := isReadonlyAdminRequest(c)
+	if readonlyAdmin && !readonlyAdminCanViewAccount(account) {
+		response.ErrorFrom(c, service.ErrAccountNotFound)
+		return
+	}
 	if h.ollamaCloudUsage != nil {
 		if err := h.ollamaCloudUsage.ResolveAccounts(c.Request.Context(), []*service.Account{account}); err != nil {
 			response.ErrorFrom(c, err)
@@ -964,7 +983,11 @@ func (h *AccountHandler) GetByID(c *gin.Context) {
 		}
 	}
 
-	response.Success(c, h.buildAccountResponseWithRuntime(c.Request.Context(), account))
+	item := h.buildAccountResponseWithRuntime(c.Request.Context(), account)
+	if readonlyAdmin {
+		redactAccountForReadonlyAdmin(item.Account)
+	}
+	response.Success(c, item)
 }
 
 // CheckMixedChannel handles checking mixed channel risk for account-group binding.
