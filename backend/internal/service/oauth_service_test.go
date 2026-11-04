@@ -19,6 +19,14 @@ type mockClaudeOAuthClient struct {
 	getAuthCodeFunc  func(ctx context.Context, sessionKey, orgUUID, scope, codeChallenge, state, proxyURL string) (string, error)
 	exchangeCodeFunc func(ctx context.Context, code, codeVerifier, state, proxyURL string, isSetupToken bool) (*oauth.TokenResponse, error)
 	refreshTokenFunc func(ctx context.Context, refreshToken, proxyURL string) (*oauth.TokenResponse, error)
+	fetchProfileFunc func(ctx context.Context, accessToken, proxyURL string) (int, error)
+}
+
+func (m *mockClaudeOAuthClient) FetchOAuthProfile(ctx context.Context, accessToken, proxyURL string) (int, error) {
+	if m.fetchProfileFunc != nil {
+		return m.fetchProfileFunc(ctx, accessToken, proxyURL)
+	}
+	panic("FetchOAuthProfile not implemented")
 }
 
 func (m *mockClaudeOAuthClient) GetOrganizationUUID(ctx context.Context, sessionKey, proxyURL string) (string, error) {
@@ -322,6 +330,7 @@ func TestOAuthService_ExchangeCode_Success(t *testing.T) {
 func TestOAuthService_ExchangeCode_SetupToken(t *testing.T) {
 	t.Parallel()
 
+	profileToken := ""
 	client := &mockClaudeOAuthClient{
 		exchangeCodeFunc: func(ctx context.Context, code, codeVerifier, state, proxyURL string, isSetupToken bool) (*oauth.TokenResponse, error) {
 			if !isSetupToken {
@@ -333,6 +342,10 @@ func TestOAuthService_ExchangeCode_SetupToken(t *testing.T) {
 				ExpiresIn:   3600,
 				Scope:       oauth.ScopeInference,
 			}, nil
+		},
+		fetchProfileFunc: func(ctx context.Context, accessToken, proxyURL string) (int, error) {
+			profileToken = accessToken
+			return 403, nil
 		},
 	}
 
@@ -354,6 +367,9 @@ func TestOAuthService_ExchangeCode_SetupToken(t *testing.T) {
 	}
 	if tokenInfo.AccessToken != "setup-token" {
 		t.Fatalf("AccessToken 不匹配: got=%q", tokenInfo.AccessToken)
+	}
+	if profileToken != "setup-token" {
+		t.Fatalf("换令牌后应用新令牌查询 profile: got=%q", profileToken)
 	}
 }
 

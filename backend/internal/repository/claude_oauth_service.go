@@ -20,16 +20,22 @@ import (
 
 func NewClaudeOAuthClient() service.ClaudeOAuthClient {
 	return &claudeOAuthService{
-		baseURL:       "https://claude.ai",
-		tokenURL:      oauth.TokenURL,
-		clientFactory: createReqClient,
+		baseURL:            "https://claude.ai",
+		tokenURL:           oauth.TokenURL,
+		profileURL:         oauth.ProfileURL,
+		clientFactory:      createReqClient,
+		tokenClientFactory: createTokenReqClient,
 	}
 }
 
 type claudeOAuthService struct {
-	baseURL       string
-	tokenURL      string
+	baseURL    string
+	tokenURL   string
+	profileURL string
+	// clientFactory serves the claude.ai browser-side authorize steps.
 	clientFactory func(proxyURL string) (*req.Client, error)
+	// tokenClientFactory serves the calls Claude Code makes through axios.
+	tokenClientFactory func(proxyURL string) (*req.Client, error)
 }
 
 func (s *claudeOAuthService) GetOrganizationUUID(ctx context.Context, sessionKey, proxyURL string) (string, error) {
@@ -183,7 +189,7 @@ type claudeTokenExchangeRequest struct {
 }
 
 func (s *claudeOAuthService) ExchangeCodeForToken(ctx context.Context, code, codeVerifier, state, proxyURL string, isSetupToken bool) (*oauth.TokenResponse, error) {
-	client, err := s.clientFactory(proxyURL)
+	client, err := s.tokenClientFactory(proxyURL)
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %w", err)
 	}
@@ -218,11 +224,8 @@ func (s *claudeOAuthService) ExchangeCodeForToken(ctx context.Context, code, cod
 
 	var tokenResp oauth.TokenResponse
 
-	resp, err := client.R().
-		SetContext(ctx).
-		SetHeader("Accept", "application/json, text/plain, */*").
+	resp, err := axiosRequest(ctx, client).
 		SetHeader("Content-Type", "application/json").
-		SetHeader("User-Agent", oauth.TokenRequestUserAgent).
 		SetBody(reqBody).
 		SetSuccessResult(&tokenResp).
 		Post(s.tokenURL)
@@ -243,7 +246,7 @@ func (s *claudeOAuthService) ExchangeCodeForToken(ctx context.Context, code, cod
 }
 
 func (s *claudeOAuthService) RefreshToken(ctx context.Context, refreshToken, proxyURL string) (*oauth.TokenResponse, error) {
-	client, err := s.clientFactory(proxyURL)
+	client, err := s.tokenClientFactory(proxyURL)
 	if err != nil {
 		return nil, fmt.Errorf("create HTTP client: %w", err)
 	}
@@ -256,11 +259,8 @@ func (s *claudeOAuthService) RefreshToken(ctx context.Context, refreshToken, pro
 
 	var tokenResp oauth.TokenResponse
 
-	resp, err := client.R().
-		SetContext(ctx).
-		SetHeader("Accept", "application/json, text/plain, */*").
+	resp, err := axiosRequest(ctx, client).
 		SetHeader("Content-Type", "application/json").
-		SetHeader("User-Agent", oauth.TokenRequestUserAgent).
 		SetBody(reqBody).
 		SetSuccessResult(&tokenResp).
 		Post(s.tokenURL)
@@ -274,6 +274,59 @@ func (s *claudeOAuthService) RefreshToken(ctx context.Context, refreshToken, pro
 	}
 
 	return &tokenResp, nil
+}
+
+// FetchOAuthProfile returns the HTTP status of the profile lookup Claude Code
+// performs right after a token exchange. A transport failure yields status 0.
+func (s *claudeOAuthService) FetchOAuthProfile(ctx context.Context, accessToken, proxyURL string) (int, error) {
+	client, err := s.tokenClientFactory(proxyURL)
+	if err != nil {
+		return 0, fmt.Errorf("create HTTP client: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(ctx, oauthProfileTimeout)
+	defer cancel()
+
+	resp, err := axiosRequest(ctx, client).
+		SetHeader("Authorization", "Bearer "+accessToken).
+		SetHeader("Content-Type", "application/json").
+		SetHeader("Cache-Control", "no-cache").
+		Get(s.profileURL)
+	if err != nil {
+		return 0, err
+	}
+	logger.LegacyPrintf("repository.claude_oauth", "[OAuth] Profile lookup status: %d", resp.StatusCode)
+	return resp.StatusCode, nil
+}
+
+const oauthProfileTimeout = 10 * time.Second
+
+// axiosRequest carries the headers axios adds on its own to every request.
+func axiosRequest(ctx context.Context, client *req.Client) *req.Request {
+	return client.R().
+		SetContext(ctx).
+		SetHeader("Accept", "application/json, text/plain, */*").
+		SetHeader("User-Agent", oauth.TokenRequestUserAgent).
+		SetHeader("Accept-Encoding", oauth.TokenRequestAcceptEncoding)
+}
+
+// createTokenReqClient serves the requests Claude Code sends through axios over
+// HTTP/1.1, so it must not carry the browser fingerprint used for claude.ai.
+func createTokenReqClient(proxyURL string) (*req.Client, error) {
+	client := req.C().
+		SetTimeout(60 * time.Second).
+		EnableForceHTTP1().
+		EnableAutoDecompress().
+		SetCookieJar(nil)
+
+	trimmed, _, err := proxyurl.Parse(proxyURL)
+	if err != nil {
+		return nil, err
+	}
+	if trimmed != "" {
+		client.SetProxyURL(trimmed)
+	}
+
+	return instrumentReqClient(client), nil
 }
 
 func createReqClient(proxyURL string) (*req.Client, error) {

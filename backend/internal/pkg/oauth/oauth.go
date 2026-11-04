@@ -22,6 +22,7 @@ const (
 	AuthorizeURL = "https://claude.com/cai/oauth/authorize"
 	TokenURL     = "https://platform.claude.com/v1/oauth/token"
 	RedirectURI  = "https://platform.claude.com/oauth/code/callback"
+	ProfileURL   = "https://api.anthropic.com/api/oauth/profile"
 
 	// Scopes - Browser URL (includes org:create_api_key for user authorization)
 	ScopeOAuth = "org:create_api_key user:profile user:inference user:sessions:claude_code user:mcp_servers user:file_upload"
@@ -35,6 +36,9 @@ const (
 
 	// TokenRequestUserAgent is the User-Agent Claude Code's axios client sends to the token endpoint
 	TokenRequestUserAgent = "axios/1.15.2"
+
+	// TokenRequestAcceptEncoding is axios' default Accept-Encoding on a runtime with brotli
+	TokenRequestAcceptEncoding = "gzip, compress, deflate, br"
 
 	// Session TTL
 	SessionTTL = 30 * time.Minute

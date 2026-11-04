@@ -1,10 +1,12 @@
 package repository
 
 import (
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"io"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 
@@ -295,7 +297,7 @@ func (s *ClaudeOAuthServiceSuite) TestExchangeCodeForToken() {
 			require.True(s.T(), ok, "type assertion failed")
 			s.client = client
 			s.client.tokenURL = "http://in-process/token"
-			s.client.clientFactory = func(string) (*req.Client, error) { return newTestReqClient(rt), nil }
+			s.client.tokenClientFactory = func(string) (*req.Client, error) { return newTestReqClient(rt), nil }
 
 			resp, err := s.client.ExchangeCodeForToken(context.Background(), tt.code, "ver", tt.state, "", tt.isSetupToken)
 
@@ -391,7 +393,7 @@ func (s *ClaudeOAuthServiceSuite) TestRefreshToken() {
 			require.True(s.T(), ok, "type assertion failed")
 			s.client = client
 			s.client.tokenURL = "http://in-process/token"
-			s.client.clientFactory = func(string) (*req.Client, error) { return newTestReqClient(rt), nil }
+			s.client.tokenClientFactory = func(string) (*req.Client, error) { return newTestReqClient(rt), nil }
 
 			resp, err := s.client.RefreshToken(context.Background(), "rt", "")
 
@@ -407,6 +409,65 @@ func (s *ClaudeOAuthServiceSuite) TestRefreshToken() {
 				tt.validate(captured)
 			}
 		})
+	}
+}
+
+func (s *ClaudeOAuthServiceSuite) TestFetchOAuthProfile() {
+	var captured *http.Request
+	rt := newInProcessTransport(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		captured = r
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusForbidden)
+		_, _ = w.Write([]byte(`{"type":"error","error":{"type":"permission_error","details":{"error_code":"oauth_scope_insufficient"}}}`))
+	}), nil)
+
+	client, ok := NewClaudeOAuthClient().(*claudeOAuthService)
+	require.True(s.T(), ok, "type assertion failed")
+	require.Equal(s.T(), oauth.ProfileURL, client.profileURL)
+	client.tokenClientFactory = func(string) (*req.Client, error) { return newTestReqClient(rt), nil }
+
+	status, err := client.FetchOAuthProfile(context.Background(), "sk-ant-oat01-test", "")
+	require.NoError(s.T(), err, "a 403 is the expected answer for setup-token scope, not a failure")
+	require.Equal(s.T(), http.StatusForbidden, status)
+	require.Equal(s.T(), http.MethodGet, captured.Method)
+	require.Equal(s.T(), "/api/oauth/profile", captured.URL.Path)
+	require.Equal(s.T(), "Bearer sk-ant-oat01-test", captured.Header.Get("Authorization"))
+	require.Equal(s.T(), "application/json", captured.Header.Get("Content-Type"))
+	require.Equal(s.T(), "no-cache", captured.Header.Get("Cache-Control"))
+	require.Equal(s.T(), oauth.TokenRequestUserAgent, captured.Header.Get("User-Agent"))
+}
+
+// The token endpoint is reached by axios in Claude Code, so the real client must
+// speak HTTP/1.1 with axios headers and none of the Chrome impersonation headers.
+func TestCreateTokenReqClientSendsAxiosRequest(t *testing.T) {
+	var proto int
+	var headers http.Header
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		proto = r.ProtoMajor
+		headers = r.Header.Clone()
+		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("Content-Encoding", "gzip")
+		gz := gzip.NewWriter(w)
+		_ = json.NewEncoder(gz).Encode(oauth.TokenResponse{AccessToken: "at", ExpiresIn: 31536000})
+		_ = gz.Close()
+	}))
+	defer server.Close()
+
+	client, ok := NewClaudeOAuthClient().(*claudeOAuthService)
+	require.True(t, ok)
+	client.tokenURL = server.URL
+
+	resp, err := client.ExchangeCodeForToken(context.Background(), "AUTH#STATE", "ver", "", "", true)
+	require.NoError(t, err)
+	require.Equal(t, "at", resp.AccessToken, "gzip response must still decode with an explicit Accept-Encoding")
+	require.Equal(t, 1, proto)
+	require.Equal(t, oauth.TokenRequestUserAgent, headers.Get("User-Agent"))
+	require.Equal(t, "application/json, text/plain, */*", headers.Get("Accept"))
+	require.Equal(t, oauth.TokenRequestAcceptEncoding, headers.Get("Accept-Encoding"))
+	for name := range headers {
+		lower := strings.ToLower(name)
+		require.False(t, strings.HasPrefix(lower, "sec-"), "unexpected browser header %s", name)
+		require.NotContains(t, []string{"pragma", "upgrade-insecure-requests", "accept-language", "cache-control"}, lower)
 	}
 }
 

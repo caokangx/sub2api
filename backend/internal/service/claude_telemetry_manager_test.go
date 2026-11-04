@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -118,6 +120,61 @@ func TestClaudeTelemetryManagerHotUpdatesGenerationAndStatus(t *testing.T) {
 	recorded, err := os.ReadFile(initial.RecordFile)
 	require.NoError(t, err)
 	require.Contains(t, string(recorded), "tengu_api_success")
+}
+
+func TestClaudeTelemetryManagerEmitSetupTokenLogin(t *testing.T) {
+	settings, manager, runtime := newClaudeTelemetryManagerForTest(t, nil)
+	now := time.Now()
+	manager.EmitSetupTokenLogin(context.Background(), claudetelemetry.SetupTokenLogin{
+		CodeReceivedAt: now, ExchangedAt: now, ProfileFetchedAt: now, ProfileStatus: 403,
+	}, "")
+	manager.mu.Lock()
+	generation := manager.current
+	manager.mu.Unlock()
+	require.NoError(t, generation.exporter.Flush(context.Background()))
+
+	recorded, err := os.ReadFile(runtime.RecordFile)
+	require.NoError(t, err)
+	var firstParty struct {
+		Payload struct {
+			Events []claudetelemetry.ClaudeCodeInternalEvent `json:"events"`
+		} `json:"payload"`
+	}
+	var names []string
+	for _, line := range strings.Split(strings.TrimSpace(string(recorded)), "\n") {
+		var entry struct {
+			Route string `json:"route"`
+		}
+		require.NoError(t, json.Unmarshal([]byte(line), &entry))
+		if entry.Route != "first_party" {
+			continue
+		}
+		require.NoError(t, json.Unmarshal([]byte(line), &firstParty))
+		for _, event := range firstParty.Payload.Events {
+			data := event.EventData
+			names = append(names, data.EventName)
+			require.Nil(t, data.Auth)
+			require.Equal(t, "cli", data.Entrypoint)
+			require.Len(t, data.DeviceID, 64)
+			require.NotEmpty(t, data.SessionID)
+			require.Equal(t, "darwin", data.Environment.Platform)
+		}
+	}
+	require.Contains(t, names, "tengu_oauth_token_exchange_success")
+	require.Contains(t, names, "tengu_feature_sad")
+
+	next := cloneClaudeTelemetryConfig(runtime)
+	next.SetupTokenEnabled = false
+	next.RecordFile = "data/telemetry/disabled.ndjson"
+	_, err = settings.SaveClaudeTelemetrySettings(context.Background(), next)
+	require.NoError(t, err)
+	manager.EmitSetupTokenLogin(context.Background(), claudetelemetry.SetupTokenLogin{ExchangeFailed: true}, "")
+	manager.mu.Lock()
+	generation = manager.current
+	manager.mu.Unlock()
+	require.NoError(t, generation.exporter.Flush(context.Background()))
+	_, statErr := os.Stat(next.RecordFile)
+	require.True(t, os.IsNotExist(statErr), "setup-token telemetry switch off must suppress login events")
 }
 
 func TestClaudeTelemetryManagerShutdownRespectsFlushOnExit(t *testing.T) {

@@ -10,6 +10,8 @@ import (
 var datadogAllowlist = map[string]struct{}{
 	"tengu_api_success":        {},
 	"tengu_feature_ok":         {},
+	"tengu_feature_bad":        {},
+	"tengu_feature_sad":        {},
 	"tengu_tool_use_success":   {},
 	"tengu_tool_use_error":     {},
 	"tengu_turn_end":           {},

@@ -5,8 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"net"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/claudetelemetry"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/oauth"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/openai"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/xai"
@@ -41,13 +43,15 @@ type ClaudeOAuthClient interface {
 	GetAuthorizationCode(ctx context.Context, sessionKey, orgUUID, scope, codeChallenge, state, proxyURL string) (string, error)
 	ExchangeCodeForToken(ctx context.Context, code, codeVerifier, state, proxyURL string, isSetupToken bool) (*oauth.TokenResponse, error)
 	RefreshToken(ctx context.Context, refreshToken, proxyURL string) (*oauth.TokenResponse, error)
+	FetchOAuthProfile(ctx context.Context, accessToken, proxyURL string) (int, error)
 }
 
 // OAuthService handles OAuth authentication flows
 type OAuthService struct {
-	sessionStore *oauth.SessionStore
-	proxyRepo    ProxyRepository
-	oauthClient  ClaudeOAuthClient
+	sessionStore    *oauth.SessionStore
+	proxyRepo       ProxyRepository
+	oauthClient     ClaudeOAuthClient
+	claudeTelemetry *ClaudeTelemetryManager
 }
 
 // NewOAuthService creates a new OAuth service
@@ -57,6 +61,13 @@ func NewOAuthService(proxyRepo ProxyRepository, oauthClient ClaudeOAuthClient) *
 		proxyRepo:    proxyRepo,
 		oauthClient:  oauthClient,
 	}
+}
+
+// ProvideOAuthService wires the telemetry manager used to report setup-token logins.
+func ProvideOAuthService(proxyRepo ProxyRepository, oauthClient ClaudeOAuthClient, claudeTelemetry *ClaudeTelemetryManager) *OAuthService {
+	svc := NewOAuthService(proxyRepo, oauthClient)
+	svc.claudeTelemetry = claudeTelemetry
+	return svc
 }
 
 // GenerateAuthURLResult contains the authorization URL and session info
@@ -254,9 +265,17 @@ func (s *OAuthService) getAuthorizationCode(ctx context.Context, sessionKey, org
 
 // exchangeCodeForToken exchanges authorization code for tokens
 func (s *OAuthService) exchangeCodeForToken(ctx context.Context, code, codeVerifier, state, proxyURL string, isSetupToken bool) (*TokenInfo, error) {
+	login := claudetelemetry.SetupTokenLogin{CodeReceivedAt: time.Now()}
 	tokenResp, err := s.oauthClient.ExchangeCodeForToken(ctx, code, codeVerifier, state, proxyURL, isSetupToken)
 	if err != nil {
+		if isSetupToken {
+			login.ExchangeFailed = true
+			s.claudeTelemetry.EmitSetupTokenLogin(ctx, login, proxyURL)
+		}
 		return nil, err
+	}
+	if isSetupToken {
+		s.followSetupTokenExchange(ctx, login, tokenResp.AccessToken, proxyURL)
 	}
 
 	tokenInfo := &TokenInfo{
@@ -284,6 +303,21 @@ func (s *OAuthService) exchangeCodeForToken(ctx context.Context, code, codeVerif
 	}
 
 	return tokenInfo, nil
+}
+
+// followSetupTokenExchange replays what `claude setup-token` does once it holds
+// the token: a profile lookup (403 for inference-only scope) and its telemetry.
+func (s *OAuthService) followSetupTokenExchange(ctx context.Context, login claudetelemetry.SetupTokenLogin, accessToken, proxyURL string) {
+	login.ExchangedAt = time.Now()
+	status, err := s.oauthClient.FetchOAuthProfile(ctx, accessToken, proxyURL)
+	login.ProfileFetchedAt = time.Now()
+	login.ProfileStatus = status
+	if err != nil {
+		var netErr net.Error
+		login.ProfileTimedOut = errors.Is(err, context.DeadlineExceeded) || (errors.As(err, &netErr) && netErr.Timeout())
+		log.Printf("[OAuth] Profile lookup after setup-token exchange failed: %v", err)
+	}
+	s.claudeTelemetry.EmitSetupTokenLogin(ctx, login, proxyURL)
 }
 
 // RefreshToken refreshes an OAuth token
