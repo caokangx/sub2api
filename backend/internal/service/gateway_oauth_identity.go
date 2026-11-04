@@ -33,7 +33,8 @@ func (s *GatewayService) rewriteAnthropicOAuthIdentity(ctx context.Context, c *g
 	if account == nil || account.Platform != PlatformAnthropic || !account.IsOAuth() {
 		return body, ""
 	}
-	if !forceClaudeCodeProfile(ctx, account) {
+	agentSDK := simulateClaudeAgentSDK(ctx, account)
+	if !forceClaudeCodeProfile(ctx, account) && !agentSDK {
 		uid := gjson.GetBytes(body, "metadata.user_id").String()
 		if parsed := ParseMetadataUserID(uid); parsed != nil {
 			return body, parsed.SessionID
@@ -82,7 +83,11 @@ func (s *GatewayService) rewriteAnthropicOAuthIdentity(ctx context.Context, c *g
 	if session == "" {
 		session = generateSessionUUID(buildStableSessionSeed(account.ID, device, firstUserTextForBilling(body)))
 	}
-	uid := FormatMetadataUserID(device, claudeAccountUUID(account), session, claude.CLICurrentVersion)
+	accountUUID := claudeAccountUUID(account)
+	if agentSDK {
+		accountUUID = ""
+	}
+	uid := FormatMetadataUserID(device, accountUUID, session, claude.CLICurrentVersion)
 	// Reuse the account's established masking policy, but never derive a
 	// second session from the intermediate identity.
 	if account.IsSessionIDMaskingEnabled() && s.identityService != nil && s.identityService.cache != nil {
@@ -93,7 +98,7 @@ func (s *GatewayService) rewriteAnthropicOAuthIdentity(ctx context.Context, c *g
 			}
 		}
 	}
-	fields := map[string]any{"device_id": device, "account_uuid": claudeAccountUUID(account), "session_id": session}
+	fields := map[string]any{"device_id": device, "account_uuid": accountUUID, "session_id": session}
 	if parsed != nil && parsed.IsNewFormat {
 		var extra map[string]json.RawMessage
 		if json.Unmarshal([]byte(raw), &extra) == nil {

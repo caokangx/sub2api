@@ -219,6 +219,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 
 	shouldMimicClaudeCode := account.IsOAuth() && !isClaudeCode
 	forceProfile := forceClaudeCodeProfile(ctx, account)
+	agentSDKProfile := simulateClaudeAgentSDK(ctx, account)
 	if forceProfile {
 		var canonical []byte
 		ctx, canonical, err = s.prepareClaudeCodeProfile(ctx, body, claude.NormalizeModelID(reqModel))
@@ -232,8 +233,21 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			c.Set(toolNameRewriteKey, &ToolNameRewrite{PreserveNames: true})
 		}
 	}
+	if agentSDKProfile {
+		var canonical []byte
+		ctx, canonical, err = s.prepareClaudeAgentSDK(ctx, c, account, body, claude.NormalizeModelID(reqModel))
+		if err != nil {
+			return nil, err
+		}
+		if err := replaceBody(canonical); err != nil {
+			return nil, err
+		}
+		if c != nil {
+			c.Set(toolNameRewriteKey, &ToolNameRewrite{PreserveNames: true})
+		}
+	}
 
-	if shouldMimicClaudeCode && !forceProfile {
+	if shouldMimicClaudeCode && !forceProfile && !agentSDKProfile {
 		// 与 Parrot 对齐：OAuth 账号无条件重写 system（即使客户端已发了 Claude Code
 		// 风格的 system prompt）。原因：第三方工具（opencode 等）会发 "You are Claude
 		// Code..." system prompt 但缺少 billing attribution block，导致 Anthropic
@@ -357,6 +371,14 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			return nil, err
 		}
 	}
+	if agentSDKProfile {
+		if budgetBody, budgetErr := applyClaudeAgentSDKOutputBudget(body, reqModel); budgetErr != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"type": "error", "error": gin.H{"type": "invalid_request_error", "message": budgetErr.Error()}})
+			return nil, budgetErr
+		} else if err := replaceBody(budgetBody); err != nil {
+			return nil, err
+		}
+	}
 
 	if s.shouldInjectAnthropicCacheTTL1h(ctx, account) {
 		if err := replaceBody(injectAnthropicCacheControlTTL1h(body)); err != nil {
@@ -461,7 +483,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 		telemetryAttempt = s.beginClaudeTelemetryAttempt(
 			ctx, c, account, claudeTelemetryBodyFromContext(ctx, wireBody), wireRequest, token, proxyURL, tlsProfile,
-			reqStream, isClaudeCode,
+			reqStream, isClaudeCode || agentSDKProfile,
 		)
 	}
 	retryStart := time.Now()
@@ -486,6 +508,51 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			return nil, s.handleUpstreamTransportError(ctx, c, account, err, OpsUpstreamErrorEvent{
 				UpstreamURL: safeUpstreamURL(upstreamReq.URL.String()),
 			})
+		}
+
+		// Agent SDK server-thread continuation can become invalid after upstream
+		// state eviction or a process/account switch. Retry exactly once as a
+		// create request using the full canonical history retained in context.
+		if resp.StatusCode >= 400 && agentSDKProfile &&
+			gjson.GetBytes(lastWireBody, "thread.type").String() == "continue" {
+			if sdkInfo, _ := ctx.Value(claudeAgentSDKContextKey{}).(*claudeAgentSDKRequestContext); sdkInfo != nil && len(sdkInfo.CreateBody) > 0 {
+				originalErrorBody, _ := s.readUpstreamErrorBody(resp)
+				_ = resp.Body.Close()
+				retryCtx, releaseRetryCtx := detachStreamUpstreamContext(ctx, reqStream)
+				createReq, createWireBody, buildErr := s.buildUpstreamRequest(
+					retryCtx, c, account, sdkInfo.CreateBody, token, tokenType, reqModel, reqStream, true,
+				)
+				releaseRetryCtx()
+				if buildErr == nil {
+					startTelemetryAttempt(createWireBody, createReq)
+					createResp, retryErr := s.httpUpstream.DoWithTLS(createReq, proxyURL, account.ID, account.Concurrency, tlsProfile)
+					if retryErr == nil {
+						resp = createResp
+						lastWireBody = createWireBody
+						if createResp.StatusCode < 400 {
+							if err := replaceBody(createWireBody); err != nil {
+								_ = createResp.Body.Close()
+								return nil, err
+							}
+						}
+					} else {
+						if createResp != nil && createResp.Body != nil {
+							_ = createResp.Body.Close()
+						}
+						resp = &http.Response{
+							StatusCode: resp.StatusCode,
+							Header:     resp.Header.Clone(),
+							Body:       io.NopCloser(bytes.NewReader(originalErrorBody)),
+						}
+					}
+				} else {
+					resp = &http.Response{
+						StatusCode: resp.StatusCode,
+						Header:     resp.Header.Clone(),
+						Body:       io.NopCloser(bytes.NewReader(originalErrorBody)),
+					}
+				}
+			}
 		}
 
 		// 优先检测thinking block签名错误（400）并重试一次
@@ -976,7 +1043,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 	}
 
 	return &ForwardResult{
-		RequestID:                     resp.Header.Get("x-request-id"),
+		RequestID:                     anthropicUpstreamRequestID(resp.Header),
 		UpstreamHeaders:               resp.Header,
 		Usage:                         *usage,
 		Model:                         originalModel, // 使用原始模型用于计费和日志

@@ -286,6 +286,9 @@ func (e *TelemetryExporter) deliverFirstParty(ctx context.Context, items []*expo
 		"user-agent":     "claude-code/" + CompatibilityProfile,
 		"x-service-name": "claude-code",
 	}
+	if events[0].EventData.ClientType == "sdk-typescript" {
+		headers["user-agent"] = "Bun/1.4.3"
+	}
 	if pending[0].route.Token != "" && sendsOAuthCredential(e.config.FirstPartyURL) {
 		token := strings.TrimSpace(pending[0].route.Token)
 		if len(token) >= 7 && strings.EqualFold(token[:7], "bearer ") {

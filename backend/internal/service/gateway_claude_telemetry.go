@@ -58,6 +58,9 @@ func (s *GatewayService) beginClaudeTelemetryAttempt(
 		wireRequest == nil || s.httpUpstream == nil {
 		return nil
 	}
+	if account.Type == AccountTypeSetupToken && !simulateClaudeAgentSDK(ctx, account) {
+		return nil
+	}
 	if proxyURL == "" && account.ProxyID != nil && account.Proxy != nil {
 		proxyURL = account.Proxy.URL()
 	}
@@ -119,22 +122,30 @@ func (s *GatewayService) beginClaudeTelemetryAttempt(
 	if retryCount < 0 {
 		retryCount = 0
 	}
-	attempt, err := s.claudeTelemetry.Begin(ctx, claudetelemetry.BeginInput{
-		EventContext: claudetelemetry.EventContext{
-			Identity: identity, IdentitySources: sources,
-			Model:       gjson.GetBytes(wireBody, "model").String(),
-			Betas:       getHeaderRaw(headers, "anthropic-beta"),
-			Environment: environment,
-			SubscriptionType: telemetryFirstNonEmpty(
-				account.GetExtraString("subscription_type"),
-				account.GetCredential("subscription_type"),
-				account.GetCredential("plan_type"),
-			),
-			Route: route,
-		},
-		RequestBody: wireBody, IsClaudeCode: isClaudeCode,
+	eventContext := claudetelemetry.EventContext{
+		Identity: identity, IdentitySources: sources,
+		Model:       gjson.GetBytes(wireBody, "model").String(),
+		Betas:       getHeaderRaw(headers, "anthropic-beta"),
+		Environment: environment,
+		SubscriptionType: telemetryFirstNonEmpty(
+			account.GetExtraString("subscription_type"),
+			account.GetCredential("subscription_type"),
+			account.GetCredential("plan_type"),
+		),
+		Route: route,
+	}
+	input := claudetelemetry.BeginInput{
+		EventContext: eventContext,
+		RequestBody:  wireBody, IsClaudeCode: isClaudeCode,
 		RetryCount: retryCount, ObserverMode: mode,
-	})
+	}
+	var attempt *ClaudeTelemetryAttempt
+	var err error
+	if simulateClaudeAgentSDK(ctx, account) {
+		attempt, err = s.claudeTelemetry.BeginAgentSDK(ctx, input)
+	} else {
+		attempt, err = s.claudeTelemetry.Begin(ctx, input)
+	}
 	if err != nil {
 		return nil
 	}

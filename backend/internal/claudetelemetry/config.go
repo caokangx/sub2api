@@ -45,6 +45,7 @@ func (m Mode) forwards() bool { return m == ModeForward || m == ModeBoth }
 // normalizes defaults and clones maps before retaining it.
 type Config struct {
 	Mode              Mode
+	OAuthEnabled      bool
 	SetupTokenEnabled bool
 	RecordFile        string
 
@@ -77,6 +78,8 @@ type Config struct {
 func DefaultConfig() Config {
 	return Config{
 		Mode:              ModeRecord,
+		OAuthEnabled:      true,
+		SetupTokenEnabled: true,
 		RecordFile:        "data/telemetry/telemetry-batches.ndjson",
 		FirstPartyEnabled: true,
 		FirstPartyURL:     defaultFirstPartyURL,
@@ -199,13 +202,13 @@ func cloneSampling(in map[string]float64) map[string]float64 {
 
 // EligibleAccount deliberately accepts strings so service-layer account types
 // do not become a dependency of this package.
-func EligibleAccount(platform, accountType string, setupTokenEnabled bool) bool {
+func EligibleAccount(platform, accountType string, oauthEnabled, setupTokenEnabled bool) bool {
 	if !strings.EqualFold(strings.TrimSpace(platform), "anthropic") {
 		return false
 	}
 	switch strings.ToLower(strings.TrimSpace(accountType)) {
 	case "oauth":
-		return true
+		return oauthEnabled
 	case "setup-token":
 		return setupTokenEnabled
 	default:

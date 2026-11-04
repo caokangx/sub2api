@@ -71,6 +71,7 @@ type ClaudeTelemetrySamplingConfig struct {
 type ClaudeTelemetryRuntimeConfig struct {
 	Profile           string                        `json:"profile"`
 	Mode              string                        `json:"mode"`
+	OAuthEnabled      bool                          `json:"oauth_enabled"`
 	SetupTokenEnabled bool                          `json:"setup_token_enabled"`
 	RecordFile        string                        `json:"record_file"`
 	FirstParty        ClaudeTelemetryTargetConfig   `json:"first_party"`
@@ -111,7 +112,8 @@ func DefaultClaudeTelemetryRuntimeConfig() *ClaudeTelemetryRuntimeConfig {
 	return &ClaudeTelemetryRuntimeConfig{
 		Profile:           ClaudeTelemetryProfile,
 		Mode:              ClaudeTelemetryModeRecord,
-		SetupTokenEnabled: false,
+		OAuthEnabled:      true,
+		SetupTokenEnabled: true,
 		RecordFile:        defaultClaudeTelemetryRecordFile,
 		FirstParty: ClaudeTelemetryTargetConfig{
 			Enabled: true,

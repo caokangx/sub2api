@@ -89,6 +89,7 @@ type APIKeyAuthGroupSnapshot struct {
 	ModelPricing                    []ChannelModelPricing         `json:"model_pricing,omitempty"`
 	ClaudeCodeOnly                  bool                          `json:"claude_code_only"`
 	ForceClaudeCodeProfile          bool                          `json:"force_claude_code_profile"`
+	SimulateClaudeAgentSDK          bool                          `json:"simulate_claude_agent_sdk"`
 	FallbackGroupID                 *int64                        `json:"fallback_group_id,omitempty"`
 	FallbackGroupIDOnInvalidRequest *int64                        `json:"fallback_group_id_on_invalid_request,omitempty"`
 

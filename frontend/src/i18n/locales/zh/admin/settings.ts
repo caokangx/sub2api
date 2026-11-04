@@ -445,8 +445,8 @@ export default {
         title: 'Claude 防封配置',
         description: '统一管理原生 Anthropic Messages 的环境伪装与本地探针拦截。',
         alwaysOnHint: 'Billing 指纹会自动排除 system-reminder 并按 UTF-16 取样；严格字段规范化始终启用。',
-        promptOverride: '强制覆盖提示词',
-        promptOverrideHint: '为选中的 Anthropic 分组强制覆盖提示词。仅在最终命中这些分组的 OAuth / setup-token 原生 Messages 和 Count Tokens 请求中生效，使用下方配置的环境信息。',
+        promptOverride: '启用分组',
+        promptOverrideHint: '为选中的 Anthropic 分组开启 OAuth 防封。仅对最终命中这些分组的 OAuth 原生 Messages 和 Count Tokens 请求生效。',
         promptOverrideSystem: '完整替换 system：Billing 归因、Claude Code 身份、固定主提示词和环境信息；Fable 保留两块精简 system。',
         promptOverrideTools: '完整替换 tools 为固定 Claude Code 工具集，移除 tool_choice；保留原始消息及历史工具调用，客户端须支持执行这些工具。',
         promptOverrideParameters: '同时按最终模型统一输出预算、temperature 和 beta，并统一账号与会话身份；环境模式为“关闭”或“仅观察”时，所选分组仍强制覆盖。',
@@ -458,6 +458,7 @@ export default {
         probe: '拦截本地探针',
         probeHint: '默认开启。hi、ping 与 Reply 指令直接本地响应，不计费、不选号、不生成遥测。',
         environment: '客户端环境覆写',
+        environmentSharedHint: '此处配置归属 OAuth 防封，同时也会被 Setup Token 防封复用。',
         mode: '环境模式',
         modes: { off: '关闭', observe: '仅观察', rewrite: '覆写' },
         onUnmatched: '无法识别时',
@@ -480,27 +481,45 @@ export default {
         additionalDirectoriesHint: '每行一个绝对路径；留空会从识别到的环境块中删除该段。',
         modules: {
           promptOverride: {
-            title: '方法一：覆盖系统提示词',
-            description: '把请求伪装成官方 Claude Code：按分组强制替换 system、tools 等提示词，并覆写客户端环境信息。'
+            title: 'OAuth 防封',
+            description: '仅针对 Anthropic OAuth 账号：按分组模拟官方 Claude Code，替换 system、tools、参数与客户端环境信息。'
           },
           thinkingStrip: {
-            title: '方法二：删除 thinking 块',
-            description: '转发前删除历史消息中的 thinking 块，避免把其他账号签发的签名带给当前账号。'
+            title: '剥离 Thinking 块',
+            description: '转发前剥离历史消息中的 thinking 块，避免把其他账号签发的签名带给当前账号。'
+          },
+          agentSDK: {
+            title: 'Setup Token 防封',
+            description: '仅对选中分组内的 Anthropic Setup Token 账号生效，按真实 TypeScript Agent SDK 的请求形态重写 system、messages、参数与请求头。'
           }
+        },
+        agentSDK: {
+          groups: '启用分组',
+          groupsHint: '只影响最终命中所选 Anthropic 分组的 Setup Token 账号；OAuth 账号由上方 OAuth 防封控制，并复用其中的客户端环境配置。',
+          saveGroups: '保存分组选择',
+          groupsSaveFailed: '以下分组保存失败，其他分组已保存；请重试：{groups}',
+          conversationMode: '对话模式',
+          conversationModeHint: '无状态模式每次发送完整历史；服务端线程模式使用 create / continue 并在 Redis 中保存一小时的线程状态。',
+          modes: {
+            stateless: '无状态（完整历史）',
+            thread: '服务端线程（create / continue）'
+          },
+          injectSystemMessages: '注入 role: system 消息',
+          injectSystemMessagesHint: '首轮注入环境信息，之后为每条用户消息或工具结果注入 token 预算消息；关闭后不注入。'
         },
         thinkingStrip: {
           enable: '启用',
-          hint: '仅对 Anthropic OAuth / Setup Token 账号生效。请求历史中只要有一个 thinking 块不是本次选中的账号签发的（查不到的签名也按此处理），就删除该请求中的全部 thinking 块，并且同一会话的后续请求也一直删除。',
-          forcePercent: '强制删除比例（%）',
-          forcePercentHint: '0–100。每个会话在第一次带上合法 thinking 时抽签一次，抽中后该会话此后一直删除；没有会话 ID 的请求不参与抽签。',
+          hint: '仅对 Anthropic OAuth / Setup Token 账号生效。请求历史中只要有一个 thinking 块不是本次选中的账号签发的（查不到的签名也按此处理），就剥离该请求中的全部 thinking 块，并且同一会话的后续请求也一直剥离。',
+          forcePercent: '强制剥离比例（%）',
+          forcePercentHint: '0–100。每个会话在第一次带上合法 thinking 时抽签一次，抽中后该会话此后一直剥离；没有会话 ID 的请求不参与抽签。',
         },
       },
       claudeTelemetry: {
         title: 'Claude 遥测',
         description: '管理 Claude Code 请求生命周期重建遥测的本地记录与安全转发。',
         profile: '兼容 Profile',
-        scopeTitle: '固定覆盖范围：Anthropic OAuth',
-        scopeHint: '仅最终选中的 Anthropic OAuth 账号参与；Setup Token 默认关闭并可单独开启。API Key、Bedrock/AWS、Service Account、Upstream 和其他平台始终排除。',
+        scopeTitle: '覆盖范围：Anthropic OAuth 与 Setup Token 防封',
+        scopeHint: 'OAuth 与 Setup Token 遥测分别控制且默认开启。Setup Token 仅在最终命中 Setup Token 防封分组时发送 SDK 形态遥测；API Key、Bedrock/AWS、Service Account、Upstream 和其他平台始终排除。',
         riskWarning: '生产端点会发送真实账号标识；passthrough 身份可能包含真实设备/会话标识；同时转发客户端原生遥测会造成重复上报；本地 NDJSON 为明文事件元数据，请限制文件权限。',
         mode: '运行模式',
         modes: {
@@ -509,8 +528,10 @@ export default {
           forward: '仅转发',
           both: '记录并转发'
         },
-        setupToken: '包含 Setup Token',
-        setupTokenHint: '默认关闭；API Key 与 AWS 不受此开关影响，仍始终排除。',
+        oauth: 'OAuth 遥测',
+        oauthHint: '对 Anthropic OAuth 账号发送现有 Claude Code CLI 形态遥测。',
+        setupToken: 'Setup Token 遥测',
+        setupTokenHint: '仅对命中方法三分组的 Setup Token 账号发送 Claude Agent SDK 形态遥测。',
         recordFile: 'NDJSON 记录文件',
         recordFileHint: '文件必须位于 data/telemetry/ 下；记录事件元数据但不写入 Authorization 或 Datadog API Key。',
         firstParty: 'Anthropic 第一方',

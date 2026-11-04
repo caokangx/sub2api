@@ -171,6 +171,7 @@ type Group struct {
 type AdminGroup struct {
 	Group
 	ForceClaudeCodeProfile bool `json:"force_claude_code_profile"`
+	SimulateClaudeAgentSDK bool `json:"simulate_claude_agent_sdk"`
 	// ForceOpenAIFast 是管理端请求策略，用户侧分组 DTO 无需暴露。
 	ForceOpenAIFast bool `json:"force_openai_fast"`
 	// FreeOpenAIFast 是管理端计费策略，用户侧分组 DTO 无需暴露。

@@ -44,7 +44,7 @@ func TestClaudeTelemetryManagerEligibleAccounts(t *testing.T) {
 	}{
 		{"anthropic oauth", &Account{Platform: PlatformAnthropic, Type: AccountTypeOAuth}, true},
 		{"synthetic oauth", &Account{Platform: PlatformAnthropic, Type: AccountTypeOAuth, Extra: map[string]any{"synthetic_ui_test": true}}, false},
-		{"setup token disabled", &Account{Platform: PlatformAnthropic, Type: AccountTypeSetupToken}, false},
+		{"setup token enabled", &Account{Platform: PlatformAnthropic, Type: AccountTypeSetupToken}, true},
 		{"api key", &Account{Platform: PlatformAnthropic, Type: AccountTypeAPIKey}, false},
 		{"bedrock", &Account{Platform: PlatformAnthropic, Type: AccountTypeBedrock}, false},
 		{"service account", &Account{Platform: PlatformAnthropic, Type: AccountTypeServiceAccount}, false},
@@ -57,10 +57,10 @@ func TestClaudeTelemetryManagerEligibleAccounts(t *testing.T) {
 	}
 
 	next := cloneClaudeTelemetryConfig(runtime)
-	next.SetupTokenEnabled = true
+	next.SetupTokenEnabled = false
 	_, err := manager.settings.SaveClaudeTelemetrySettings(context.Background(), next)
 	require.NoError(t, err)
-	require.True(t, manager.Eligible(&Account{Platform: PlatformAnthropic, Type: AccountTypeSetupToken}))
+	require.False(t, manager.Eligible(&Account{Platform: PlatformAnthropic, Type: AccountTypeSetupToken}))
 	require.False(t, manager.Eligible(&Account{Platform: PlatformAnthropic, Type: AccountTypeAPIKey}))
 	require.False(t, manager.Eligible(&Account{Platform: PlatformAnthropic, Type: AccountTypeBedrock}))
 	require.False(t, manager.Eligible(&Account{Platform: PlatformAnthropic, Type: AccountTypeServiceAccount}))

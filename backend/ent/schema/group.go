@@ -207,6 +207,9 @@ func (Group) Fields() []ent.Field {
 		field.Bool("force_claude_code_profile").
 			Default(false).
 			Comment("Anthropic OAuth 原生请求强制使用完整 Claude Code system/tools"),
+		field.Bool("simulate_claude_agent_sdk").
+			Default(false).
+			Comment("Anthropic setup-token 原生请求模拟 Claude Agent SDK"),
 		field.Int64("fallback_group_id").
 			Optional().
 			Nillable().

@@ -1396,6 +1396,7 @@ export interface ClaudeTelemetryRuntimeStatus {
 export interface ClaudeTelemetrySettings {
   profile: string;
   mode: ClaudeTelemetryMode;
+  oauth_enabled: boolean;
   setup_token_enabled: boolean;
   record_file: string;
   first_party: {
@@ -1497,6 +1498,10 @@ export interface ClaudeAntiBanSettings {
     profile: ClaudeEnvironmentProfile;
   };
   thinking_strip: ClaudeThinkingStripSettings;
+  agent_sdk: {
+    conversation_mode: "stateless" | "thread";
+    inject_system_messages: boolean;
+  };
 }
 
 export async function getClaudeAntiBanSettings(): Promise<ClaudeAntiBanSettings> {

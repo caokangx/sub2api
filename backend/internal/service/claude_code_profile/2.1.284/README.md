@@ -10,7 +10,7 @@
 
 样本中的私人 Memory 目录替换为 `{{MEMORY_DIRECTORY}}`；会话 token 预算删除。ultrareview、EndConversation 和末尾并行依赖规则采用本地版本的固定文本，运行时无条件列出。样本不含 `<pasted_content>` 防注入段，当前段落为显式补充规则，并非已核验的上游逐字原文。
 
-`force_claude_code_profile` 默认关闭，只由管理员配置。最终生效分组必须为 Anthropic，账号必须为 OAuth/setup-token。原生 Messages 和两个 Count Tokens 路径共享构建器，完整丢弃原 system、删除 tool_choice；不会将原 system 搬到 messages，也不改历史工具名。tools 为固定的 23 项加上调用方名字以 `mcp__` 开头的工具（按名字去重排序后追加在末尾，去掉 `defer_loading` 与 `cache_control`），其余调用方工具丢弃。
+`force_claude_code_profile` 默认关闭，只由管理员配置。最终生效分组必须为 Anthropic，账号必须为 OAuth；setup-token 由独立的 Agent SDK 模拟策略处理。原生 Messages 和两个 Count Tokens 路径共享构建器，完整丢弃原 system、删除 tool_choice；不会将原 system 搬到 messages，也不改历史工具名。tools 为固定的 23 项加上调用方名字以 `mcp__` 开头的工具（按名字去重排序后追加在末尾，去掉 `defer_loading` 与 `cache_control`），其余调用方工具丢弃。
 
 system 只含 billing、identity 与 `system.txt` 三块静态内容。与 2.1.284 的 isMeta attachment 一致，动态内容放在第一条 user 消息开头的独立 `<system-reminder>` text block 中，依次为：session context（gitStatus，仅 git 仓库时）、Environment、模型身份（展示名与知识截止日期取自 2.1.284 内置模型表）。构建器会先移除同类的已有 reminder，重复执行结果不变，真实客户端自带的副本会被替换；其余 messages 字节不变。三个 reminder 在消息中的相对顺序、是否为独立 block，以及 MCP 工具相对内置工具的顺序，尚未用抓包核对。
 

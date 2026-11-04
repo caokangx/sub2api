@@ -81,6 +81,9 @@
             <legend class="text-sm font-semibold text-gray-900 dark:text-white">
               {{ t("admin.settings.claudeAntiBan.environment") }}
             </legend>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t("admin.settings.claudeAntiBan.environmentSharedHint") }}
+            </p>
             <div class="grid gap-4 md:grid-cols-2">
               <label>
                 <span class="input-label">{{ t("admin.settings.claudeAntiBan.mode") }}</span>
@@ -173,6 +176,58 @@
         </div>
       </section>
 
+      <section class="rounded-xl border border-gray-200 dark:border-dark-600" data-testid="anti-ban-module-agent-sdk">
+        <header class="rounded-t-xl border-b border-gray-100 bg-gray-50 px-5 py-4 dark:border-dark-700 dark:bg-dark-800/60">
+          <h3 class="text-base font-semibold text-gray-900 dark:text-white">
+            {{ t("admin.settings.claudeAntiBan.modules.agentSDK.title") }}
+          </h3>
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            {{ t("admin.settings.claudeAntiBan.modules.agentSDK.description") }}
+          </p>
+        </header>
+        <div class="space-y-5 p-5">
+          <fieldset class="space-y-3" :disabled="groupsLoading || agentGroupsSaving">
+            <legend class="text-sm font-semibold text-gray-900 dark:text-white">
+              {{ t("admin.settings.claudeAntiBan.agentSDK.groups") }}
+            </legend>
+            <p class="text-sm text-gray-600 dark:text-gray-300">
+              {{ t("admin.settings.claudeAntiBan.agentSDK.groupsHint") }}
+            </p>
+            <GroupSelector
+              v-if="!groupsLoading && !groupsLoadFailed"
+              v-model="agentGroupIds"
+              :groups="promptGroups"
+              :searchable="true"
+              data-testid="agent-sdk-groups"
+            />
+            <div class="flex justify-end">
+              <button type="button" class="btn btn-primary btn-sm" :disabled="groupsLoadFailed || !agentGroupsDirty" data-testid="agent-sdk-groups-save" @click="saveAgentGroups">
+                {{ agentGroupsSaving ? t("common.saving") : t("admin.settings.claudeAntiBan.agentSDK.saveGroups") }}
+              </button>
+            </div>
+          </fieldset>
+          <label class="block border-t border-gray-100 pt-4 dark:border-dark-700">
+            <span class="input-label">{{ t("admin.settings.claudeAntiBan.agentSDK.conversationMode") }}</span>
+            <select v-model="form.agent_sdk.conversation_mode" class="input" data-testid="agent-sdk-conversation-mode">
+              <option value="stateless">{{ t("admin.settings.claudeAntiBan.agentSDK.modes.stateless") }}</option>
+              <option value="thread">{{ t("admin.settings.claudeAntiBan.agentSDK.modes.thread") }}</option>
+            </select>
+            <span class="input-hint">{{ t("admin.settings.claudeAntiBan.agentSDK.conversationModeHint") }}</span>
+          </label>
+          <div class="flex items-center justify-between gap-4 border-t border-gray-100 pt-4 dark:border-dark-700">
+            <div>
+              <p class="text-sm font-medium text-gray-900 dark:text-white">
+                {{ t("admin.settings.claudeAntiBan.agentSDK.injectSystemMessages") }}
+              </p>
+              <p class="text-xs text-gray-500 dark:text-gray-400">
+                {{ t("admin.settings.claudeAntiBan.agentSDK.injectSystemMessagesHint") }}
+              </p>
+            </div>
+            <Toggle v-model="form.agent_sdk.inject_system_messages" data-testid="agent-sdk-inject-system-messages" />
+          </div>
+        </div>
+      </section>
+
       <section class="rounded-xl border border-gray-200 dark:border-dark-600" data-testid="anti-ban-module-thinking-strip">
         <header class="rounded-t-xl border-b border-gray-100 bg-gray-50 px-5 py-4 dark:border-dark-700 dark:bg-dark-800/60">
           <h3 class="text-base font-semibold text-gray-900 dark:text-white">
@@ -253,10 +308,16 @@ const promptGroups = ref<AdminGroup[]>([]);
 const promptGroupIds = ref<number[]>([]);
 const groupsLoading = ref(true);
 const groupsSaving = ref(false);
+const agentGroupsSaving = ref(false);
 const groupsLoadFailed = ref(false);
+const agentGroupIds = ref<number[]>([]);
 const promptGroupsDirty = computed(() => {
   const selected = new Set(promptGroupIds.value);
   return promptGroups.value.some((group) => selected.has(group.id) !== Boolean(group.force_claude_code_profile));
+});
+const agentGroupsDirty = computed(() => {
+  const selected = new Set(agentGroupIds.value);
+  return promptGroups.value.some((group) => selected.has(group.id) !== Boolean(group.simulate_claude_agent_sdk));
 });
 
 async function loadPromptGroups(): Promise<void> {
@@ -265,11 +326,38 @@ async function loadPromptGroups(): Promise<void> {
   try {
     promptGroups.value = (await getAllIncludingInactive()).filter((group) => group.platform === "anthropic");
     promptGroupIds.value = promptGroups.value.filter((group) => group.force_claude_code_profile).map((group) => group.id);
+    agentGroupIds.value = promptGroups.value.filter((group) => group.simulate_claude_agent_sdk).map((group) => group.id);
   } catch (error) {
     groupsLoadFailed.value = true;
     appStore.showError(extractApiErrorMessage(error, t("admin.settings.claudeAntiBan.promptGroupsLoadFailed")));
   } finally {
     groupsLoading.value = false;
+  }
+}
+
+async function saveAgentGroups(): Promise<void> {
+  if (groupsLoading.value || agentGroupsSaving.value || groupsLoadFailed.value || !agentGroupsDirty.value) return;
+  agentGroupsSaving.value = true;
+  const selected = new Set(agentGroupIds.value);
+  const changes = promptGroups.value.filter((group) => selected.has(group.id) !== Boolean(group.simulate_claude_agent_sdk));
+  try {
+    const results = await Promise.allSettled(changes.map((group) => updateGroup(group.id, { simulate_claude_agent_sdk: selected.has(group.id) })));
+    const failed: string[] = [];
+    results.forEach((result, index) => {
+      const group = changes[index];
+      if (result.status === "fulfilled") {
+        group.simulate_claude_agent_sdk = result.value.simulate_claude_agent_sdk;
+      } else {
+        failed.push(group.name);
+      }
+    });
+    if (failed.length) {
+      appStore.showError(t("admin.settings.claudeAntiBan.agentSDK.groupsSaveFailed", { groups: failed.join(", ") }));
+    } else {
+      appStore.showSuccess(t("common.saved"));
+    }
+  } finally {
+    agentGroupsSaving.value = false;
   }
 }
 
@@ -328,6 +416,10 @@ const defaultForm = (): ClaudeAntiBanSettings => ({
   thinking_strip: {
     enabled: false,
     force_strip_percent: 0,
+  },
+  agent_sdk: {
+    conversation_mode: "stateless",
+    inject_system_messages: true,
   },
 });
 const form = reactive<ClaudeAntiBanSettings>(defaultForm());

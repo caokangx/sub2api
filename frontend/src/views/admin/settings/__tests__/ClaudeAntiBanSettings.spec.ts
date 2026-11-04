@@ -59,9 +59,9 @@ const mountSettings = () => mount(ClaudeAntiBanSettings, {
 });
 
 const groups = () => [
-  { id: 1, name: "Primary", platform: "anthropic", status: "active", force_claude_code_profile: true },
-  { id: 2, name: "Secondary", platform: "anthropic", status: "active", force_claude_code_profile: false },
-  { id: 3, name: "Inactive", platform: "anthropic", status: "inactive", force_claude_code_profile: true },
+  { id: 1, name: "Primary", platform: "anthropic", status: "active", force_claude_code_profile: true, simulate_claude_agent_sdk: false },
+  { id: 2, name: "Secondary", platform: "anthropic", status: "active", force_claude_code_profile: false, simulate_claude_agent_sdk: true },
+  { id: 3, name: "Inactive", platform: "anthropic", status: "inactive", force_claude_code_profile: true, simulate_claude_agent_sdk: false },
   { id: 4, name: "OpenAI", platform: "openai", status: "active", force_claude_code_profile: false },
   { id: 5, name: "Composite", platform: "composite", status: "active", force_claude_code_profile: false },
 ];
@@ -150,20 +150,49 @@ describe("ClaudeAntiBanSettings", () => {
     expect(mocks.updateGroup).not.toHaveBeenCalled();
   });
 
-  it("groups prompt override and thinking strip into separate method modules", async () => {
+  it("orders OAuth, Setup Token, and Thinking protection as separate modules", async () => {
     const wrapper = mountSettings();
     await flushPromises();
+
+    expect(wrapper.findAll('[data-testid^="anti-ban-module-"]').map((node) => node.attributes("data-testid")))
+      .toEqual([
+        "anti-ban-module-prompt",
+        "anti-ban-module-agent-sdk",
+        "anti-ban-module-thinking-strip",
+      ]);
 
     const promptModule = wrapper.get('[data-testid="anti-ban-module-prompt"]');
     expect(promptModule.text()).toContain("admin.settings.claudeAntiBan.modules.promptOverride.title");
     expect(promptModule.find('[data-testid="prompt-override-groups"]').exists()).toBe(true);
     expect(promptModule.find('[data-testid="anti-ban-mode"]').exists()).toBe(true);
+    expect(promptModule.text()).toContain("admin.settings.claudeAntiBan.environmentSharedHint");
     expect(promptModule.find('[data-testid="anti-ban-thinking-strip"]').exists()).toBe(false);
+
+    const agentModule = wrapper.get('[data-testid="anti-ban-module-agent-sdk"]');
+    expect(agentModule.text()).toContain("admin.settings.claudeAntiBan.modules.agentSDK.title");
+    expect(agentModule.find('[data-testid="agent-sdk-groups"]').exists()).toBe(true);
+    expect(agentModule.find('[data-testid="agent-sdk-conversation-mode"]').exists()).toBe(true);
+    expect(agentModule.find('[data-testid="agent-sdk-inject-system-messages"]').exists()).toBe(true);
+    expect(agentModule.find('[data-testid="anti-ban-mode"]').exists()).toBe(false);
 
     const thinkingModule = wrapper.get('[data-testid="anti-ban-module-thinking-strip"]');
     expect(thinkingModule.text()).toContain("admin.settings.claudeAntiBan.modules.thinkingStrip.title");
     expect(thinkingModule.find('[data-testid="anti-ban-thinking-strip"]').exists()).toBe(true);
     expect(thinkingModule.find('[data-testid="anti-ban-thinking-strip-percent"]').exists()).toBe(true);
+  });
+
+  it("loads and saves Agent SDK group policies separately", async () => {
+    const wrapper = mountSettings();
+    await flushPromises();
+    const selectors = wrapper.findAllComponents(GroupSelector);
+    expect(selectors).toHaveLength(2);
+    expect(selectors[1].props("modelValue")).toEqual([2]);
+    selectors[1].vm.$emit("update:modelValue", [1]);
+    await wrapper.vm.$nextTick();
+    await wrapper.get('[data-testid="agent-sdk-groups-save"]').trigger("click");
+    await flushPromises();
+    expect(mocks.updateGroup).toHaveBeenCalledWith(1, { simulate_claude_agent_sdk: true });
+    expect(mocks.updateGroup).toHaveBeenCalledWith(2, { simulate_claude_agent_sdk: false });
   });
 
   it("defaults thinking strip to disabled when the server omits it", async () => {

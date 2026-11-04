@@ -22,6 +22,8 @@ func TestClaudeAntiBanSettingsDefaultsAndSave(t *testing.T) {
 	require.Equal(t, "/Users/developer/project", initial.Environment.Profile.WorkingDirectory)
 	require.NotNil(t, initial.Environment.Profile.AdditionalWorkingDirectories)
 	require.NotNil(t, initial.Environment.Profile.RecentCommits)
+	require.Equal(t, ClaudeAgentSDKConversationStateless, initial.AgentSDK.ConversationMode)
+	require.True(t, initial.AgentSDK.InjectSystemMessages)
 
 	initial.Environment.Mode = ClaudeEnvironmentModeRewrite
 	initial.Environment.OnUnmatched = ClaudeEnvironmentUnmatchedReject
@@ -69,6 +71,10 @@ func TestClaudeAntiBanThinkingStripLegacyJSONUsesDefaults(t *testing.T) {
 
 	got := NewSettingService(repo, &config.Config{}).ClaudeThinkingStripRuntime(ctx)
 	require.Equal(t, ClaudeThinkingStripSettings{}, got)
+	loaded, err := NewSettingService(repo, &config.Config{}).GetClaudeAntiBanSettings(ctx)
+	require.NoError(t, err)
+	require.Equal(t, ClaudeAgentSDKConversationStateless, loaded.AgentSDK.ConversationMode)
+	require.True(t, loaded.AgentSDK.InjectSystemMessages)
 }
 
 func TestClaudeAntiBanThinkingStripRejectsOutOfRangePercent(t *testing.T) {

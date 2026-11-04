@@ -22,6 +22,9 @@ const (
 
 	ClaudeEnvironmentUnmatchedPass   = "pass"
 	ClaudeEnvironmentUnmatchedReject = "reject"
+
+	ClaudeAgentSDKConversationStateless = "stateless"
+	ClaudeAgentSDKConversationThread    = "thread"
 )
 
 type ClaudeEnvironmentProfile struct {
@@ -59,15 +62,25 @@ type ClaudeThinkingStripSettings struct {
 	ForceStripPercent int  `json:"force_strip_percent"`
 }
 
+type ClaudeAgentSDKSettings struct {
+	ConversationMode     string `json:"conversation_mode"`
+	InjectSystemMessages bool   `json:"inject_system_messages"`
+}
+
 type ClaudeAntiBanSettings struct {
 	ProbeInterceptionEnabled bool                             `json:"probe_interception_enabled"`
 	Environment              ClaudeEnvironmentRewriteSettings `json:"environment"`
 	ThinkingStrip            ClaudeThinkingStripSettings      `json:"thinking_strip"`
+	AgentSDK                 ClaudeAgentSDKSettings           `json:"agent_sdk"`
 }
 
 func DefaultClaudeAntiBanSettings() *ClaudeAntiBanSettings {
 	return &ClaudeAntiBanSettings{
 		ProbeInterceptionEnabled: true,
+		AgentSDK: ClaudeAgentSDKSettings{
+			ConversationMode:     ClaudeAgentSDKConversationStateless,
+			InjectSystemMessages: true,
+		},
 		Environment: ClaudeEnvironmentRewriteSettings{
 			Mode:        ClaudeEnvironmentModeRewrite,
 			OnUnmatched: ClaudeEnvironmentUnmatchedPass,
@@ -110,6 +123,13 @@ func cloneClaudeAntiBanSettings(in *ClaudeAntiBanSettings) *ClaudeAntiBanSetting
 func normalizeClaudeAntiBanSettings(settings *ClaudeAntiBanSettings) {
 	settings.Environment.Mode = strings.ToLower(strings.TrimSpace(settings.Environment.Mode))
 	settings.Environment.OnUnmatched = strings.ToLower(strings.TrimSpace(settings.Environment.OnUnmatched))
+	settings.AgentSDK.ConversationMode = strings.ToLower(strings.TrimSpace(settings.AgentSDK.ConversationMode))
+	if settings.AgentSDK.ConversationMode == "" {
+		settings.AgentSDK.ConversationMode = ClaudeAgentSDKConversationStateless
+		// A pre-Agent-SDK client omits the entire object. Preserve the new
+		// default instead of silently disabling injection on its next save.
+		settings.AgentSDK.InjectSystemMessages = true
+	}
 	profile := &settings.Environment.Profile
 	profile.WorkingDirectory = strings.TrimSpace(profile.WorkingDirectory)
 	profile.Platform = strings.ToLower(strings.TrimSpace(profile.Platform))
@@ -147,6 +167,11 @@ func validateClaudeAntiBanSettings(settings *ClaudeAntiBanSettings) error {
 	case ClaudeEnvironmentUnmatchedPass, ClaudeEnvironmentUnmatchedReject:
 	default:
 		return errors.New("environment.on_unmatched must be one of pass, reject")
+	}
+	switch settings.AgentSDK.ConversationMode {
+	case ClaudeAgentSDKConversationStateless, ClaudeAgentSDKConversationThread:
+	default:
+		return errors.New("agent_sdk.conversation_mode must be stateless or thread")
 	}
 	profile := settings.Environment.Profile
 	for name, value := range map[string]string{

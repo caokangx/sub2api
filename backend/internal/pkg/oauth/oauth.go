@@ -30,6 +30,12 @@ const (
 	// Scopes - Setup token (inference only)
 	ScopeInference = "user:inference"
 
+	// SetupTokenExpiresIn is the lifetime `claude setup-token` requests at token exchange (1 year)
+	SetupTokenExpiresIn int64 = 31536000
+
+	// TokenRequestUserAgent is the User-Agent Claude Code's axios client sends to the token endpoint
+	TokenRequestUserAgent = "axios/1.15.2"
+
 	// Session TTL
 	SessionTTL = 30 * time.Minute
 )

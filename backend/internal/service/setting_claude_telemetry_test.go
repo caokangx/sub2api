@@ -87,7 +87,8 @@ func TestClaudeTelemetrySettingsDefaults(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, ClaudeTelemetryProfile, got.Profile)
 	require.Equal(t, ClaudeTelemetryModeRecord, got.Mode)
-	require.False(t, got.SetupTokenEnabled)
+	require.True(t, got.OAuthEnabled)
+	require.True(t, got.SetupTokenEnabled)
 	require.Equal(t, 10_000, got.Batch.DelayMS)
 	require.Equal(t, 400, got.Batch.Size)
 	require.Equal(t, 8192, got.Batch.QueueSize)
@@ -95,6 +96,23 @@ func TestClaudeTelemetrySettingsDefaults(t *testing.T) {
 	require.Empty(t, got.Datadog.APIKey)
 	require.False(t, got.Runtime.Available)
 	require.Equal(t, 8192, got.Runtime.QueueCapacity)
+}
+
+func TestClaudeTelemetryLegacyConfigDefaultsOAuthEnabled(t *testing.T) {
+	repo := newClaudeTelemetrySettingRepo()
+	cfg := DefaultClaudeTelemetryRuntimeConfig()
+	raw, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	var legacy map[string]any
+	require.NoError(t, json.Unmarshal(raw, &legacy))
+	delete(legacy, "oauth_enabled")
+	raw, err = json.Marshal(legacy)
+	require.NoError(t, err)
+	require.NoError(t, repo.Set(context.Background(), SettingKeyClaudeTelemetrySettings, string(raw)))
+
+	got, err := NewSettingService(repo, &config.Config{}).GetClaudeTelemetrySettings(context.Background())
+	require.NoError(t, err)
+	require.True(t, got.OAuthEnabled)
 }
 
 func TestClaudeTelemetrySettingsSecretMaskKeepAndClear(t *testing.T) {

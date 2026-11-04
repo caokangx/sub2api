@@ -148,6 +148,7 @@ func GroupFromServiceAdmin(g *service.Group) *AdminGroup {
 	}
 	out := &AdminGroup{
 		ForceClaudeCodeProfile:      g.ForceClaudeCodeProfile,
+		SimulateClaudeAgentSDK:      g.SimulateClaudeAgentSDK,
 		Group:                       groupFromServiceBase(g),
 		ForceOpenAIFast:             g.ForceOpenAIFast,
 		FreeOpenAIFast:              g.FreeOpenAIFast,

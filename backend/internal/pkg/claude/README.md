@@ -15,6 +15,11 @@ existing `groups.force_claude_code_profile` field and group update API; the
 protocol and database names remain unchanged. Environment settings are saved
 separately on the same page.
 
+Force Prompt Override applies only to Anthropic OAuth accounts. The separate
+`groups.simulate_claude_agent_sdk` policy applies only to setup-token accounts
+and uses the versioned profile under
+`internal/service/claude_agent_sdk_profile/0.3.310`.
+
 | Family | Default | Upper | Temperature | Thinking / effort |
 | --- | ---: | ---: | --- | --- |
 | Claude 3.5 Haiku/Sonnet | 8,192 | 8,192 | yes | legacy thinking |

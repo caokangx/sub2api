@@ -33,7 +33,7 @@ func WithClaudeCodeProfilePolicy(ctx context.Context, group *Group) context.Cont
 }
 
 func forceClaudeCodeProfile(ctx context.Context, account *Account) bool {
-	if ctx == nil || account == nil || account.Platform != PlatformAnthropic || !account.IsOAuth() {
+	if ctx == nil || account == nil || account.Platform != PlatformAnthropic || account.Type != AccountTypeOAuth {
 		return false
 	}
 	enabled, _ := ctx.Value(claudeCodeProfilePolicyKey{}).(bool)

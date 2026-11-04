@@ -11,11 +11,12 @@ import (
 )
 
 func TestEligibleAccountAndIdentityProvenance(t *testing.T) {
-	require.True(t, EligibleAccount("anthropic", "oauth", false))
-	require.False(t, EligibleAccount("anthropic", "setup-token", false))
-	require.True(t, EligibleAccount("ANTHROPIC", "setup-token", true))
-	require.False(t, EligibleAccount("anthropic", "apikey", true))
-	require.False(t, EligibleAccount("bedrock", "oauth", true))
+	require.True(t, EligibleAccount("anthropic", "oauth", true, false))
+	require.False(t, EligibleAccount("anthropic", "oauth", false, true))
+	require.False(t, EligibleAccount("anthropic", "setup-token", true, false))
+	require.True(t, EligibleAccount("ANTHROPIC", "setup-token", false, true))
+	require.False(t, EligibleAccount("anthropic", "apikey", true, true))
+	require.False(t, EligibleAccount("bedrock", "oauth", true, true))
 
 	input := IdentityInput{
 		MetadataUserID: `{"account_uuid":"embedded-account","device_id":"device","session_id":"session"}`,
@@ -127,6 +128,31 @@ func TestInternalEventEnvelopeAndDatadogAllowlist(t *testing.T) {
 	for _, forbidden := range []string{"process_metrics", `"process"`, "plugin_lifecycle", "mcp_lifecycle"} {
 		require.NotContains(t, serialized, forbidden)
 	}
+}
+
+func TestAgentSDKEventIdentity(t *testing.T) {
+	context := testEventContext()
+	context.Entrypoint = "sdk-ts"
+	context.ClientType = "sdk-typescript"
+	context.AgentSDKVersion = "0.3.310"
+	context.OmitAuth = true
+	interactive := false
+	context.Interactive = &interactive
+	built, err := buildEvent(time.Unix(1, 0), context, "tengu_sdk_result", map[string]any{
+		"is_error": false,
+	}, inferredFields("is_error"))
+	require.NoError(t, err)
+	require.Equal(t, "sdk-ts", built.FirstParty.EventData.Entrypoint)
+	require.Equal(t, "sdk-typescript", built.FirstParty.EventData.ClientType)
+	require.Equal(t, "0.3.310", built.FirstParty.EventData.AgentSDKVersion)
+	require.False(t, *built.FirstParty.EventData.IsInteractive)
+	require.Nil(t, built.FirstParty.EventData.Auth)
+
+	allowed, err := buildEvent(time.Unix(1, 0), context, "tengu_api_success", nil, nil)
+	require.NoError(t, err)
+	require.Equal(t, "sdk-ts", allowed.Datadog["entrypoint"])
+	require.Equal(t, "sdk-typescript", allowed.Datadog["client_type"])
+	require.Equal(t, "0.3.310", allowed.Datadog["agent_sdk_version"])
 }
 
 func TestSessionRuntimeTTLAndCapacity(t *testing.T) {

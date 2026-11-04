@@ -171,6 +171,17 @@ func (s *claudeOAuthService) GetAuthorizationCode(ctx context.Context, sessionKe
 	return fullCode, nil
 }
 
+// claudeTokenExchangeRequest keeps Claude Code's field order for the authorization_code exchange body.
+type claudeTokenExchangeRequest struct {
+	GrantType    string `json:"grant_type"`
+	Code         string `json:"code"`
+	RedirectURI  string `json:"redirect_uri"`
+	ClientID     string `json:"client_id"`
+	CodeVerifier string `json:"code_verifier"`
+	State        string `json:"state,omitempty"`
+	ExpiresIn    int64  `json:"expires_in,omitempty"`
+}
+
 func (s *claudeOAuthService) ExchangeCodeForToken(ctx context.Context, code, codeVerifier, state, proxyURL string, isSetupToken bool) (*oauth.TokenResponse, error) {
 	client, err := s.clientFactory(proxyURL)
 	if err != nil {
@@ -185,21 +196,25 @@ func (s *claudeOAuthService) ExchangeCodeForToken(ctx context.Context, code, cod
 		codeState = code[idx+1:]
 	}
 
-	reqBody := map[string]any{
-		"code":          authCode,
-		"grant_type":    "authorization_code",
-		"client_id":     oauth.ClientID,
-		"redirect_uri":  oauth.RedirectURI,
-		"code_verifier": codeVerifier,
+	if codeState == "" {
+		codeState = state
 	}
 
-	if codeState != "" {
-		reqBody["state"] = codeState
+	reqBody := claudeTokenExchangeRequest{
+		GrantType:    "authorization_code",
+		Code:         authCode,
+		RedirectURI:  oauth.RedirectURI,
+		ClientID:     oauth.ClientID,
+		CodeVerifier: codeVerifier,
+		State:        codeState,
+	}
+	if isSetupToken {
+		reqBody.ExpiresIn = oauth.SetupTokenExpiresIn
 	}
 
 	logger.LegacyPrintf("repository.claude_oauth", "[OAuth] Step 3: Exchanging code for token at %s", s.tokenURL)
-	reqBodyJSON, _ := json.Marshal(logredact.RedactMap(reqBody))
-	logger.LegacyPrintf("repository.claude_oauth", "[OAuth] Step 3 Request Body: %s", string(reqBodyJSON))
+	reqBodyJSON, _ := json.Marshal(reqBody)
+	logger.LegacyPrintf("repository.claude_oauth", "[OAuth] Step 3 Request Body: %s", logredact.RedactJSON(reqBodyJSON))
 
 	var tokenResp oauth.TokenResponse
 
@@ -207,7 +222,7 @@ func (s *claudeOAuthService) ExchangeCodeForToken(ctx context.Context, code, cod
 		SetContext(ctx).
 		SetHeader("Accept", "application/json, text/plain, */*").
 		SetHeader("Content-Type", "application/json").
-		SetHeader("User-Agent", "axios/1.13.6").
+		SetHeader("User-Agent", oauth.TokenRequestUserAgent).
 		SetBody(reqBody).
 		SetSuccessResult(&tokenResp).
 		Post(s.tokenURL)
@@ -245,7 +260,7 @@ func (s *claudeOAuthService) RefreshToken(ctx context.Context, refreshToken, pro
 		SetContext(ctx).
 		SetHeader("Accept", "application/json, text/plain, */*").
 		SetHeader("Content-Type", "application/json").
-		SetHeader("User-Agent", "axios/1.13.6").
+		SetHeader("User-Agent", oauth.TokenRequestUserAgent).
 		SetBody(reqBody).
 		SetSuccessResult(&tokenResp).
 		Post(s.tokenURL)

@@ -98,7 +98,8 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		fingerprint = identityFingerprint
 	}
 	oauthSessionID := ""
-	if forceClaudeCodeProfile(ctx, account) {
+	agentSDKProfile := simulateClaudeAgentSDK(ctx, account)
+	if forceClaudeCodeProfile(ctx, account) || agentSDKProfile {
 		body, oauthSessionID = s.rewriteAnthropicOAuthIdentity(ctx, c, account, body, identityFingerprint, false)
 	} else if account.IsOAuth() && s.identityService != nil && identityFingerprint != nil {
 		accountUUID := claudeAccountUUID(account)
@@ -140,6 +141,10 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		}
 		finalBetaShouldSet, mimicClaudeCode = true, true
 	}
+	if agentSDKProfile {
+		finalBetaHeader = strings.Join(strings.Fields(claudeAgentSDKBetas), ",")
+		finalBetaShouldSet, mimicClaudeCode = true, true
+	}
 
 	// 账号覆写了 anthropic-beta 时，覆写值即最终上游值（由下方 ApplyHeaderOverrides 写入）：
 	// body 能力净化必须以覆写值为准，否则 header/body 不对称会被上游 400。
@@ -157,6 +162,13 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 	// base 取值同源，仅实际上游为 ollama.com 且映射后出站模型
 	// 为 DeepSeek 系时压到 cap，详见 helper 注释。
 	body = clampOllamaCloudAnthropicMessagesMaxTokens(account, baseURL, body)
+	if agentSDKProfile {
+		var cchErr error
+		body, cchErr = attestClaudeCCH(body)
+		if cchErr != nil {
+			return nil, nil, cchErr
+		}
+	}
 
 	req, err := http.NewRequestWithContext(ctx, "POST", targetURL, bytes.NewReader(body))
 	if err != nil {
@@ -219,7 +231,7 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		setHeaderRaw(req.Header, "anthropic-beta", finalBetaHeader)
 	}
 
-	if forceClaudeCodeProfile(ctx, account) || getHeaderRaw(req.Header, "X-Claude-Code-Session-Id") != "" {
+	if forceClaudeCodeProfile(ctx, account) || agentSDKProfile || getHeaderRaw(req.Header, "X-Claude-Code-Session-Id") != "" {
 		syncAnthropicOAuthSessionHeader(req.Header, oauthSessionID)
 	}
 
@@ -231,6 +243,7 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 	}
 	applyClaudeEnvironmentHeadersFromContext(ctx, req.Header)
 	applyClaudeCodeProfileHeaders(ctx, account, req.Header)
+	applyClaudeAgentSDKHeaders(ctx, account, req.Header, reqStream)
 	filterSonnet55ToolsetBetaHeader(req.Header, body, modelID)
 
 	// === DEBUG: 打印上游转发请求（headers + body 摘要），与 CLIENT_ORIGINAL 对比 ===

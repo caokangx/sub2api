@@ -27,6 +27,7 @@ type requestCapture struct {
 	body        []byte
 	bodyJSON    map[string]any
 	contentType string
+	userAgent   string
 }
 
 func newTestReqClient(rt http.RoundTripper) *req.Client {
@@ -192,6 +193,7 @@ func (s *ClaudeOAuthServiceSuite) TestExchangeCodeForToken() {
 		name         string
 		handler      http.HandlerFunc
 		code         string
+		state        string
 		isSetupToken bool
 		wantErr      bool
 		wantResp     *oauth.TokenResponse
@@ -223,12 +225,13 @@ func (s *ClaudeOAuthServiceSuite) TestExchangeCodeForToken() {
 				require.Equal(s.T(), oauth.ClientID, captured.bodyJSON["client_id"])
 				require.Equal(s.T(), oauth.RedirectURI, captured.bodyJSON["redirect_uri"])
 				require.Equal(s.T(), "ver", captured.bodyJSON["code_verifier"])
+				require.Equal(s.T(), oauth.TokenRequestUserAgent, captured.userAgent)
 				// Regular OAuth should not include expires_in
 				require.Nil(s.T(), captured.bodyJSON["expires_in"], "regular OAuth should not include expires_in")
 			},
 		},
 		{
-			name: "setup_token_omits_expires_in",
+			name: "setup_token_requests_one_year_expiry",
 			handler: func(w http.ResponseWriter, r *http.Request) {
 				w.Header().Set("Content-Type", "application/json")
 				_ = json.NewEncoder(w).Encode(oauth.TokenResponse{
@@ -237,13 +240,30 @@ func (s *ClaudeOAuthServiceSuite) TestExchangeCodeForToken() {
 					ExpiresIn:   31536000,
 				})
 			},
-			code:         "AUTH",
+			code:         "AUTH#STATE3",
 			isSetupToken: true,
 			wantResp: &oauth.TokenResponse{
 				AccessToken: "at",
 			},
 			validate: func(captured requestCapture) {
-				require.Nil(s.T(), captured.bodyJSON["expires_in"], "setup token should not include expires_in")
+				require.Equal(s.T(), float64(oauth.SetupTokenExpiresIn), captured.bodyJSON["expires_in"])
+				require.Equal(s.T(),
+					`{"grant_type":"authorization_code","code":"AUTH","redirect_uri":"`+oauth.RedirectURI+`","client_id":"`+oauth.ClientID+`","code_verifier":"ver","state":"STATE3","expires_in":31536000}`,
+					string(captured.body), "body must match Claude Code's field order")
+			},
+		},
+		{
+			name: "falls_back_to_session_state",
+			handler: func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(oauth.TokenResponse{AccessToken: "at"})
+			},
+			code:         "AUTH",
+			state:        "SESSION_STATE",
+			isSetupToken: false,
+			wantResp:     &oauth.TokenResponse{AccessToken: "at"},
+			validate: func(captured requestCapture) {
+				require.Equal(s.T(), "SESSION_STATE", captured.bodyJSON["state"])
 			},
 		},
 		{
@@ -265,6 +285,7 @@ func (s *ClaudeOAuthServiceSuite) TestExchangeCodeForToken() {
 			rt := newInProcessTransport(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				captured.method = r.Method
 				captured.contentType = r.Header.Get("Content-Type")
+				captured.userAgent = r.Header.Get("User-Agent")
 				captured.body, _ = io.ReadAll(r.Body)
 				_ = json.Unmarshal(captured.body, &captured.bodyJSON)
 				tt.handler(w, r)
@@ -276,7 +297,7 @@ func (s *ClaudeOAuthServiceSuite) TestExchangeCodeForToken() {
 			s.client.tokenURL = "http://in-process/token"
 			s.client.clientFactory = func(string) (*req.Client, error) { return newTestReqClient(rt), nil }
 
-			resp, err := s.client.ExchangeCodeForToken(context.Background(), tt.code, "ver", "", "", tt.isSetupToken)
+			resp, err := s.client.ExchangeCodeForToken(context.Background(), tt.code, "ver", tt.state, "", tt.isSetupToken)
 
 			if tt.wantErr {
 				require.Error(s.T(), err)

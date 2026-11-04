@@ -8,19 +8,22 @@ import (
 	"time"
 
 	"github.com/Wei-Shaw/sub2api/internal/claudetelemetry"
+	agentsdktelemetry "github.com/Wei-Shaw/sub2api/internal/claudetelemetry/agentsdk"
 )
 
 type claudeTelemetryGeneration struct {
-	integration *claudetelemetry.Integration
-	exporter    *claudetelemetry.TelemetryExporter
-	enabled     bool
-	setupToken  bool
-	active      int
-	retiring    bool
-	closing     bool
-	flushOnExit bool
-	flushRetire bool
-	closeDone   chan struct{}
+	integration    *claudetelemetry.Integration
+	sdkIntegration *agentsdktelemetry.Integration
+	exporter       *claudetelemetry.TelemetryExporter
+	enabled        bool
+	oauth          bool
+	setupToken     bool
+	active         int
+	retiring       bool
+	closing        bool
+	flushOnExit    bool
+	flushRetire    bool
+	closeDone      chan struct{}
 }
 
 // ClaudeTelemetryManager owns hot-swappable telemetry generations. Requests
@@ -37,10 +40,11 @@ type ClaudeTelemetryManager struct {
 }
 
 type ClaudeTelemetryAttempt struct {
-	manager    *ClaudeTelemetryManager
-	generation *claudeTelemetryGeneration
-	request    *claudetelemetry.Request
-	once       sync.Once
+	manager     *ClaudeTelemetryManager
+	generation  *claudeTelemetryGeneration
+	request     *claudetelemetry.Request
+	integration *claudetelemetry.Integration
+	once        sync.Once
 }
 
 func NewClaudeTelemetryManager(settings *SettingService) (*ClaudeTelemetryManager, error) {
@@ -82,13 +86,20 @@ func newClaudeTelemetryGeneration(runtime *ClaudeTelemetryRuntimeConfig) (*claud
 		_ = exporter.Close(context.Background())
 		return nil, err
 	}
+	sdkIntegration, err := agentsdktelemetry.NewIntegration(cfg, exporter)
+	if err != nil {
+		_ = exporter.Close(context.Background())
+		return nil, err
+	}
 	return &claudeTelemetryGeneration{
-		integration: integration,
-		exporter:    exporter,
-		enabled:     cfg.Mode != claudetelemetry.ModeOff,
-		setupToken:  cfg.SetupTokenEnabled,
-		flushOnExit: cfg.FlushOnExit,
-		closeDone:   make(chan struct{}),
+		integration:    integration,
+		sdkIntegration: sdkIntegration,
+		exporter:       exporter,
+		enabled:        cfg.Mode != claudetelemetry.ModeOff,
+		oauth:          cfg.OAuthEnabled,
+		setupToken:     cfg.SetupTokenEnabled,
+		flushOnExit:    cfg.FlushOnExit,
+		closeDone:      make(chan struct{}),
 	}, nil
 }
 
@@ -99,6 +110,7 @@ func toClaudeTelemetryConfig(runtime *ClaudeTelemetryRuntimeConfig) claudeteleme
 	defaultRate := runtime.Sampling.DefaultRate
 	return claudetelemetry.Config{
 		Mode:              claudetelemetry.Mode(runtime.Mode),
+		OAuthEnabled:      runtime.OAuthEnabled,
 		SetupTokenEnabled: runtime.SetupTokenEnabled,
 		RecordFile:        runtime.RecordFile,
 		FirstPartyEnabled: runtime.FirstParty.Enabled,
@@ -160,7 +172,28 @@ func (m *ClaudeTelemetryManager) Begin(ctx context.Context, input claudetelemetr
 		m.release(generation)
 		return nil, err
 	}
-	return &ClaudeTelemetryAttempt{manager: m, generation: generation, request: request}, nil
+	return &ClaudeTelemetryAttempt{manager: m, generation: generation, request: request, integration: generation.integration}, nil
+}
+
+func (m *ClaudeTelemetryManager) BeginAgentSDK(ctx context.Context, input claudetelemetry.BeginInput) (*ClaudeTelemetryAttempt, error) {
+	m.mu.Lock()
+	if m.closed || m.current == nil {
+		m.mu.Unlock()
+		return nil, nil
+	}
+	generation := m.current
+	generation.active++
+	m.mu.Unlock()
+
+	request, err := generation.sdkIntegration.Begin(ctx, input)
+	if err != nil {
+		m.release(generation)
+		return nil, err
+	}
+	return &ClaudeTelemetryAttempt{
+		manager: m, generation: generation, request: request,
+		integration: generation.sdkIntegration.Core(),
+	}, nil
 }
 
 func (m *ClaudeTelemetryManager) Eligible(account *Account) bool {
@@ -171,21 +204,21 @@ func (m *ClaudeTelemetryManager) Eligible(account *Account) bool {
 	generation := m.current
 	m.mu.Unlock()
 	return generation != nil && generation.enabled &&
-		claudetelemetry.EligibleAccount(account.Platform, account.Type, generation.setupToken)
+		claudetelemetry.EligibleAccount(account.Platform, account.Type, generation.oauth, generation.setupToken)
 }
 
 func (a *ClaudeTelemetryAttempt) ObserveEventJSON(raw []byte) {
 	if a == nil || a.generation == nil {
 		return
 	}
-	_ = a.generation.integration.ObserveEventJSON(a.request, raw)
+	_ = a.integration.ObserveEventJSON(a.request, raw)
 }
 
 func (a *ClaudeTelemetryAttempt) ObserveJSON(raw []byte) {
 	if a == nil || a.generation == nil {
 		return
 	}
-	_ = a.generation.integration.Observe(a.request, raw)
+	_ = a.integration.Observe(a.request, raw)
 }
 
 func (a *ClaudeTelemetryAttempt) Complete(ctx context.Context, requestID string) {
@@ -193,7 +226,7 @@ func (a *ClaudeTelemetryAttempt) Complete(ctx context.Context, requestID string)
 		return
 	}
 	a.once.Do(func() {
-		if err := a.generation.integration.Complete(ctx, a.request, claudetelemetry.Completion{
+		if err := a.integration.Complete(ctx, a.request, claudetelemetry.Completion{
 			RequestID: requestID, CompletedAt: time.Now(),
 		}); err != nil {
 			slog.Warn("complete Claude telemetry attempt", "error", err)
@@ -207,7 +240,7 @@ func (a *ClaudeTelemetryAttempt) Abort() {
 		return
 	}
 	a.once.Do(func() {
-		a.generation.integration.Abort(a.request)
+		a.integration.Abort(a.request)
 		a.manager.release(a.generation)
 	})
 }

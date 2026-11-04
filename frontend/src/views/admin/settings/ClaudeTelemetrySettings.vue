@@ -27,7 +27,7 @@
         <p class="mt-2">{{ t("admin.settings.claudeTelemetry.riskWarning") }}</p>
       </div>
 
-      <div class="grid gap-4 md:grid-cols-2">
+      <div class="grid gap-4 md:grid-cols-3">
         <label class="block">
           <span class="input-label">{{ t("admin.settings.claudeTelemetry.mode") }}</span>
           <select v-model="form.mode" class="input" data-testid="claude-telemetry-mode">
@@ -37,6 +37,17 @@
             <option value="both">{{ t("admin.settings.claudeTelemetry.modes.both") }}</option>
           </select>
         </label>
+        <div class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 dark:border-dark-600">
+          <div>
+            <p class="text-sm font-medium text-gray-900 dark:text-white">
+              {{ t("admin.settings.claudeTelemetry.oauth") }}
+            </p>
+            <p class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t("admin.settings.claudeTelemetry.oauthHint") }}
+            </p>
+          </div>
+          <Toggle v-model="form.oauth_enabled" data-testid="claude-telemetry-oauth" />
+        </div>
         <div class="flex items-center justify-between rounded-lg border border-gray-200 px-4 py-3 dark:border-dark-600">
           <div>
             <p class="text-sm font-medium text-gray-900 dark:text-white">
@@ -237,7 +248,8 @@ let refreshTimer: number | null = null;
 
 const defaultForm = (): UpdateClaudeTelemetrySettingsRequest => ({
   mode: "record",
-  setup_token_enabled: false,
+  oauth_enabled: true,
+  setup_token_enabled: true,
   record_file: "./data/telemetry/telemetry-batches.ndjson",
   first_party: {
     enabled: true,

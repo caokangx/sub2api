@@ -104,6 +104,8 @@ const (
 	FieldClaudeCodeOnly = "claude_code_only"
 	// FieldForceClaudeCodeProfile holds the string denoting the force_claude_code_profile field in the database.
 	FieldForceClaudeCodeProfile = "force_claude_code_profile"
+	// FieldSimulateClaudeAgentSdk holds the string denoting the simulate_claude_agent_sdk field in the database.
+	FieldSimulateClaudeAgentSdk = "simulate_claude_agent_sdk"
 	// FieldFallbackGroupID holds the string denoting the fallback_group_id field in the database.
 	FieldFallbackGroupID = "fallback_group_id"
 	// FieldFallbackGroupIDOnInvalidRequest holds the string denoting the fallback_group_id_on_invalid_request field in the database.
@@ -271,6 +273,7 @@ var Columns = []string{
 	FieldModelPricing,
 	FieldClaudeCodeOnly,
 	FieldForceClaudeCodeProfile,
+	FieldSimulateClaudeAgentSdk,
 	FieldFallbackGroupID,
 	FieldFallbackGroupIDOnInvalidRequest,
 	FieldModelRouting,
@@ -396,6 +399,8 @@ var (
 	DefaultClaudeCodeOnly bool
 	// DefaultForceClaudeCodeProfile holds the default value on creation for the "force_claude_code_profile" field.
 	DefaultForceClaudeCodeProfile bool
+	// DefaultSimulateClaudeAgentSdk holds the default value on creation for the "simulate_claude_agent_sdk" field.
+	DefaultSimulateClaudeAgentSdk bool
 	// DefaultModelRoutingEnabled holds the default value on creation for the "model_routing_enabled" field.
 	DefaultModelRoutingEnabled bool
 	// DefaultMcpXMLInject holds the default value on creation for the "mcp_xml_inject" field.
@@ -657,6 +662,11 @@ func ByClaudeCodeOnly(opts ...sql.OrderTermOption) OrderOption {
 // ByForceClaudeCodeProfile orders the results by the force_claude_code_profile field.
 func ByForceClaudeCodeProfile(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldForceClaudeCodeProfile, opts...).ToFunc()
+}
+
+// BySimulateClaudeAgentSdk orders the results by the simulate_claude_agent_sdk field.
+func BySimulateClaudeAgentSdk(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSimulateClaudeAgentSdk, opts...).ToFunc()
 }
 
 // ByFallbackGroupID orders the results by the fallback_group_id field.

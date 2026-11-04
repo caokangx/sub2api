@@ -97,11 +97,19 @@ type ClientEnvironment struct {
 	Runtime               string `json:"runtimes,omitempty"`
 	Terminal              string `json:"terminal,omitempty"`
 	Shell                 string `json:"shell,omitempty"`
+	PackageManagers       string `json:"package_managers,omitempty"`
 	Version               string `json:"version"`
 	VersionBase           string `json:"version_base"`
 	BuildTime             string `json:"build_time,omitempty"`
 	DeploymentEnvironment string `json:"deployment_environment,omitempty"`
 	IsCI                  *bool  `json:"is_ci,omitempty"`
+	IsClaubbit            *bool  `json:"is_claubbit,omitempty"`
+	IsGitHubAction        *bool  `json:"is_github_action,omitempty"`
+	IsClaudeCodeAction    *bool  `json:"is_claude_code_action,omitempty"`
+	IsClaudeCodeRemote    *bool  `json:"is_claude_code_remote,omitempty"`
+	IsLocalAgentMode      *bool  `json:"is_local_agent_mode,omitempty"`
+	IsConductor           *bool  `json:"is_conductor,omitempty"`
+	IsClaudeAIAuth        *bool  `json:"is_claude_ai_auth,omitempty"`
 }
 
 // NormalizePlatform maps Stainless OS names (for example "MacOS") to Node's
@@ -169,6 +177,11 @@ type EventContext struct {
 	Interactive      *bool
 	Provider         string
 	Route            DeliveryRoute
+	UserType         string
+	Entrypoint       string
+	ClientType       string
+	AgentSDKVersion  string
+	OmitAuth         bool
 }
 
 type ClaudeCodeInternalEvent struct {
@@ -189,7 +202,8 @@ type InternalEventData struct {
 	Entrypoint         string            `json:"entrypoint"`
 	IsInteractive      *bool             `json:"is_interactive,omitempty"`
 	ClientType         string            `json:"client_type"`
-	Auth               EventAuth         `json:"auth"`
+	AgentSDKVersion    string            `json:"agent_sdk_version,omitempty"`
+	Auth               *EventAuth        `json:"auth,omitempty"`
 	AdditionalMetadata string            `json:"additional_metadata"`
 }
 
@@ -220,25 +234,30 @@ func buildEvent(now time.Time, context EventContext, name string, metadata map[s
 	if err != nil {
 		return BuiltEvent{}, fmt.Errorf("marshal telemetry metadata: %w", err)
 	}
+	var auth *EventAuth
+	if !context.OmitAuth {
+		auth = &EventAuth{
+			AccountUUID:      context.Identity.AccountUUID,
+			OrganizationUUID: context.Identity.OrganizationUUID,
+		}
+	}
 	event := ClaudeCodeInternalEvent{
 		EventType: "ClaudeCodeInternalEvent",
 		EventData: InternalEventData{
-			EventName:       name,
-			ClientTimestamp: now.UTC().Format(time.RFC3339Nano),
-			EventID:         randomUUID(),
-			Model:           valueOr(context.Model, "unknown"),
-			SessionID:       context.Identity.SessionID,
-			DeviceID:        context.Identity.DeviceID,
-			UserType:        "external",
-			Betas:           context.Betas,
-			Environment:     context.Environment,
-			Entrypoint:      "cli",
-			IsInteractive:   context.Interactive,
-			ClientType:      "cli",
-			Auth: EventAuth{
-				AccountUUID:      context.Identity.AccountUUID,
-				OrganizationUUID: context.Identity.OrganizationUUID,
-			},
+			EventName:          name,
+			ClientTimestamp:    now.UTC().Format(time.RFC3339Nano),
+			EventID:            randomUUID(),
+			Model:              valueOr(context.Model, "unknown"),
+			SessionID:          context.Identity.SessionID,
+			DeviceID:           context.Identity.DeviceID,
+			UserType:           valueOr(context.UserType, "external"),
+			Betas:              context.Betas,
+			Environment:        context.Environment,
+			Entrypoint:         valueOr(context.Entrypoint, "cli"),
+			IsInteractive:      context.Interactive,
+			ClientType:         valueOr(context.ClientType, "cli"),
+			AgentSDKVersion:    context.AgentSDKVersion,
+			Auth:               auth,
 			AdditionalMetadata: base64.StdEncoding.EncodeToString(raw),
 		},
 	}

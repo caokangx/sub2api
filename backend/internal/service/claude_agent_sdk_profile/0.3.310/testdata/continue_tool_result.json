@@ -1,0 +1,66 @@
+{
+  "model": "claude-sonnet-5-5",
+  "messages": [
+    {
+      "role": "user",
+      "content": [
+        {
+          "tool_use_id": "toolu_01T1VRUqA2rPiR3k5UaBEAcC",
+          "type": "tool_result",
+          "content": "1\t# capture-lab\n2\t\n3\t抓包用的小项目。\n4\t\n5\t- `src/calc.py`：订单统计函数\n6\t- `tests/test_calc.py`：测试，运行 `python3 tests/test_calc.py`\n7\t- `data/orders.json`：示例订单\n8\t- `notes.ipynb`：示例 notebook\n9\t"
+        },
+        {
+          "tool_use_id": "toolu_012cgM8jxFX4MFSaAXJDxRDa",
+          "type": "tool_result",
+          "content": "1\t[\n2\t  { \"id\": 1, \"customer\": \"alice\", \"amount\": 120, \"status\": \"paid\" },\n3\t  { \"id\": 2, \"customer\": \"bob\", \"amount\": 80, \"status\": \"refunded\" },\n4\t  { \"id\": 3, \"customer\": \"carol\", \"amount\": 250, \"status\": \"paid\" },\n5\t  { \"id\": 4, \"customer\": \"dave\", \"amount\": 150, \"status\": \"paid\" }\n6\t]\n7\t"
+        }
+      ]
+    },
+    {
+      "role": "system",
+      "content": [
+        {
+          "type": "text",
+          "text": "<total_tokens>14984604 tokens left</total_tokens>",
+          "cache_control": {
+            "type": "ephemeral",
+            "ttl": "1h"
+          }
+        }
+      ]
+    }
+  ],
+  "system": [
+    {
+      "type": "text",
+      "text": "x-anthropic-billing-header: cc_version=2.1.284.<fp>; cc_entrypoint=sdk-ts; cch=<cch>; cc_prev_req=<request_id>; cc_prompt_id=<prompt_id>; cc_turn_origin=sdk; cc_prompt_index=0; cc_turn_index=1;"
+    }
+  ],
+  "metadata": {
+    "user_id": "{\"device_id\":\"<device_id>\",\"account_uuid\":\"\",\"session_id\":\"<session_id>\"}"
+  },
+  "max_tokens": 128000,
+  "thinking": {
+    "type": "adaptive",
+    "display": "updates"
+  },
+  "context_management": {
+    "edits": [
+      {
+        "type": "clear_thinking_20251015",
+        "keep": "all"
+      }
+    ]
+  },
+  "output_config": {
+    "effort": "medium"
+  },
+  "thread": {
+    "type": "continue",
+    "previous_message_id": "<message_id>"
+  },
+  "diagnostics": {
+    "previous_message_id": "<message_id>"
+  },
+  "stream": true
+}

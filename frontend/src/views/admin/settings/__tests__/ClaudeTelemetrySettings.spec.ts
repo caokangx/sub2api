@@ -48,7 +48,8 @@ const ToggleStub = defineComponent({
 const response = () => ({
   profile: "2.1.284",
   mode: "record" as const,
-  setup_token_enabled: false,
+  oauth_enabled: true,
+  setup_token_enabled: true,
   record_file: "./data/telemetry/telemetry-batches.ndjson",
   first_party: {
     enabled: true,
@@ -115,12 +116,12 @@ describe("ClaudeTelemetrySettings", () => {
     const wrapper = mountComponent();
     await flushPromises();
 
-    await wrapper.get('[data-testid="claude-telemetry-setup-token"]').setValue(true);
+    await wrapper.get('[data-testid="claude-telemetry-setup-token"]').setValue(false);
     await wrapper.get('[data-testid="claude-telemetry-save"]').trigger("click");
     await flushPromises();
 
     expect(mocks.update).toHaveBeenCalledWith(expect.objectContaining({
-      setup_token_enabled: true,
+      setup_token_enabled: false,
       datadog: expect.objectContaining({
         api_key: "",
         clear_api_key: false,

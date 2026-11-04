@@ -21,10 +21,8 @@ import (
 func TestClaudeCodeProfilePolicy(t *testing.T) {
 	group := &Group{Platform: PlatformAnthropic, ForceClaudeCodeProfile: true}
 	ctx := WithClaudeCodeProfilePolicy(context.Background(), group)
-	for _, typ := range []string{AccountTypeOAuth, AccountTypeSetupToken} {
-		require.True(t, forceClaudeCodeProfile(ctx, &Account{Platform: PlatformAnthropic, Type: typ}))
-	}
-	for _, account := range []*Account{nil, {Platform: PlatformAnthropic, Type: AccountTypeAPIKey}, {Platform: PlatformOpenAI, Type: AccountTypeOAuth}, {Platform: PlatformAnthropic, Type: AccountTypeBedrock}} {
+	require.True(t, forceClaudeCodeProfile(ctx, &Account{Platform: PlatformAnthropic, Type: AccountTypeOAuth}))
+	for _, account := range []*Account{nil, {Platform: PlatformAnthropic, Type: AccountTypeSetupToken}, {Platform: PlatformAnthropic, Type: AccountTypeAPIKey}, {Platform: PlatformOpenAI, Type: AccountTypeOAuth}, {Platform: PlatformAnthropic, Type: AccountTypeBedrock}} {
 		require.False(t, forceClaudeCodeProfile(ctx, account))
 	}
 	account := &Account{Platform: PlatformAnthropic, Type: AccountTypeOAuth}
@@ -264,7 +262,7 @@ func TestClaudeCodeProfileNativeWireParity(t *testing.T) {
 						require.NoError(t, err)
 						require.NotNil(t, upstream.lastReq)
 						wire := upstream.lastBody
-						if !enabled || typ == AccountTypeAPIKey {
+						if !enabled || typ != AccountTypeOAuth {
 							require.Len(t, gjson.GetBytes(wire, "tools").Array(), 1)
 							require.NotContains(t, string(wire), "# Harness")
 							if client == claude.DefaultUserAgent() || typ == AccountTypeAPIKey {
@@ -296,7 +294,7 @@ func TestClaudeCodeProfileNativeWireParity(t *testing.T) {
 
 func TestClaudeCodeProfileAuthCacheRoundTrip(t *testing.T) {
 	groupID := int64(71)
-	apiKey := &APIKey{ID: 2, UserID: 1, Key: "test-key", Status: StatusActive, GroupID: &groupID, User: &User{ID: 1, Status: StatusActive}, Group: &Group{ID: groupID, Platform: PlatformAnthropic, Status: StatusActive, Hydrated: true, ForceClaudeCodeProfile: true}}
+	apiKey := &APIKey{ID: 2, UserID: 1, Key: "test-key", Status: StatusActive, GroupID: &groupID, User: &User{ID: 1, Status: StatusActive}, Group: &Group{ID: groupID, Platform: PlatformAnthropic, Status: StatusActive, Hydrated: true, ForceClaudeCodeProfile: true, SimulateClaudeAgentSDK: true}}
 	svc := &APIKeyService{}
 	payload, err := json.Marshal(&APIKeyAuthCacheEntry{Snapshot: svc.snapshotFromAPIKey(context.Background(), apiKey)})
 	require.NoError(t, err)
@@ -306,6 +304,7 @@ func TestClaudeCodeProfileAuthCacheRoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, used)
 	require.True(t, materialized.Group.ForceClaudeCodeProfile)
+	require.True(t, materialized.Group.SimulateClaudeAgentSDK)
 }
 
 func TestClaudeCodeProfileResponsePreservesToolNamesAndArguments(t *testing.T) {

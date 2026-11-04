@@ -114,7 +114,7 @@ func TestOAuthIdentityRetryAndAccountSwitch(t *testing.T) {
 	svc := &GatewayService{}
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
-	account := &Account{ID: 10, Platform: PlatformAnthropic, Type: AccountTypeSetupToken, Credentials: map[string]any{"account_uuid": "credentials-uuid"}}
+	account := &Account{ID: 10, Platform: PlatformAnthropic, Type: AccountTypeOAuth, Credentials: map[string]any{"account_uuid": "credentials-uuid"}}
 	fp := &Fingerprint{ClientID: strings.Repeat("a", 64)}
 	raw := `{"device_id":"client-device","account_uuid":"client-account","session_id":"123e4567-e89b-42d3-a456-426614174000","parent_session_id":"parent","ti":"supported","unknown":"discard"}`
 	body, _ := json.Marshal(map[string]any{"metadata": map[string]any{"user_id": raw}, "messages": []any{}})

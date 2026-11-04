@@ -614,6 +614,20 @@ func (_c *GroupCreate) SetNillableForceClaudeCodeProfile(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetSimulateClaudeAgentSdk sets the "simulate_claude_agent_sdk" field.
+func (_c *GroupCreate) SetSimulateClaudeAgentSdk(v bool) *GroupCreate {
+	_c.mutation.SetSimulateClaudeAgentSdk(v)
+	return _c
+}
+
+// SetNillableSimulateClaudeAgentSdk sets the "simulate_claude_agent_sdk" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableSimulateClaudeAgentSdk(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetSimulateClaudeAgentSdk(*v)
+	}
+	return _c
+}
+
 // SetFallbackGroupID sets the "fallback_group_id" field.
 func (_c *GroupCreate) SetFallbackGroupID(v int64) *GroupCreate {
 	_c.mutation.SetFallbackGroupID(v)
@@ -1155,6 +1169,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultForceClaudeCodeProfile
 		_c.mutation.SetForceClaudeCodeProfile(v)
 	}
+	if _, ok := _c.mutation.SimulateClaudeAgentSdk(); !ok {
+		v := group.DefaultSimulateClaudeAgentSdk
+		_c.mutation.SetSimulateClaudeAgentSdk(v)
+	}
 	if _, ok := _c.mutation.ModelRoutingEnabled(); !ok {
 		v := group.DefaultModelRoutingEnabled
 		_c.mutation.SetModelRoutingEnabled(v)
@@ -1373,6 +1391,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.ForceClaudeCodeProfile(); !ok {
 		return &ValidationError{Name: "force_claude_code_profile", err: errors.New(`ent: missing required field "Group.force_claude_code_profile"`)}
+	}
+	if _, ok := _c.mutation.SimulateClaudeAgentSdk(); !ok {
+		return &ValidationError{Name: "simulate_claude_agent_sdk", err: errors.New(`ent: missing required field "Group.simulate_claude_agent_sdk"`)}
 	}
 	if _, ok := _c.mutation.ModelRoutingEnabled(); !ok {
 		return &ValidationError{Name: "model_routing_enabled", err: errors.New(`ent: missing required field "Group.model_routing_enabled"`)}
@@ -1654,6 +1675,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ForceClaudeCodeProfile(); ok {
 		_spec.SetField(group.FieldForceClaudeCodeProfile, field.TypeBool, value)
 		_node.ForceClaudeCodeProfile = value
+	}
+	if value, ok := _c.mutation.SimulateClaudeAgentSdk(); ok {
+		_spec.SetField(group.FieldSimulateClaudeAgentSdk, field.TypeBool, value)
+		_node.SimulateClaudeAgentSdk = value
 	}
 	if value, ok := _c.mutation.FallbackGroupID(); ok {
 		_spec.SetField(group.FieldFallbackGroupID, field.TypeInt64, value)
@@ -2642,6 +2667,18 @@ func (u *GroupUpsert) SetForceClaudeCodeProfile(v bool) *GroupUpsert {
 // UpdateForceClaudeCodeProfile sets the "force_claude_code_profile" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateForceClaudeCodeProfile() *GroupUpsert {
 	u.SetExcluded(group.FieldForceClaudeCodeProfile)
+	return u
+}
+
+// SetSimulateClaudeAgentSdk sets the "simulate_claude_agent_sdk" field.
+func (u *GroupUpsert) SetSimulateClaudeAgentSdk(v bool) *GroupUpsert {
+	u.Set(group.FieldSimulateClaudeAgentSdk, v)
+	return u
+}
+
+// UpdateSimulateClaudeAgentSdk sets the "simulate_claude_agent_sdk" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateSimulateClaudeAgentSdk() *GroupUpsert {
+	u.SetExcluded(group.FieldSimulateClaudeAgentSdk)
 	return u
 }
 
@@ -3893,6 +3930,20 @@ func (u *GroupUpsertOne) SetForceClaudeCodeProfile(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateForceClaudeCodeProfile() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateForceClaudeCodeProfile()
+	})
+}
+
+// SetSimulateClaudeAgentSdk sets the "simulate_claude_agent_sdk" field.
+func (u *GroupUpsertOne) SetSimulateClaudeAgentSdk(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetSimulateClaudeAgentSdk(v)
+	})
+}
+
+// UpdateSimulateClaudeAgentSdk sets the "simulate_claude_agent_sdk" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateSimulateClaudeAgentSdk() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateSimulateClaudeAgentSdk()
 	})
 }
 
@@ -5367,6 +5418,20 @@ func (u *GroupUpsertBulk) SetForceClaudeCodeProfile(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateForceClaudeCodeProfile() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateForceClaudeCodeProfile()
+	})
+}
+
+// SetSimulateClaudeAgentSdk sets the "simulate_claude_agent_sdk" field.
+func (u *GroupUpsertBulk) SetSimulateClaudeAgentSdk(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetSimulateClaudeAgentSdk(v)
+	})
+}
+
+// UpdateSimulateClaudeAgentSdk sets the "simulate_claude_agent_sdk" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateSimulateClaudeAgentSdk() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateSimulateClaudeAgentSdk()
 	})
 }
 

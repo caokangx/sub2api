@@ -966,6 +966,7 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 			var result *service.ForwardResult
 			requestCtx := c.Request.Context()
 			requestCtx = service.WithClaudeCodeProfilePolicy(requestCtx, selection.EffectiveGroup)
+			requestCtx = service.WithClaudeAgentSDKPolicy(requestCtx, selection.EffectiveGroup)
 			requestCtx = service.WithClaudeTelemetryRouteEligible(
 				requestCtx,
 				currentAPIKey.Group != nil && currentAPIKey.Group.Platform == service.PlatformAnthropic,

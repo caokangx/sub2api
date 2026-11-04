@@ -609,6 +609,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		AudioSTTPricePerHour:            audioSTTPricePerHour,
 		ClaudeCodeOnly:                  input.ClaudeCodeOnly,
 		ForceClaudeCodeProfile:          input.ForceClaudeCodeProfile && platform == PlatformAnthropic,
+		SimulateClaudeAgentSDK:          input.SimulateClaudeAgentSDK && platform == PlatformAnthropic,
 		FallbackGroupID:                 input.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: fallbackOnInvalidRequest,
 		ModelRouting:                    input.ModelRouting,
@@ -1007,8 +1008,12 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	if input.ForceClaudeCodeProfile != nil {
 		group.ForceClaudeCodeProfile = *input.ForceClaudeCodeProfile
 	}
+	if input.SimulateClaudeAgentSDK != nil {
+		group.SimulateClaudeAgentSDK = *input.SimulateClaudeAgentSDK
+	}
 	if group.Platform != PlatformAnthropic {
 		group.ForceClaudeCodeProfile = false
+		group.SimulateClaudeAgentSDK = false
 	}
 	if input.FreeOpenAIFast != nil {
 		group.FreeOpenAIFast = *input.FreeOpenAIFast

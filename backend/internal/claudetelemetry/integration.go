@@ -165,6 +165,15 @@ func (i *Integration) Begin(_ context.Context, input BeginInput) (*Request, erro
 	}
 	req.observer.now = i.now
 	req.request = requestEvents(body, req, retry, summaries, seenResults)
+	if eventContext.ClientType == "sdk-typescript" && mutation.PromptIndex == 1 && !retry && !continuation {
+		req.request = append([]eventDraft{
+			draft("tengu_init", map[string]any{"entrypoint": eventContext.Entrypoint}, inferredFields("entrypoint")),
+			draft("tengu_started", map[string]any{"entrypoint": eventContext.Entrypoint}, inferredFields("entrypoint")),
+			draft("tengu_sdk_init_handshake", map[string]any{
+				"agent_sdk_version": eventContext.AgentSDKVersion, "client_type": eventContext.ClientType,
+			}, inferredFields("agent_sdk_version", "client_type")),
+		}, req.request...)
+	}
 	return req, nil
 }
 
@@ -452,6 +461,23 @@ func completionEvents(req *Request, observation Observation, requestID string, e
 				"thinkingContentLength", "toolUseContentLengths", "imageBlockCount", "imageTotalBytes",
 				"documentBlockCount", "documentTotalBytes", "inputTextCharLength", "timeSinceLastApiCallMs"},
 		), "buildAgeMins")),
+	}
+	if req.context.ClientType == "sdk-typescript" {
+		events = append(events,
+			draft("tengu_sdk_ttft", map[string]any{
+				"ttft_ms":           ttftAt.Sub(req.startedAt).Milliseconds(),
+				"agent_sdk_version": req.context.AgentSDKVersion,
+			}, FieldProvenance{"ttft_ms": Derived, "agent_sdk_version": Inferred}),
+			draft("tengu_sdk_result", map[string]any{
+				"is_error": false, "duration_ms": duration.Milliseconds(),
+				"num_turns": 1, "agent_sdk_version": req.context.AgentSDKVersion,
+			}, mixedProvenance([]string{"duration_ms"}, []string{"is_error", "num_turns", "agent_sdk_version"})),
+		)
+		if observation.TextContentLength > 0 {
+			events = append(events, draft("tengu_turn_first_text", map[string]any{
+				"duration_ms": ttftAt.Sub(req.startedAt).Milliseconds(),
+			}, FieldProvenance{"duration_ms": Derived}))
+		}
 	}
 	if len(observation.ToolUses) > 0 {
 		completionType := "tool_use_single"

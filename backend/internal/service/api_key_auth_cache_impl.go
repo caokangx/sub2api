@@ -14,7 +14,7 @@ import (
 	"github.com/dgraph-io/ristretto"
 )
 
-const apiKeyAuthSnapshotVersion = 25 // v25: group force_claude_code_profile policy
+const apiKeyAuthSnapshotVersion = 26 // v26: group simulate_claude_agent_sdk policy
 
 type apiKeyAuthCacheConfig struct {
 	l1Size        int
@@ -411,6 +411,7 @@ func (s *APIKeyService) snapshotFromAPIKey(ctx context.Context, apiKey *APIKey) 
 			ModelPricing:                    apiKey.Group.ModelPricing,
 			ClaudeCodeOnly:                  apiKey.Group.ClaudeCodeOnly,
 			ForceClaudeCodeProfile:          apiKey.Group.ForceClaudeCodeProfile,
+			SimulateClaudeAgentSDK:          apiKey.Group.SimulateClaudeAgentSDK,
 			FallbackGroupID:                 apiKey.Group.FallbackGroupID,
 			FallbackGroupIDOnInvalidRequest: apiKey.Group.FallbackGroupIDOnInvalidRequest,
 			ModelRouting:                    apiKey.Group.ModelRouting,
@@ -514,6 +515,7 @@ func (s *APIKeyService) snapshotToAPIKey(key string, snapshot *APIKeyAuthSnapsho
 			ModelPricing:                    snapshot.Group.ModelPricing,
 			ClaudeCodeOnly:                  snapshot.Group.ClaudeCodeOnly,
 			ForceClaudeCodeProfile:          snapshot.Group.ForceClaudeCodeProfile,
+			SimulateClaudeAgentSDK:          snapshot.Group.SimulateClaudeAgentSDK,
 			FallbackGroupID:                 snapshot.Group.FallbackGroupID,
 			FallbackGroupIDOnInvalidRequest: snapshot.Group.FallbackGroupIDOnInvalidRequest,
 			ModelRouting:                    snapshot.Group.ModelRouting,

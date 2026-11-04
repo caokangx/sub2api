@@ -691,7 +691,7 @@ func partialStreamUsageResult(c *gin.Context, resp *http.Response, streamResult 
 		return nil
 	}
 	return &ForwardResult{
-		RequestID:                     resp.Header.Get("x-request-id"),
+		RequestID:                     anthropicUpstreamRequestID(resp.Header),
 		UpstreamHeaders:               resp.Header,
 		Usage:                         *streamResult.usage,
 		Model:                         model,
@@ -725,7 +725,7 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 	c.Header("X-Accel-Buffering", "no")
 
 	// 透传其他响应头
-	if v := resp.Header.Get("x-request-id"); v != "" {
+	if v := anthropicUpstreamRequestID(resp.Header); v != "" {
 		c.Header("x-request-id", v)
 	}
 
@@ -963,13 +963,18 @@ func (s *GatewayService) handleStreamingResponse(ctx context.Context, resp *http
 		// 兼容 Kimi cached_tokens → cache_read_input_tokens
 		if eventType == "message_start" {
 			if msg, ok := event["message"].(map[string]any); ok {
+				if messageID, _ := msg["id"].(string); messageID != "" {
+					s.recordClaudeAgentSDKResponse(ctx, messageID, anthropicUpstreamRequestID(resp.Header))
+				}
 				if u, ok := msg["usage"].(map[string]any); ok {
+					s.recordClaudeAgentSDKUsage(ctx, u, true)
 					eventChanged = reconcileCachedTokens(u) || eventChanged
 				}
 			}
 		}
 		if eventType == "message_delta" {
 			if u, ok := event["usage"].(map[string]any); ok {
+				s.recordClaudeAgentSDKUsage(ctx, u, false)
 				eventChanged = reconcileCachedTokens(u) || eventChanged
 			}
 		}
@@ -1425,6 +1430,16 @@ func (s *GatewayService) handleNonStreamingResponse(ctx context.Context, resp *h
 	observer.ObserveAnthropic(body)
 	if resp.StatusCode >= http.StatusOK && resp.StatusCode < http.StatusMultipleChoices {
 		s.thinkingStrip.RegisterIssuedFromResponse(ctx, account, body)
+		if messageID := gjson.GetBytes(body, "id").String(); messageID != "" {
+			s.recordClaudeAgentSDKResponse(ctx, messageID, anthropicUpstreamRequestID(resp.Header))
+		}
+		var responseMap map[string]any
+		if json.Unmarshal(body, &responseMap) == nil {
+			if usage, ok := responseMap["usage"].(map[string]any); ok {
+				s.recordClaudeAgentSDKUsage(ctx, usage, true)
+				s.recordClaudeAgentSDKUsage(ctx, usage, false)
+			}
+		}
 	}
 
 	// 解析usage

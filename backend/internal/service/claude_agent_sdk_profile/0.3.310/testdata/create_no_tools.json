@@ -1,0 +1,66 @@
+{
+  "model": "claude-sonnet-5-5",
+  "messages": [
+    {
+      "role": "user",
+      "content": "用一句话介绍你自己。"
+    },
+    {
+      "role": "system",
+      "content": [
+        {
+          "type": "text",
+          "text": "# Environment\nYou have been invoked in the following environment: \n - Primary working directory: /Users/developer/project\n - Is a git repository: true\n - Platform: darwin\n - Shell: zsh\n - OS Version: Darwin 24.5.0\n\nYou are powered by the model named Sonnet 5.5. The exact model ID is claude-sonnet-5-5. Assistant knowledge cutoff is June 2026.\n\n<total_tokens>15000000 tokens left</total_tokens>\n\nToday's date is 2026-11-03.",
+          "cache_control": {
+            "type": "ephemeral",
+            "ttl": "1h"
+          }
+        }
+      ],
+      "output_config": {
+        "effort": "medium"
+      }
+    }
+  ],
+  "system": [
+    {
+      "type": "text",
+      "text": "x-anthropic-billing-header: cc_version=2.1.284.<fp>; cc_entrypoint=sdk-ts; cch=<cch>; cc_prompt_id=<prompt_id>; cc_turn_origin=sdk; cc_prompt_index=0; cc_turn_index=1;"
+    },
+    {
+      "type": "text",
+      "text": "You are a Claude agent, built on Anthropic's Claude Agent SDK.",
+      "cache_control": {
+        "type": "ephemeral",
+        "ttl": "1h"
+      }
+    }
+  ],
+  "tools": [],
+  "metadata": {
+    "user_id": "{\"device_id\":\"<device_id>\",\"account_uuid\":\"\",\"session_id\":\"<session_id>\"}"
+  },
+  "max_tokens": 128000,
+  "thinking": {
+    "type": "adaptive",
+    "display": "updates"
+  },
+  "context_management": {
+    "edits": [
+      {
+        "type": "clear_thinking_20251015",
+        "keep": "all"
+      }
+    ]
+  },
+  "output_config": {
+    "effort": "medium"
+  },
+  "thread": {
+    "type": "create"
+  },
+  "diagnostics": {
+    "previous_message_id": null
+  },
+  "stream": true
+}
