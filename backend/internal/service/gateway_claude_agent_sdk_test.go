@@ -119,11 +119,12 @@ func TestClaudeAgentSDKStatelessRewrite(t *testing.T) {
 	}`)
 	ctx, body, err := svc.prepareClaudeAgentSDK(ctx, c, account, input, "claude-sonnet-5-5")
 	require.NoError(t, err)
-	require.Equal(t, "CLIENT SYSTEM", gjson.GetBytes(body, "messages.0.content").String())
-	require.Equal(t, "user", gjson.GetBytes(body, "messages.1.role").String())
+	require.Equal(t, "user", gjson.GetBytes(body, "messages.0.role").String())
+	require.Equal(t, "system", gjson.GetBytes(body, "messages.1.role").String())
+	require.Contains(t, gjson.GetBytes(body, "messages.1.content.0.text").String(), "Primary working directory: /sdk/work")
+	require.Equal(t, "ephemeral", gjson.GetBytes(body, "messages.1.content.0.cache_control.type").String())
 	require.Equal(t, "system", gjson.GetBytes(body, "messages.2.role").String())
-	require.Contains(t, gjson.GetBytes(body, "messages.2.content.0.text").String(), "Primary working directory: /sdk/work")
-	require.Equal(t, "ephemeral", gjson.GetBytes(body, "messages.2.content.0.cache_control.type").String())
+	require.Equal(t, "CLIENT SYSTEM", gjson.GetBytes(body, "messages.2.content").String())
 	require.Len(t, gjson.GetBytes(body, "system").Array(), 3)
 	require.False(t, gjson.GetBytes(body, "system.1.cache_control").Exists(), "identity block intentionally has no cache_control")
 	require.Equal(t, "client_tool", gjson.GetBytes(body, "tools.0.name").String())
@@ -192,7 +193,65 @@ func TestClaudeAgentSDKCanDisableSystemMessageInjection(t *testing.T) {
 	}`), "claude-sonnet-5-5")
 	require.NoError(t, err)
 	require.Len(t, gjson.GetBytes(body, "messages").Array(), 2)
-	require.Equal(t, "system", gjson.GetBytes(body, "messages.0.role").String())
-	require.Equal(t, "client policy", gjson.GetBytes(body, "messages.0.content").String())
-	require.Equal(t, "user", gjson.GetBytes(body, "messages.1.role").String())
+	require.Equal(t, "user", gjson.GetBytes(body, "messages.0.role").String())
+	require.Equal(t, "system", gjson.GetBytes(body, "messages.1.role").String())
+	require.Equal(t, "client policy", gjson.GetBytes(body, "messages.1.content").String())
+}
+
+func TestClaudeAgentSDKValidationIgnoresRewrittenFields(t *testing.T) {
+	body := []byte(`{"model":"claude-opus-5-5","max_tokens":1,"temperature":0.2,"tool_choice":{"type":"any"},"thinking":{"type":"disabled"},"messages":[{"role":"user","content":"hello"}]}`)
+	setupToken := &Account{ID: 10, Platform: PlatformAnthropic, Type: AccountTypeSetupToken}
+	group := &Group{Platform: PlatformAnthropic, SimulateClaudeAgentSDK: true}
+
+	plain, rewritten := nativeClaudeValidationInput(context.Background(), setupToken, body)
+	require.False(t, rewritten)
+	require.ErrorContains(t, validateNativeClaudeRequest(plain, "claude-opus-5-5", rewritten), "requires adaptive thinking")
+
+	ctx := WithClaudeAgentSDKPolicy(context.Background(), group)
+	validation, rewritten := nativeClaudeValidationInput(ctx, setupToken, body)
+	require.True(t, rewritten)
+	require.NoError(t, validateNativeClaudeRequest(validation, "claude-opus-5-5", rewritten))
+
+	settings := DefaultClaudeAntiBanSettings()
+	svc := &GatewayService{settingService: &SettingService{}, cache: &agentSDKTestCache{}}
+	svc.settingService.claudeAntiBanRuntime.Store(settings)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
+	_, out, err := svc.prepareClaudeAgentSDK(ctx, c, setupToken, body, "claude-opus-5-5")
+	require.NoError(t, err)
+	require.Equal(t, "adaptive", gjson.GetBytes(out, "thinking.type").String())
+	require.False(t, gjson.GetBytes(out, "temperature").Exists())
+	require.False(t, gjson.GetBytes(out, "tool_choice").Exists())
+
+	oauth := &Account{ID: 11, Platform: PlatformAnthropic, Type: AccountTypeOAuth}
+	_, rewritten = nativeClaudeValidationInput(ctx, oauth, body)
+	require.False(t, rewritten, "the Agent SDK profile applies to setup-token accounts only")
+}
+
+func TestAgentSDKInsertClientSystemNeverLeadsMessages(t *testing.T) {
+	profile := DefaultClaudeAntiBanSettings().Environment.Profile
+	for _, tc := range []struct {
+		name     string
+		messages []any
+		inject   bool
+		want     int
+	}{
+		{"injected", []any{map[string]any{"role": "user", "content": "hi"}}, true, 2},
+		{"not injected", []any{map[string]any{"role": "user", "content": "hi"}}, false, 1},
+		{"client control message", []any{
+			map[string]any{"role": "user", "content": "hi"},
+			map[string]any{"role": "system", "content": "<total_tokens>1 tokens left</total_tokens>"},
+			map[string]any{"role": "assistant", "content": "ok"},
+		}, true, 2},
+		{"no user message", []any{map[string]any{"role": "assistant", "content": "ok"}}, true, 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			out := agentSDKMessages(tc.messages, "CLIENT SYSTEM", "claude-sonnet-5-5", profile, false, tc.inject, 1000)
+			require.NotEqual(t, "system", out[0].(map[string]any)["role"])
+			got := out[tc.want].(map[string]any)
+			require.Equal(t, "system", got["role"])
+			require.Equal(t, "CLIENT SYSTEM", got["content"])
+		})
+	}
+	require.Empty(t, agentSDKMessages(nil, "CLIENT SYSTEM", "claude-sonnet-5-5", profile, false, true, 1000))
 }

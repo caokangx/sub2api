@@ -222,9 +222,6 @@ func agentSDKSystemText(value any) string {
 
 func agentSDKMessages(messages []any, clientSystem, model string, profile ClaudeEnvironmentProfile, hasTools, inject bool, remainingTokens int64) []any {
 	out := make([]any, 0, len(messages)*2+1)
-	if clientSystem != "" {
-		out = append(out, map[string]any{"role": "system", "content": clientSystem})
-	}
 	firstUser := true
 	injected := make([]int, 0, len(messages))
 	for i, raw := range messages {
@@ -261,10 +258,40 @@ func agentSDKMessages(messages []any, clientSystem, model string, profile Claude
 			"cache_control": map[string]any{"type": "ephemeral", "ttl": "1h"},
 		}}
 	}
+	if clientSystem != "" {
+		out = agentSDKInsertClientSystem(out, clientSystem)
+	}
 	if hasTools {
 		agentSDKPrependGitAttribution(out)
 	}
 	return out
+}
+
+// agentSDKInsertClientSystem places the caller's system prompt after the first
+// user message and the system messages that follow it. The upstream rejects a
+// content-bearing system message at messages[0].
+func agentSDKInsertClientSystem(messages []any, clientSystem string) []any {
+	if len(messages) == 0 {
+		return messages
+	}
+	position := len(messages)
+	for i, raw := range messages {
+		if msg, ok := raw.(map[string]any); ok && msg["role"] == "user" {
+			position = i + 1
+			break
+		}
+	}
+	for position < len(messages) {
+		msg, ok := messages[position].(map[string]any)
+		if !ok || msg["role"] != "system" {
+			break
+		}
+		position++
+	}
+	out := make([]any, 0, len(messages)+1)
+	out = append(out, messages[:position]...)
+	out = append(out, map[string]any{"role": "system", "content": clientSystem})
+	return append(out, messages[position:]...)
 }
 
 func agentSDKControlSystemMessage(message map[string]any) bool {

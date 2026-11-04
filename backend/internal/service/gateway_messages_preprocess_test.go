@@ -24,7 +24,7 @@ func TestPreprocessNativeClaudeMessagesStrictNormalization(t *testing.T) {
 	result, err := PreprocessNativeClaudeMessages(body, settings)
 	require.NoError(t, err)
 	require.EqualValues(t, 64_000, gjson.GetBytes(result.Body, "max_tokens").Int())
-	require.True(t, gjson.GetBytes(result.Body, "stream").Bool())
+	require.False(t, gjson.GetBytes(result.Body, "stream").Exists())
 	require.True(t, gjson.GetBytes(result.Body, "system").IsArray())
 	require.True(t, gjson.GetBytes(result.Body, "tools").IsArray())
 	require.True(t, gjson.GetBytes(result.Body, "metadata").IsObject())
@@ -37,6 +37,32 @@ func TestPreprocessNativeClaudeMessagesStrictNormalization(t *testing.T) {
 		result.Body,
 	)
 	require.Equal(t, "plan", gjson.GetBytes(telemetryBody, "safeguards.0.classifier_context.permission_mode").String())
+}
+
+func TestPreprocessNativeClaudeMessagesFlattensToolSchemaRootUnions(t *testing.T) {
+	settings := DefaultClaudeAntiBanSettings()
+	settings.ProbeInterceptionEnabled = false
+	plain := `{"type":"object","properties":{"q":{"anyOf":[{"type":"string"},{"type":"null"}]}},"required":["q"]}`
+	body := []byte(`{
+		"model":"claude-opus-5-5",
+		"messages":[{"role":"user","content":"hello"}],
+		"tools":[
+			{"name":"plain","input_schema":` + plain + `},
+			{"name":"union","input_schema":{"anyOf":[
+				{"type":"object","properties":{"a":{"type":"string"}},"required":["a","shared"]},
+				{"type":"object","properties":{"b":{"type":"number"}},"required":["shared"]}
+			]}}
+		]
+	}`)
+	result, err := PreprocessNativeClaudeMessages(body, settings)
+	require.NoError(t, err)
+	require.JSONEq(t, plain, gjson.GetBytes(result.Body, "tools.0.input_schema").Raw)
+	union := gjson.GetBytes(result.Body, "tools.1.input_schema")
+	require.False(t, union.Get("anyOf").Exists())
+	require.Equal(t, "object", union.Get("type").String())
+	require.Equal(t, "string", union.Get("properties.a.type").String())
+	require.Equal(t, "number", union.Get("properties.b.type").String())
+	require.JSONEq(t, `["shared"]`, union.Get("required").Raw)
 }
 
 func TestPreprocessNativeClaudeMessagesRejectsUnknownField(t *testing.T) {

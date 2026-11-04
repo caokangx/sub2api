@@ -9,11 +9,11 @@ import (
 // JSON Schema 联合关键字；嵌套层不受限制，因此只摊平根节点。
 var anthropicInputSchemaUnionKeywords = []string{"oneOf", "anyOf", "allOf"}
 
-// flattenAnthropicRootUnions 用单一 object schema 替换顶层的 oneOf/anyOf/allOf：
+// FlattenAnthropicRootUnions 用单一 object schema 替换顶层的 oneOf/anyOf/allOf：
 // 属性取各分支并集，同名属性用嵌套联合保留两侧约束；required 在 oneOf/anyOf
 // 下取分支交集、在 allOf 下取分支并集。非对象分支无法用 Anthropic 的 object
 // schema 表达，视为不贡献属性与必填字段。
-func flattenAnthropicRootUnions(schema map[string]json.RawMessage) {
+func FlattenAnthropicRootUnions(schema map[string]json.RawMessage) {
 	present := make([]string, 0, len(anthropicInputSchemaUnionKeywords))
 	for _, keyword := range anthropicInputSchemaUnionKeywords {
 		if _, ok := schema[keyword]; ok {
@@ -89,7 +89,7 @@ func decodeAnthropicUnionBranches(raw json.RawMessage) ([]map[string]json.RawMes
 			branches = append(branches, nil)
 			continue
 		}
-		flattenAnthropicRootUnions(branch)
+		FlattenAnthropicRootUnions(branch)
 		branches = append(branches, branch)
 	}
 	return branches, true

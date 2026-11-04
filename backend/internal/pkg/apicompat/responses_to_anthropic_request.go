@@ -770,7 +770,7 @@ func normalizeAnthropicInputSchema(schema json.RawMessage) json.RawMessage {
 		return json.RawMessage(`{"type":"object","properties":{}}`)
 	}
 
-	flattenAnthropicRootUnions(m)
+	FlattenAnthropicRootUnions(m)
 
 	typeRaw, ok := m["type"]
 	if !ok || strings.TrimSpace(string(typeRaw)) == "" || string(typeRaw) == "null" {

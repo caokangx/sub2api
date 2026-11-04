@@ -8,6 +8,8 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+
+	"github.com/Wei-Shaw/sub2api/internal/pkg/apicompat"
 )
 
 const (
@@ -241,6 +243,7 @@ func PreprocessNativeClaudeMessages(
 		return ClaudeMessagesPreprocessResult{}, &ClaudeMessagesPreprocessError{Status: 400, Code: "invalid_request_body", Message: err.Error()}
 	}
 	delete(decoded, "tool_choice")
+	flattenClaudeToolSchemaRootUnions(decoded)
 	var originalMaxTokens *int
 	if value, ok := decoded["max_tokens"].(float64); ok && value >= 0 && value == float64(int(value)) {
 		parsed := int(value)
@@ -309,6 +312,54 @@ func PreprocessNativeClaudeMessages(
 	return result, nil
 }
 
+// flattenClaudeToolSchemaRootUnions rewrites only tool input_schemas whose root
+// uses oneOf/anyOf/allOf, which the upstream rejects outright.
+func flattenClaudeToolSchemaRootUnions(body map[string]any) {
+	tools, _ := body["tools"].([]any)
+	for _, raw := range tools {
+		tool, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		schema, ok := tool["input_schema"].(map[string]any)
+		if !ok || !hasClaudeSchemaRootUnion(schema) {
+			continue
+		}
+		encoded, err := json.Marshal(schema)
+		if err != nil {
+			continue
+		}
+		var fields map[string]json.RawMessage
+		if json.Unmarshal(encoded, &fields) != nil {
+			continue
+		}
+		apicompat.FlattenAnthropicRootUnions(fields)
+		if _, ok := fields["type"]; !ok {
+			fields["type"] = json.RawMessage(`"object"`)
+		}
+		if _, ok := fields["properties"]; !ok {
+			fields["properties"] = json.RawMessage(`{}`)
+		}
+		flattened, err := json.Marshal(fields)
+		if err != nil {
+			continue
+		}
+		var next map[string]any
+		if json.Unmarshal(flattened, &next) == nil {
+			tool["input_schema"] = next
+		}
+	}
+}
+
+func hasClaudeSchemaRootUnion(schema map[string]any) bool {
+	for _, keyword := range []string{"oneOf", "anyOf", "allOf"} {
+		if _, ok := schema[keyword]; ok {
+			return true
+		}
+	}
+	return false
+}
+
 func normalizeClaudeMessagesBody(body map[string]any) {
 	if _, ok := body["model"]; !ok {
 		body["model"] = defaultClaudeMessagesModel
@@ -327,9 +378,6 @@ func normalizeClaudeMessagesBody(body map[string]any) {
 	}
 	if _, ok := body["max_tokens"]; !ok {
 		body["max_tokens"] = normalizedClaudeMessagesMaxTokens(claudeStringValue(body["model"]))
-	}
-	if _, ok := body["stream"]; !ok {
-		body["stream"] = true
 	}
 }
 

@@ -1,6 +1,7 @@
 package service
 
 import (
+	"context"
 	"fmt"
 	"github.com/tidwall/gjson"
 	"math"
@@ -136,6 +137,24 @@ func validateNativeClaudeFields(body []byte, ignoreMaxTokens bool) error {
 
 func nativeClaudeInteger(v gjson.Result) bool {
 	return v.Type == gjson.Number && v.Float() == math.Trunc(v.Float()) && v.Float() >= -9007199254740991 && v.Float() <= 9007199254740991
+}
+
+// nativeClaudeValidationInput drops the fields an anti-ban profile replaces, so
+// the caller's values cannot reject a request the rewrite would make valid. The
+// bool reports whether a rewriting profile applies.
+func nativeClaudeValidationInput(ctx context.Context, account *Account, body []byte) ([]byte, bool) {
+	rewritten := false
+	if forceClaudeCodeProfile(ctx, account) {
+		rewritten = true
+		body, _ = deleteJSONPathBytes(body, "tool_choice")
+	}
+	if simulateClaudeAgentSDK(ctx, account) {
+		rewritten = true
+		for _, field := range []string{"thinking", "temperature", "tool_choice"} {
+			body, _ = deleteJSONPathBytes(body, field)
+		}
+	}
+	return body, rewritten
 }
 
 func validateNativeClaudeRequest(body []byte, model string, forceProfile bool) error {
