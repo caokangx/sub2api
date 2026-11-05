@@ -80,7 +80,7 @@ function simulateGuard(
       (toPath === '/login' || toPath === '/register')
     ) {
       if (authState.backendModeEnabled && !authState.isAdmin) {
-        return null
+        return authState.isReadonlyAdmin ? '/admin/accounts' : null
       }
       return authState.isAdmin ? '/admin/dashboard' : '/dashboard'
     }
@@ -131,10 +131,13 @@ function simulateGuard(
     }
   }
 
-  // Backend mode: admin gets full access, non-admin blocked
+  // Backend mode: admin gets full access, read-only admin only gets allowed admin pages
   if (authState.backendModeEnabled) {
     if (authState.isAuthenticated && authState.isAdmin) {
       return null
+    }
+    if (authState.isAuthenticated && authState.isReadonlyAdmin) {
+      return toMeta.allowReadonlyAdmin === true ? null : '/admin/accounts'
     }
     const allowed = ['/login', '/key-usage', '/setup', '/payment/result']
     const callbackPaths = [
@@ -286,6 +289,18 @@ describe('路由守卫逻辑', () => {
 
     it('Backend 模式下仍可访问 /admin/accounts', () => {
       expect(simulateGuard('/admin/accounts', accountsMeta, { ...authState, backendModeEnabled: true })).toBeNull()
+    })
+
+    it('Backend 模式下登录后访问前台页面重定向到 /admin/accounts', () => {
+      const backendState = { ...authState, backendModeEnabled: true }
+      expect(simulateGuard('/dashboard', {}, backendState)).toBe('/admin/accounts')
+      expect(simulateGuard('/keys', {}, backendState)).toBe('/admin/accounts')
+    })
+
+    it('Backend 模式下已登录访问 /login 重定向到 /admin/accounts', () => {
+      expect(
+        simulateGuard('/login', { requiresAuth: false }, { ...authState, backendModeEnabled: true })
+      ).toBe('/admin/accounts')
     })
 
     it('普通用户即使命中 allowReadonlyAdmin 页面也被拒绝', () => {

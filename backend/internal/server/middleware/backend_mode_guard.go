@@ -12,13 +12,26 @@ import (
 // BackendModeUserGuard blocks non-admin users from accessing user routes when backend mode is enabled.
 // Must be placed AFTER JWT auth middleware so that the user role is available in context.
 func BackendModeUserGuard(settingService *service.SettingService) gin.HandlerFunc {
+	return backendModeRoleGuard(settingService, func(role string) bool {
+		return role == service.RoleAdmin
+	})
+}
+
+// BackendModeSessionGuard guards current-session endpoints (e.g. /auth/me) in backend mode.
+// Read-only admins may log in under backend mode, so they are allowed here in addition to admins,
+// while user self-service routes stay behind BackendModeUserGuard.
+func BackendModeSessionGuard(settingService *service.SettingService) gin.HandlerFunc {
+	return backendModeRoleGuard(settingService, service.IsBackendModeLoginRole)
+}
+
+func backendModeRoleGuard(settingService *service.SettingService, allowed func(role string) bool) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if settingService == nil || !settingService.IsBackendModeEnabled(c.Request.Context()) {
 			c.Next()
 			return
 		}
 		role, _ := GetUserRoleFromContext(c)
-		if role == "admin" {
+		if allowed(role) {
 			c.Next()
 			return
 		}

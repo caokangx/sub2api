@@ -76,6 +76,11 @@ func (u *User) IsReadonlyAdmin() bool {
 	return u.Role == RoleReadonlyAdmin
 }
 
+// IsBackendModeLoginRole 判断该角色在 Backend 模式下是否允许登录（管理员与只读管理员）。
+func IsBackendModeLoginRole(role string) bool {
+	return role == RoleAdmin || role == RoleReadonlyAdmin
+}
+
 func (u *User) IsActive() bool {
 	return u.Status == StatusActive
 }

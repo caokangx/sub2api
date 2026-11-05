@@ -774,6 +774,7 @@ const BACKEND_MODE_CALLBACK_PATHS = [
   '/auth/wechat/payment/callback',
 ]
 const BACKEND_MODE_PENDING_AUTH_PATHS = ['/register', '/email-verify']
+const BACKEND_MODE_READONLY_ADMIN_HOME = '/admin/accounts'
 
 function isBackendModePublicRouteAllowed(path: string, hasPendingAuthSession: boolean): boolean {
   if (BACKEND_MODE_ALLOWED_PATHS.some((allowedPath) => path === allowedPath || path.startsWith(allowedPath))) {
@@ -835,6 +836,10 @@ router.beforeEach(async (to, _from, next) => {
       // In backend mode, non-admin users should NOT be redirected away from login
       // (they are blocked from all protected routes, so redirecting would cause a loop)
       if (appStore.backendModeEnabled && !authStore.isAdmin) {
+        if (authStore.isReadonlyAdmin) {
+          next(BACKEND_MODE_READONLY_ADMIN_HOME)
+          return
+        }
         next()
         return
       }
@@ -978,10 +983,19 @@ router.beforeEach(async (to, _from, next) => {
     }
   }
 
-  // Backend mode: admin gets full access, non-admin blocked
+  // Backend mode: admin gets full access, read-only admin only gets admin pages
+  // that allow it (front-office pages are disabled), everyone else is blocked
   if (appStore.backendModeEnabled) {
     if (authStore.isAuthenticated && authStore.isAdmin) {
       next()
+      return
+    }
+    if (authStore.isAuthenticated && authStore.isReadonlyAdmin) {
+      if (to.meta.allowReadonlyAdmin === true) {
+        next()
+        return
+      }
+      next(BACKEND_MODE_READONLY_ADMIN_HOME)
       return
     }
     const isAllowed = isBackendModePublicRouteAllowed(to.path, authStore.hasPendingAuthSession)

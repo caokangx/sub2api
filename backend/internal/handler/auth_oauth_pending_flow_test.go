@@ -20,6 +20,7 @@ import (
 	"github.com/Wei-Shaw/sub2api/ent/redeemcode"
 	dbuser "github.com/Wei-Shaw/sub2api/ent/user"
 	"github.com/Wei-Shaw/sub2api/internal/config"
+	infraerrors "github.com/Wei-Shaw/sub2api/internal/pkg/errors"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/pagination"
 	"github.com/Wei-Shaw/sub2api/internal/service"
 	"github.com/gin-gonic/gin"
@@ -858,6 +859,22 @@ func TestExchangePendingOAuthCompletionBlocksBackendModeBeforeReturningTokenPayl
 	storedSession, err := client.PendingAuthSession.Get(ctx, session.ID)
 	require.NoError(t, err)
 	require.Nil(t, storedSession.ConsumedAt)
+}
+
+func TestEnsureBackendModeAllowsUserPermitsAdminAndReadonlyAdmin(t *testing.T) {
+	handler, _ := newOAuthPendingFlowTestHandlerWithDependencies(t, oauthPendingFlowTestHandlerOptions{
+		settingValues: map[string]string{
+			service.SettingKeyBackendModeEnabled: "true",
+		},
+	})
+	ctx := context.Background()
+
+	require.NoError(t, handler.ensureBackendModeAllowsUser(ctx, &service.User{Role: service.RoleAdmin}))
+	require.NoError(t, handler.ensureBackendModeAllowsUser(ctx, &service.User{Role: service.RoleReadonlyAdmin}))
+
+	err := handler.ensureBackendModeAllowsUser(ctx, &service.User{Role: service.RoleUser})
+	require.Error(t, err)
+	require.Equal(t, "BACKEND_MODE_ADMIN_ONLY", infraerrors.Reason(err))
 }
 
 func TestExchangePendingOAuthCompletionRejectsDisabledTargetUser(t *testing.T) {

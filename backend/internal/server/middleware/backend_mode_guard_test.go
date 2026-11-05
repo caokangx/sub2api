@@ -109,6 +109,12 @@ func TestBackendModeUserGuard(t *testing.T) {
 			wantStatus: http.StatusForbidden,
 		},
 		{
+			name:       "enabled_readonly_admin_blocked",
+			enabled:    "true",
+			role:       stringPtr("readonly_admin"),
+			wantStatus: http.StatusForbidden,
+		},
+		{
 			name:       "enabled_no_role_blocked",
 			enabled:    "true",
 			wantStatus: http.StatusForbidden,
@@ -124,34 +130,99 @@ func TestBackendModeUserGuard(t *testing.T) {
 	for _, tc := range tests {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			gin.SetMode(gin.TestMode)
-
-			r := gin.New()
-			if tc.role != nil {
-				role := *tc.role
-				r.Use(func(c *gin.Context) {
-					c.Set(string(ContextKeyUserRole), role)
-					c.Next()
-				})
-			}
-
-			var svc *service.SettingService
-			if !tc.nilService {
-				svc = newBackendModeSettingService(t, tc.enabled)
-			}
-
-			r.Use(BackendModeUserGuard(svc))
-			r.GET("/test", func(c *gin.Context) {
-				c.JSON(http.StatusOK, gin.H{"ok": true})
-			})
-
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, "/test", nil)
-			r.ServeHTTP(w, req)
-
-			require.Equal(t, tc.wantStatus, w.Code)
+			runBackendModeRoleGuardCase(t, BackendModeUserGuard, tc.nilService, tc.enabled, tc.role, tc.wantStatus)
 		})
 	}
+}
+
+func TestBackendModeSessionGuard(t *testing.T) {
+	tests := []struct {
+		name       string
+		nilService bool
+		enabled    string
+		role       *string
+		wantStatus int
+	}{
+		{
+			name:       "disabled_allows_user",
+			enabled:    "false",
+			role:       stringPtr("user"),
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "nil_service_allows_user",
+			nilService: true,
+			role:       stringPtr("user"),
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "enabled_admin_allowed",
+			enabled:    "true",
+			role:       stringPtr("admin"),
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "enabled_readonly_admin_allowed",
+			enabled:    "true",
+			role:       stringPtr("readonly_admin"),
+			wantStatus: http.StatusOK,
+		},
+		{
+			name:       "enabled_user_blocked",
+			enabled:    "true",
+			role:       stringPtr("user"),
+			wantStatus: http.StatusForbidden,
+		},
+		{
+			name:       "enabled_no_role_blocked",
+			enabled:    "true",
+			wantStatus: http.StatusForbidden,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			runBackendModeRoleGuardCase(t, BackendModeSessionGuard, tc.nilService, tc.enabled, tc.role, tc.wantStatus)
+		})
+	}
+}
+
+func runBackendModeRoleGuardCase(
+	t *testing.T,
+	guard func(*service.SettingService) gin.HandlerFunc,
+	nilService bool,
+	enabled string,
+	role *string,
+	wantStatus int,
+) {
+	t.Helper()
+	gin.SetMode(gin.TestMode)
+
+	r := gin.New()
+	if role != nil {
+		roleValue := *role
+		r.Use(func(c *gin.Context) {
+			c.Set(string(ContextKeyUserRole), roleValue)
+			c.Next()
+		})
+	}
+
+	var svc *service.SettingService
+	if !nilService {
+		svc = newBackendModeSettingService(t, enabled)
+	}
+
+	r.Use(guard(svc))
+	r.GET("/test", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"ok": true})
+	})
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, wantStatus, w.Code)
 }
 
 func TestBackendModeAuthGuard(t *testing.T) {
