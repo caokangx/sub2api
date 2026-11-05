@@ -461,6 +461,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/bedrock-verify',
+    name: 'AdminBedrockVerify',
+    component: () => import('@/views/admin/BedrockVerifyView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Bedrock Verify',
+      titleKey: 'admin.bedrockVerify.title'
+    }
+  },
+  {
     path: '/admin/users',
     name: 'AdminUsers',
     component: () => import('@/views/admin/UsersView.vue'),

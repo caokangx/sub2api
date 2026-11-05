@@ -53,7 +53,8 @@ export default {
     },
     sections: {
       decode: 'Signature decoding',
-      verify: 'Genuineness check'
+      verify: 'Genuineness check',
+      injection: 'Injection analysis'
     },
     verify: {
       description:
@@ -98,6 +99,36 @@ export default {
         upstreamError: 'Upstream returned an error',
         nonJson: 'Upstream returned non-JSON content: {detail}',
         http: 'Upstream returned HTTP {status}'
+      }
+    },
+    injection: {
+      description:
+        'Uses the connection above to send 3 probes of known length ("hi" followed by 0, 200 and 800 copies of " hello"). The input tokens the upstream reports (input + cache_creation + cache_read) are compared with the genuine count to estimate how many tokens the upstream injects into every request, and whether it inflates token counts proportionally. The analysis costs about 2,000 input tokens, plus whatever the upstream injects.',
+      scopeNote:
+        'Only these built-in probes are analyzed. The upstream may inject different content into other kinds of requests, for example ones with tools or Claude Code headers.',
+      start: 'Analyze injection',
+      progress: 'Sending probes: {done}/{total} done',
+      verdict: {
+        none: 'No injection found',
+        minor: 'Minor injection',
+        major: 'Major injection'
+      },
+      inflatedTag: 'Token counts look inflated',
+      injectedLabel: 'Estimated injection',
+      injectedValue: '~{n} tokens per request',
+      injectedNote: 'Accurate to about ±10 tokens. More than 500 tokens usually means a whole system prompt is injected, e.g. to impersonate Claude Code.',
+      inflationLabel: 'Inflation factor',
+      inflationNote: 'Reported / genuine token ratio; 1.00x is normal.',
+      table: {
+        units: 'Padding units',
+        expected: 'Genuine tokens (no injection)',
+        reported: 'Reported total'
+      },
+      hints: {
+        uncalibrated: 'This model is not in the calibration table, so a default baseline was used: the injection estimate may be less accurate and the inflation factor cannot be computed.',
+        unstable: 'The three counts do not fall on a straight line. The upstream count is unstable, so treat the result as a rough guide.',
+        cached: 'The probes do not enable caching, yet the upstream reported cached tokens: the upstream adds caching itself, so the injected content is likely cached.',
+        belowBaseline: 'The upstream reports fewer tokens than the genuine count; it may truncate the content or rewrite the count.'
       }
     }
   }

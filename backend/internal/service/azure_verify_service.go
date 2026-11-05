@@ -2,10 +2,8 @@ package service
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -17,28 +15,20 @@ import (
 )
 
 const (
-	azureVerifyStepTimeout       = 120 * time.Second
-	azureVerifyMaxResponseBytes  = 2 << 20
-	azureVerifyMaxStreamBytes    = 64 << 10
 	azureVerifyMaxStreamChunks   = 3
-	azureVerifyMaxErrorChars     = 2000
-	azureVerifyMaxEvidenceChars  = 200
 	azureVerifyMaxCompletionToks = 64
-	// The probe prompt is ~17 tokens; anything far above means the relay injects its own prompt.
-	azureVerifyInjectedPromptTokens = 200
-	azureVerifyProbePrompt          = "写一篇 800 字的文章介绍长城"
-	azureVerifyRememberPrompt       = "记住数字 4729，只回复OK"
-	azureVerifyRecallPrompt         = "我刚才让你记住的数字是多少？只回复数字"
-	azureVerifyRememberedNumber     = "4729"
+	azureVerifyRememberPrompt    = "记住数字 4729，只回复OK"
+	azureVerifyRecallPrompt      = "我刚才让你记住的数字是多少？只回复数字"
+	azureVerifyRememberedNumber  = "4729"
 )
 
 const (
-	AzureVerifyStatusOK     = "ok"
-	AzureVerifyStatusFailed = "failed"
+	AzureVerifyStatusOK     = UpstreamVerifyStatusOK
+	AzureVerifyStatusFailed = UpstreamVerifyStatusFailed
 
 	AzureVerifyEvidenceAzure    = "azure"
 	AzureVerifyEvidenceNonAzure = "non_azure"
-	AzureVerifyEvidenceInfo     = "info"
+	AzureVerifyEvidenceInfo     = UpstreamVerifyEvidenceInfo
 
 	AzureVerifyStepChat      = "chat_completions"
 	AzureVerifyStepStream    = "chat_completions_stream"
@@ -84,40 +74,29 @@ var azureVerifyNonAzureErrorPatterns = []struct {
 	{regexp.MustCompile(`(?i)with a chatgpt account`), "报错提到 ChatGPT 账号"},
 }
 
-var azureVerifyModelUnavailablePattern = regexp.MustCompile(`(?i)model_not_found|no available channel|无可用渠道|deploymentnotfound|model[^\n]{0,80}(not found|does not exist)`)
-
 var azureVerifyDatedModelPattern = regexp.MustCompile(`-\d{4}-\d{2}-\d{2}$`)
 
 // AzureVerifyService probes an admin-supplied OpenAI-compatible relay and judges
 // whether the models behind it are served by Azure OpenAI.
 type AzureVerifyService struct {
-	upstream HTTPUpstream
+	client *upstreamVerifyClient
 }
 
 func NewAzureVerifyService(upstream HTTPUpstream) *AzureVerifyService {
-	return &AzureVerifyService{upstream: upstream}
+	return &AzureVerifyService{client: &upstreamVerifyClient{
+		upstream: upstream,
+		setAuth: func(h http.Header, apiKey string) {
+			h.Set("Authorization", "Bearer "+apiKey)
+		},
+		reportedHeaderPrefixes: azureVerifyReportedHeaderPrefixes,
+	}}
 }
 
-type AzureVerifyModelsResult struct {
-	Status int      `json:"status"`
-	Models []string `json:"models"`
-	Error  string   `json:"error,omitempty"`
-}
+type AzureVerifyModelsResult = UpstreamVerifyModelsResult
 
-type AzureVerifyEvidence struct {
-	Kind   string `json:"kind"`
-	Detail string `json:"detail"`
-	Value  string `json:"value,omitempty"`
-}
+type AzureVerifyEvidence = UpstreamVerifyEvidence
 
-type AzureVerifyStep struct {
-	Name       string              `json:"name"`
-	Status     int                 `json:"status"`
-	OK         bool                `json:"ok"`
-	DurationMs int64               `json:"duration_ms"`
-	Headers    map[string][]string `json:"headers,omitempty"`
-	Error      string              `json:"error,omitempty"`
-}
+type AzureVerifyStep = UpstreamVerifyStep
 
 type AzureVerifyProbeResult struct {
 	Model            string                `json:"model"`
@@ -162,35 +141,8 @@ type azureVerdict struct {
 	Evidences        []AzureVerifyEvidence
 }
 
-type azureVerifyHTTPResult struct {
-	status   int
-	headers  http.Header
-	body     []byte
-	duration time.Duration
-	err      error
-}
-
 func (s *AzureVerifyService) ListModels(ctx context.Context, baseURL, apiKey string) AzureVerifyModelsResult {
-	res := s.do(ctx, http.MethodGet, azureVerifyEndpoint(baseURL, "/v1/models"), apiKey, nil)
-	out := AzureVerifyModelsResult{Status: res.status, Models: []string{}}
-	if res.err != nil {
-		out.Error = res.err.Error()
-		return out
-	}
-	if res.status != http.StatusOK {
-		out.Error = azureVerifyErrorText(res.status, res.body)
-		return out
-	}
-	gjson.GetBytes(res.body, "data.#.id").ForEach(func(_, id gjson.Result) bool {
-		if v := strings.TrimSpace(id.String()); v != "" {
-			out.Models = append(out.Models, v)
-		}
-		return true
-	})
-	if len(out.Models) == 0 {
-		out.Error = "upstream returned no models"
-	}
-	return out
+	return s.client.listModels(ctx, baseURL, apiKey)
 }
 
 func (s *AzureVerifyService) ProbeModel(ctx context.Context, baseURL, apiKey, model string) AzureVerifyProbeResult {
@@ -222,16 +174,16 @@ func (s *AzureVerifyService) probeChat(ctx context.Context, baseURL, apiKey stri
 	body, _ := json.Marshal(map[string]any{
 		"model":                 obs.Model,
 		"max_completion_tokens": azureVerifyMaxCompletionToks,
-		"messages":              []map[string]string{{"role": "user", "content": azureVerifyProbePrompt}},
+		"messages":              []map[string]string{{"role": "user", "content": upstreamVerifyProbePrompt}},
 	})
-	res := s.do(ctx, http.MethodPost, azureVerifyEndpoint(baseURL, "/v1/chat/completions"), apiKey, body)
-	step := newAzureVerifyStep(AzureVerifyStepChat, res)
-	if !s.recordResult(obs, &step, res) {
+	res := s.client.do(ctx, http.MethodPost, upstreamVerifyEndpoint(baseURL, "/v1/chat/completions"), apiKey, body)
+	step := s.client.newStep(AzureVerifyStepChat, res)
+	if !recordAzureVerifyResult(obs, &step, res) {
 		return step
 	}
 	if !gjson.ValidBytes(res.body) || gjson.GetBytes(res.body, "error").Exists() {
 		step.OK = false
-		step.Error = azureVerifyErrorText(res.status, res.body)
+		step.Error = upstreamVerifyErrorText(res.status, res.body)
 		obs.Errors = append(obs.Errors, step.Error)
 		return step
 	}
@@ -251,32 +203,30 @@ func (s *AzureVerifyService) probeStream(ctx context.Context, baseURL, apiKey st
 		"stream":   true,
 		"messages": []map[string]string{{"role": "user", "content": "say hi"}},
 	})
-	ctx, cancel := context.WithTimeout(ctx, azureVerifyStepTimeout)
+	ctx, cancel := context.WithTimeout(ctx, upstreamVerifyStepTimeout)
 	defer cancel()
 
 	start := time.Now()
-	req, err := s.newRequest(ctx, http.MethodPost, azureVerifyEndpoint(baseURL, "/v1/chat/completions"), apiKey, body)
+	resp, err := s.client.open(ctx, http.MethodPost, upstreamVerifyEndpoint(baseURL, "/v1/chat/completions"), apiKey, body)
 	if err != nil {
-		return s.failStep(obs, AzureVerifyStepStream, 0, start, err.Error())
-	}
-	resp, err := s.upstream.Do(req, "", 0, 1)
-	if err != nil {
-		return s.failStep(obs, AzureVerifyStepStream, 0, start, "request failed: "+err.Error())
+		msg := "request failed: " + err.Error()
+		obs.Errors = append(obs.Errors, msg)
+		return AzureVerifyStep{Name: AzureVerifyStepStream, DurationMs: time.Since(start).Milliseconds(), Error: msg}
 	}
 	defer func() { _ = resp.Body.Close() }()
 
-	step := AzureVerifyStep{Name: AzureVerifyStepStream, Status: resp.StatusCode, Headers: azureVerifyReportedHeaders(resp.Header)}
+	step := AzureVerifyStep{Name: AzureVerifyStepStream, Status: resp.StatusCode, Headers: s.client.reportedHeaders(resp.Header)}
 	obs.Headers = append(obs.Headers, resp.Header)
 	if resp.StatusCode != http.StatusOK {
-		raw, _ := io.ReadAll(io.LimitReader(resp.Body, azureVerifyMaxErrorChars*4))
-		step.Error = azureVerifyErrorText(resp.StatusCode, raw)
+		raw, _ := io.ReadAll(io.LimitReader(resp.Body, upstreamVerifyMaxErrorChars*4))
+		step.Error = upstreamVerifyErrorText(resp.StatusCode, raw)
 		step.DurationMs = time.Since(start).Milliseconds()
 		obs.Errors = append(obs.Errors, step.Error)
 		return step
 	}
 
-	scanner := bufio.NewScanner(io.LimitReader(resp.Body, azureVerifyMaxStreamBytes))
-	scanner.Buffer(make([]byte, 0, 16<<10), azureVerifyMaxStreamBytes)
+	scanner := bufio.NewScanner(io.LimitReader(resp.Body, upstreamVerifyMaxStreamBytes))
+	scanner.Buffer(make([]byte, 0, 16<<10), upstreamVerifyMaxStreamBytes)
 	chunks := 0
 	for scanner.Scan() && chunks < azureVerifyMaxStreamChunks {
 		line := strings.TrimSpace(scanner.Text())
@@ -289,7 +239,7 @@ func (s *AzureVerifyService) probeStream(ctx context.Context, baseURL, apiKey st
 		}
 		chunks++
 		if gjson.Get(payload, "error").Exists() {
-			step.Error = azureVerifyTruncate(payload)
+			step.Error = upstreamVerifyTruncate(payload)
 			obs.Errors = append(obs.Errors, step.Error)
 			break
 		}
@@ -317,17 +267,17 @@ func (s *AzureVerifyService) probeStream(ctx context.Context, baseURL, apiKey st
 
 func (s *AzureVerifyService) probeContinuation(ctx context.Context, baseURL, apiKey string, obs *azureVerifyObservation) AzureVerifyStep {
 	obs.ContinuationTried = true
-	endpoint := azureVerifyEndpoint(baseURL, "/v1/responses")
+	endpoint := upstreamVerifyEndpoint(baseURL, "/v1/responses")
 	first, _ := json.Marshal(map[string]any{"model": obs.Model, "store": true, "input": azureVerifyRememberPrompt})
-	res := s.do(ctx, http.MethodPost, endpoint, apiKey, first)
-	step := newAzureVerifyStep(AzureVerifyStepResponses, res)
-	if !s.recordResult(obs, &step, res) {
+	res := s.client.do(ctx, http.MethodPost, endpoint, apiKey, first)
+	step := s.client.newStep(AzureVerifyStepResponses, res)
+	if !recordAzureVerifyResult(obs, &step, res) {
 		return step
 	}
 	responseID := gjson.GetBytes(res.body, "id").String()
 	if responseID == "" {
 		step.OK = false
-		step.Error = azureVerifyErrorText(res.status, res.body)
+		step.Error = upstreamVerifyErrorText(res.status, res.body)
 		obs.Errors = append(obs.Errors, step.Error)
 		return step
 	}
@@ -337,30 +287,25 @@ func (s *AzureVerifyService) probeContinuation(ctx context.Context, baseURL, api
 		"previous_response_id": responseID,
 		"input":                azureVerifyRecallPrompt,
 	})
-	res2 := s.do(ctx, http.MethodPost, endpoint, apiKey, second)
+	res2 := s.client.do(ctx, http.MethodPost, endpoint, apiKey, second)
 	step.Status = res2.status
 	step.DurationMs += res2.duration.Milliseconds()
-	for name, values := range azureVerifyReportedHeaders(res2.headers) {
-		if step.Headers == nil {
-			step.Headers = make(map[string][]string)
-		}
-		step.Headers[name] = append(step.Headers[name], values...)
-	}
-	if !s.recordResult(obs, &step, res2) {
+	step.Headers = mergeUpstreamVerifyHeaders(step.Headers, s.client.reportedHeaders(res2.headers))
+	if !recordAzureVerifyResult(obs, &step, res2) {
 		return step
 	}
 	if !strings.Contains(azureVerifyResponsesText(res2.body), azureVerifyRememberedNumber) {
 		step.OK = false
-		step.Error = "previous_response_id did not carry the earlier turn: " + azureVerifyTruncate(string(res2.body))
+		step.Error = "previous_response_id did not carry the earlier turn: " + upstreamVerifyTruncate(string(res2.body))
 		return step
 	}
 	obs.ContinuationOK = true
 	return step
 }
 
-// recordResult folds one HTTP exchange into the observation and reports whether
-// the exchange succeeded at the HTTP level.
-func (s *AzureVerifyService) recordResult(obs *azureVerifyObservation, step *AzureVerifyStep, res azureVerifyHTTPResult) bool {
+// recordAzureVerifyResult folds one HTTP exchange into the observation and reports
+// whether the exchange succeeded at the HTTP level.
+func recordAzureVerifyResult(obs *azureVerifyObservation, step *AzureVerifyStep, res upstreamVerifyHTTPResult) bool {
 	if res.headers != nil {
 		obs.Headers = append(obs.Headers, res.headers)
 	}
@@ -372,7 +317,7 @@ func (s *AzureVerifyService) recordResult(obs *azureVerifyObservation, step *Azu
 	}
 	if res.status != http.StatusOK {
 		step.OK = false
-		step.Error = azureVerifyErrorText(res.status, res.body)
+		step.Error = upstreamVerifyErrorText(res.status, res.body)
 		obs.Errors = append(obs.Errors, step.Error)
 		return false
 	}
@@ -380,85 +325,19 @@ func (s *AzureVerifyService) recordResult(obs *azureVerifyObservation, step *Azu
 	return true
 }
 
-func (s *AzureVerifyService) failStep(obs *azureVerifyObservation, name string, status int, start time.Time, msg string) AzureVerifyStep {
-	obs.Errors = append(obs.Errors, msg)
-	return AzureVerifyStep{Name: name, Status: status, DurationMs: time.Since(start).Milliseconds(), Error: msg}
-}
-
-func (s *AzureVerifyService) do(ctx context.Context, method, url, apiKey string, body []byte) azureVerifyHTTPResult {
-	ctx, cancel := context.WithTimeout(ctx, azureVerifyStepTimeout)
-	defer cancel()
-	start := time.Now()
-	req, err := s.newRequest(ctx, method, url, apiKey, body)
-	if err != nil {
-		return azureVerifyHTTPResult{err: err, duration: time.Since(start)}
-	}
-	resp, err := s.upstream.Do(req, "", 0, 1)
-	if err != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			err = errors.New("upstream request timed out")
-		}
-		return azureVerifyHTTPResult{err: err, duration: time.Since(start)}
-	}
-	defer func() { _ = resp.Body.Close() }()
-	raw, err := io.ReadAll(io.LimitReader(resp.Body, azureVerifyMaxResponseBytes+1))
-	out := azureVerifyHTTPResult{status: resp.StatusCode, headers: resp.Header, duration: time.Since(start)}
-	if err != nil {
-		out.err = fmt.Errorf("read upstream response: %w", err)
-		return out
-	}
-	if len(raw) > azureVerifyMaxResponseBytes {
-		out.err = errors.New("upstream response too large")
-		return out
-	}
-	out.body = raw
-	return out
-}
-
-func (s *AzureVerifyService) newRequest(ctx context.Context, method, url, apiKey string, body []byte) (*http.Request, error) {
-	var reader io.Reader
-	if body != nil {
-		reader = bytes.NewReader(body)
-	}
-	req, err := http.NewRequestWithContext(ctx, method, url, reader)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("Authorization", "Bearer "+apiKey)
-	if body != nil {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	return req, nil
-}
-
-func newAzureVerifyStep(name string, res azureVerifyHTTPResult) AzureVerifyStep {
-	return AzureVerifyStep{
-		Name:       name,
-		Status:     res.status,
-		DurationMs: res.duration.Milliseconds(),
-		Headers:    azureVerifyReportedHeaders(res.headers),
-	}
-}
-
 func evaluateAzureEvidence(obs azureVerifyObservation) azureVerdict {
 	var v azureVerdict
-	add := func(kind, detail, value string) {
-		if r := []rune(value); len(r) > azureVerifyMaxEvidenceChars {
-			value = string(r[:azureVerifyMaxEvidenceChars]) + "…"
-		}
-		v.Evidences = append(v.Evidences, AzureVerifyEvidence{Kind: kind, Detail: detail, Value: value})
-	}
+	var ev upstreamVerifyEvidenceList
 	azureHits, counterHits := 0, 0
 
 	seenHeader := map[string]bool{}
 	requestIDs := map[string]bool{}
-	newAPI := false
 	for _, h := range obs.Headers {
 		for _, name := range azureVerifyAzureHeaders {
 			if val := strings.TrimSpace(h.Get(name)); val != "" && !seenHeader[name] {
 				seenHeader[name] = true
 				azureHits++
-				add(AzureVerifyEvidenceAzure, "响应头包含 Azure 特有字段 "+name, val)
+				ev.add(AzureVerifyEvidenceAzure, "响应头包含 Azure 特有字段 "+name, val)
 				if name == "x-ms-served-model" && v.ServedModel == "" {
 					v.ServedModel = val
 				}
@@ -469,10 +348,7 @@ func evaluateAzureEvidence(obs azureVerifyObservation) azureVerdict {
 			if strings.HasPrefix(lower, "x-codex-") && !seenHeader[lower] {
 				seenHeader[lower] = true
 				counterHits++
-				add(AzureVerifyEvidenceNonAzure, "响应头包含 ChatGPT 订阅（Codex）特有字段 "+lower, h.Get(name))
-			}
-			if strings.HasPrefix(lower, "x-new-api-") || strings.HasPrefix(lower, "x-oneapi-") {
-				newAPI = true
+				ev.add(AzureVerifyEvidenceNonAzure, "响应头包含 ChatGPT 订阅（Codex）特有字段 "+lower, h.Get(name))
 			}
 		}
 		for _, id := range h.Values("x-request-id") {
@@ -482,27 +358,27 @@ func evaluateAzureEvidence(obs azureVerifyObservation) azureVerdict {
 
 	if obs.ChatFilterFields {
 		azureHits++
-		add(AzureVerifyEvidenceAzure, "非流式响应体包含 Azure 内容过滤字段（prompt_filter_results / content_filter_results）", "")
+		ev.add(AzureVerifyEvidenceAzure, "非流式响应体包含 Azure 内容过滤字段（prompt_filter_results / content_filter_results）", "")
 	}
 	if obs.StreamAzureChunk {
 		azureHits++
-		add(AzureVerifyEvidenceAzure, "流式响应的第一个块是 Azure 特有的内容过滤空块", "")
+		ev.add(AzureVerifyEvidenceAzure, "流式响应的第一个块是 Azure 特有的内容过滤空块", "")
 	} else if obs.StreamFilterField {
 		azureHits++
-		add(AzureVerifyEvidenceAzure, "流式响应包含 Azure 内容过滤字段", "")
+		ev.add(AzureVerifyEvidenceAzure, "流式响应包含 Azure 内容过滤字段", "")
 	}
 
 	for _, msg := range obs.Errors {
 		for _, p := range azureVerifyAzureErrorPatterns {
 			if p.re.MatchString(msg) {
 				azureHits++
-				add(AzureVerifyEvidenceAzure, p.detail, azureVerifyTruncate(msg))
+				ev.add(AzureVerifyEvidenceAzure, p.detail, upstreamVerifyTruncate(msg))
 			}
 		}
 		for _, p := range azureVerifyNonAzureErrorPatterns {
 			if p.re.MatchString(msg) {
 				counterHits++
-				add(AzureVerifyEvidenceNonAzure, p.detail, azureVerifyTruncate(msg))
+				ev.add(AzureVerifyEvidenceNonAzure, p.detail, upstreamVerifyTruncate(msg))
 			}
 		}
 	}
@@ -510,20 +386,20 @@ func evaluateAzureEvidence(obs azureVerifyObservation) azureVerdict {
 	if obs.ChatOK {
 		if obs.ChatOutputTokens > azureVerifyMaxCompletionToks {
 			counterHits++
-			add(AzureVerifyEvidenceNonAzure,
+			ev.add(AzureVerifyEvidenceNonAzure,
 				fmt.Sprintf("长度限制未生效：要求最多 %d 个 token，实际输出 %d 个", azureVerifyMaxCompletionToks, obs.ChatOutputTokens),
 				"finish_reason="+obs.ChatFinishReason)
 		} else {
-			add(AzureVerifyEvidenceInfo,
+			ev.add(AzureVerifyEvidenceInfo,
 				fmt.Sprintf("长度限制生效：输出 %d 个 token", obs.ChatOutputTokens),
 				"finish_reason="+obs.ChatFinishReason)
 		}
-		if obs.ChatPromptTokens > azureVerifyInjectedPromptTokens {
+		if obs.ChatPromptTokens > upstreamVerifyInjectedPromptTokens {
 			counterHits++
-			add(AzureVerifyEvidenceNonAzure,
+			ev.add(AzureVerifyEvidenceNonAzure,
 				fmt.Sprintf("疑似注入了提示词：一句话的提示词被计为 %d 个输入 token", obs.ChatPromptTokens), "")
 		} else if obs.ChatPromptTokens > 0 {
-			add(AzureVerifyEvidenceInfo, fmt.Sprintf("输入 token 数正常（%d）", obs.ChatPromptTokens), "")
+			ev.add(AzureVerifyEvidenceInfo, fmt.Sprintf("输入 token 数正常（%d）", obs.ChatPromptTokens), "")
 		}
 		if obs.ChatModel != "" && obs.ChatModel != obs.Model {
 			detail := "返回的 model 字段与请求不同"
@@ -533,84 +409,35 @@ func evaluateAzureEvidence(obs azureVerifyObservation) azureVerdict {
 					v.ServedModel = obs.ChatModel
 				}
 			}
-			add(AzureVerifyEvidenceInfo, detail, obs.ChatModel)
+			ev.add(AzureVerifyEvidenceInfo, detail, obs.ChatModel)
 		}
 	}
 
 	if obs.ContinuationTried {
 		if obs.ContinuationOK {
-			add(AzureVerifyEvidenceInfo, "Responses API 的 previous_response_id 续接成功", "")
+			ev.add(AzureVerifyEvidenceInfo, "Responses API 的 previous_response_id 续接成功", "")
 		} else {
-			add(AzureVerifyEvidenceInfo, "Responses API 的 previous_response_id 续接未成功", "")
+			ev.add(AzureVerifyEvidenceInfo, "Responses API 的 previous_response_id 续接未成功", "")
 		}
 	}
-	if newAPI {
-		add(AzureVerifyEvidenceInfo, "响应头显示经过 new-api / one-api 中转", "")
+	if upstreamVerifyHasNewAPIHeaders(obs.Headers) {
+		ev.add(AzureVerifyEvidenceInfo, "响应头显示经过 new-api / one-api 中转", "")
 	}
 	if len(requestIDs) > 1 {
-		add(AzureVerifyEvidenceInfo, fmt.Sprintf("单个模型的请求中出现 %d 个不同的 x-request-id，可能套了多层中转", len(requestIDs)), "")
+		ev.add(AzureVerifyEvidenceInfo, fmt.Sprintf("单个模型的请求中出现 %d 个不同的 x-request-id，可能套了多层中转", len(requestIDs)), "")
 	}
 
+	v.Evidences = ev
 	anySuccess := obs.ChatOK || obs.StreamOK || obs.ContinuationOK
 	if !anySuccess && azureHits == 0 && counterHits == 0 {
 		v.Status = AzureVerifyStatusFailed
-		for _, msg := range obs.Errors {
-			if azureVerifyModelUnavailablePattern.MatchString(msg) {
-				v.ModelUnavailable = true
-				break
-			}
-		}
+		v.ModelUnavailable = upstreamVerifyModelUnavailable(obs.Errors)
 		return v
 	}
 	v.Status = AzureVerifyStatusOK
 	v.IsAzure = azureHits > 0 && counterHits == 0
 	v.Suspicious = azureHits > 0 && counterHits > 0
 	return v
-}
-
-func azureVerifyEndpoint(baseURL, path string) string {
-	base := strings.TrimRight(strings.TrimSpace(baseURL), "/")
-	base = strings.TrimSuffix(base, "/v1")
-	return base + path
-}
-
-func azureVerifyReportedHeaders(h http.Header) map[string][]string {
-	if len(h) == 0 {
-		return nil
-	}
-	out := make(map[string][]string)
-	for name, values := range h {
-		lower := strings.ToLower(name)
-		for _, prefix := range azureVerifyReportedHeaderPrefixes {
-			if strings.HasPrefix(lower, prefix) {
-				out[lower] = append(out[lower], values...)
-				break
-			}
-		}
-	}
-	if len(out) == 0 {
-		return nil
-	}
-	return out
-}
-
-func azureVerifyErrorText(status int, body []byte) string {
-	msg := strings.TrimSpace(gjson.GetBytes(body, "error.message").String())
-	if msg == "" {
-		msg = strings.TrimSpace(gjson.GetBytes(body, "message").String())
-	}
-	if msg == "" {
-		msg = strings.TrimSpace(string(body))
-	}
-	if code := gjson.GetBytes(body, "error.code").String(); code != "" && !strings.Contains(msg, code) {
-		msg = code + ": " + msg
-	}
-	if msg == "" {
-		msg = fmt.Sprintf("upstream returned HTTP %d", status)
-	} else if status != 0 && status != http.StatusOK {
-		msg = fmt.Sprintf("HTTP %d: %s", status, msg)
-	}
-	return azureVerifyTruncate(msg)
 }
 
 func azureVerifyResponsesText(body []byte) string {
@@ -626,12 +453,4 @@ func azureVerifyResponsesText(body []byte) string {
 		sb.WriteString(gjson.GetBytes(body, "output_text").String())
 	}
 	return sb.String()
-}
-
-func azureVerifyTruncate(s string) string {
-	r := []rune(s)
-	if len(r) > azureVerifyMaxErrorChars {
-		return string(r[:azureVerifyMaxErrorChars])
-	}
-	return s
 }

@@ -1681,7 +1681,8 @@ export default {
         passiveSampled: 'Passive',
         activeQuery: 'Query',
         estimatedTotalCost: 'Est. total ${cost}',
-        estimatedTotalCostTooltip: 'Estimated total cost at 100% utilization, based on current window cost and utilization'
+        estimatedTotalCostTooltip: 'Estimated total cost at 100% utilization, based on current window cost and utilization',
+        estimatedStandardCapacityTooltip: 'Estimated window capacity at standard price (excluding account multiplier) and utilization; not shown below 5% utilization'
       },
       openaiReferral: {
         available: 'Invites left',

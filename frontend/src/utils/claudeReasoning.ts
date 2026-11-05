@@ -135,7 +135,8 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, '')
 }
 
-async function callMessages(conn: ReasoningConn, body: AnyRecord): Promise<unknown> {
+/** Send one Messages request through the backend relay; throws ReasoningError on failure. */
+export async function callMessages(conn: ReasoningConn, body: AnyRecord): Promise<unknown> {
   const base = normalizeBaseUrl(conn.baseUrl)
   if (!base) throw new ReasoningError('missingBaseUrl')
   if (!conn.apiKey.trim()) throw new ReasoningError('missingApiKey')

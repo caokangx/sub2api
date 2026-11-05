@@ -21,7 +21,7 @@ export default {
     },
     models: {
       title: '选择要测试的模型',
-      selectGpt6: '只选 gpt-6 系列',
+      selectDefault: '只选 gpt-6 系列',
       selectAll: '全选',
       clear: '清空',
       start: '开始测试（{n} 个）',
@@ -30,7 +30,7 @@ export default {
     },
     results: {
       title: '测试结果',
-      summary: '已完成 {finished}/{total}：{azure} 个是 Azure，{notAzure} 个不是 Azure，{failed} 个测试失败',
+      summary: '已完成 {finished}/{total}：{match} 个是 Azure，{notMatch} 个不是 Azure，{failed} 个测试失败',
       servedModel: '实际部署：{model}',
       suspicious: '同时出现了 Azure 特征和非 Azure 行为，可能是混合渠道，或者伪造了 Azure 响应头。',
       details: '查看依据',
@@ -39,8 +39,8 @@ export default {
       states: {
         pending: '等待中',
         running: '测试中',
-        azure: '是 Azure',
-        notAzure: '不是 Azure',
+        match: '是 Azure',
+        notMatch: '不是 Azure',
         failed: '测试失败',
         unavailable: '模型不可用'
       },

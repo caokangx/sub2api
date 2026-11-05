@@ -162,10 +162,3 @@ func TestEvaluateAzureEvidence(t *testing.T) {
 		})
 	}
 }
-
-func TestAzureVerifyEndpoint(t *testing.T) {
-	require.Equal(t, "https://a.example.com/v1/models", azureVerifyEndpoint("https://a.example.com", "/v1/models"))
-	require.Equal(t, "https://a.example.com/v1/models", azureVerifyEndpoint("https://a.example.com/", "/v1/models"))
-	require.Equal(t, "https://a.example.com/v1/models", azureVerifyEndpoint("https://a.example.com/v1/", "/v1/models"))
-	require.Equal(t, "https://a.example.com/api/v1/models", azureVerifyEndpoint("https://a.example.com/api", "/v1/models"))
-}

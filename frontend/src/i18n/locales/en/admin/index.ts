@@ -9,6 +9,7 @@ import promptAudit from './promptAudit'
 import plugins from './plugins'
 import signature from './signature'
 import azureVerify from './azureVerify'
+import bedrockVerify from './bedrockVerify'
 
 export default {
   ...overview,
@@ -22,4 +23,5 @@ export default {
   ...plugins,
   ...signature,
   ...azureVerify,
+  ...bedrockVerify,
 }

@@ -686,6 +686,90 @@ describe('AccountUsageCell', () => {
     expect(wrapper.text()).not.toMatch(/Infinity|NaN/)
   })
 
+  it.each(['oauth', 'setup-token'] as const)('Claude %s 账号按标准价为 5h 和 7d 窗口估算容量', async (type) => {
+    getUsage.mockResolvedValue({
+      source: 'passive',
+      five_hour: {
+        utilization: 25,
+        resets_at: null,
+        remaining_seconds: 0,
+        window_stats: { requests: 1, tokens: 100, cost: 4, standard_cost: 2 }
+      },
+      seven_day: {
+        utilization: 40,
+        resets_at: null,
+        remaining_seconds: 0,
+        window_stats: { requests: 2, tokens: 200, cost: 24, standard_cost: 12 }
+      },
+      seven_day_sonnet: {
+        utilization: 10,
+        resets_at: null,
+        remaining_seconds: 0
+      }
+    })
+
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({ id: type === 'oauth' ? 6901 : 6902, platform: 'anthropic', type })
+      },
+      global: {
+        stubs: {
+          UsageProgressBar: {
+            props: ['label', 'estimatedTotalCost'],
+            template: '<div class="usage-bar">{{ label }}|{{ estimatedTotalCost ?? "none" }}</div>'
+          },
+          ClaudeResetCreditsCell: true,
+          AccountQuotaInfo: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('5h|8')
+    expect(wrapper.text()).toContain('7d|30')
+    expect(wrapper.text()).toContain('7d S|none')
+  })
+
+  it('Claude 使用率低于 5% 时不估算容量', async () => {
+    getUsage.mockResolvedValue({
+      source: 'passive',
+      five_hour: {
+        utilization: 4.9,
+        resets_at: null,
+        remaining_seconds: 0,
+        window_stats: { requests: 1, tokens: 100, cost: 1, standard_cost: 1 }
+      },
+      seven_day: {
+        utilization: 5,
+        resets_at: null,
+        remaining_seconds: 0,
+        window_stats: { requests: 2, tokens: 200, cost: 1, standard_cost: 1 }
+      }
+    })
+
+    const wrapper = mount(AccountUsageCell, {
+      props: {
+        account: makeAccount({ id: 6903, platform: 'anthropic', type: 'oauth' })
+      },
+      global: {
+        stubs: {
+          UsageProgressBar: {
+            props: ['label', 'estimatedTotalCost'],
+            template: '<div class="usage-bar">{{ label }}|{{ estimatedTotalCost ?? "none" }}</div>'
+          },
+          ClaudeResetCreditsCell: true,
+          AccountQuotaInfo: true
+        }
+      }
+    })
+
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('5h|none')
+    expect(wrapper.text()).toContain('7d|20')
+  })
+
   it('OpenAI OAuth 有现成快照时，手动刷新信号会触发 usage 重拉', async () => {
     getUsage.mockResolvedValue({
       five_hour: {

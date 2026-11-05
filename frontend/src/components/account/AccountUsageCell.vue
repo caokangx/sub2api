@@ -47,15 +47,20 @@
           :utilization="usageInfo.five_hour.utilization"
           :resets-at="usageInfo.five_hour.resets_at"
           :window-stats="usageInfo.five_hour.window_stats"
+          :estimated-total-cost="claudeFiveHourEstimatedTotalCost"
+          :estimated-total-cost-tooltip="t('admin.accounts.usageWindow.estimatedStandardCapacityTooltip')"
           color="indigo"
         />
 
-        <!-- 7d Window (OAuth only) -->
+        <!-- 7d Window -->
         <UsageProgressBar
           v-if="usageInfo.seven_day"
           label="7d"
           :utilization="usageInfo.seven_day.utilization"
           :resets-at="usageInfo.seven_day.resets_at"
+          :window-stats="usageInfo.seven_day.window_stats"
+          :estimated-total-cost="claudeSevenDayEstimatedTotalCost"
+          :estimated-total-cost-tooltip="t('admin.accounts.usageWindow.estimatedStandardCapacityTooltip')"
           color="emerald"
         />
 
@@ -679,7 +684,7 @@
 import { ref, computed, onMounted, onBeforeUnmount, onUnmounted, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { adminAPI } from '@/api/admin'
-import type { Account, AccountUsageInfo, GeminiCredentials, WindowStats } from '@/types'
+import type { Account, AccountUsageInfo, GeminiCredentials, UsageProgress, WindowStats } from '@/types'
 import { buildOpenAIUsageRefreshKey } from '@/utils/accountUsageRefresh'
 import { enqueueUsageRequest } from '@/utils/usageLoadQueue'
 import { formatCompactNumber } from '@/utils/format'
@@ -826,16 +831,21 @@ const hasOpenAIUsageFallback = computed(() => {
   return !!usageInfo.value?.five_hour || !!usageInfo.value?.seven_day
 })
 
-const openAISevenDayEstimatedTotalCost = computed(() => {
-  const sevenDay = usageInfo.value?.seven_day
-  const utilization = sevenDay?.utilization
-  const currentCost = sevenDay?.window_stats?.cost
+// Extrapolates the window's total budget from local cost and upstream utilization.
+const estimateWindowTotalCost = (
+  progress?: UsageProgress | null,
+  options: { costField?: 'cost' | 'standard_cost'; minUtilization?: number } = {}
+): number | null => {
+  const { costField = 'cost', minUtilization = 0 } = options
+  const utilization = progress?.utilization
+  const currentCost = progress?.window_stats?.[costField]
   if (
     typeof utilization !== 'number' ||
     typeof currentCost !== 'number' ||
     !Number.isFinite(utilization) ||
     !Number.isFinite(currentCost) ||
     utilization <= 0 ||
+    utilization < minUtilization ||
     currentCost <= 0
   ) {
     return null
@@ -843,7 +853,28 @@ const openAISevenDayEstimatedTotalCost = computed(() => {
 
   const estimate = (currentCost * 100) / utilization
   return Number.isFinite(estimate) && estimate > 0 ? estimate : null
-})
+}
+
+const openAISevenDayEstimatedTotalCost = computed(() =>
+  estimateWindowTotalCost(usageInfo.value?.seven_day)
+)
+
+// Below this utilization the extrapolation is too noisy to be useful.
+const CLAUDE_ESTIMATE_MIN_UTILIZATION = 5
+
+const claudeFiveHourEstimatedTotalCost = computed(() =>
+  estimateWindowTotalCost(usageInfo.value?.five_hour, {
+    costField: 'standard_cost',
+    minUtilization: CLAUDE_ESTIMATE_MIN_UTILIZATION
+  })
+)
+
+const claudeSevenDayEstimatedTotalCost = computed(() =>
+  estimateWindowTotalCost(usageInfo.value?.seven_day, {
+    costField: 'standard_cost',
+    minUtilization: CLAUDE_ESTIMATE_MIN_UTILIZATION
+  })
+)
 
 const openAIUsageRefreshKey = computed(() => buildOpenAIUsageRefreshKey(props.account))
 

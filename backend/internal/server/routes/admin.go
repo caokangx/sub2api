@@ -43,6 +43,9 @@ func RegisterAdminRoutes(
 		// Azure 真假测试（探测管理员填写的中转站）
 		registerAzureVerifyRoutes(admin, h)
 
+		// Bedrock 真假测试（探测管理员填写的中转站）
+		registerBedrockVerifyRoutes(admin, h)
+
 		// 用户管理
 		registerUserManagementRoutes(admin, h)
 
@@ -172,6 +175,11 @@ func registerSignatureVerifyRoutes(admin *gin.RouterGroup, h *handler.Handlers) 
 func registerAzureVerifyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	admin.POST("/azure-verify/models", h.Admin.AzureVerify.Models)
 	admin.POST("/azure-verify/probe", h.Admin.AzureVerify.Probe)
+}
+
+func registerBedrockVerifyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	admin.POST("/bedrock-verify/models", h.Admin.BedrockVerify.Models)
+	admin.POST("/bedrock-verify/probe", h.Admin.BedrockVerify.Probe)
 }
 
 func registerAdminComplianceRoutes(admin *gin.RouterGroup, h *handler.Handlers) {

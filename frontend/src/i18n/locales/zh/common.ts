@@ -216,6 +216,7 @@ export default {
     auditLogs: '操作日志',
     signatureDecoder: '签名解析',
     azureVerify: 'Azure 真假测试',
+    bedrockVerify: 'Bedrock 真假测试',
   },
 
   // Auth

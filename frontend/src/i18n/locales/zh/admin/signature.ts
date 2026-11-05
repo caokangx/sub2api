@@ -53,7 +53,8 @@ export default {
     },
     sections: {
       decode: '签名解析',
-      verify: '签名真假校验'
+      verify: '签名真假校验',
+      injection: '注入量分析'
     },
     verify: {
       description:
@@ -98,6 +99,36 @@ export default {
         upstreamError: '上游返回错误',
         nonJson: '上游返回了非 JSON 内容：{detail}',
         http: '上游返回 HTTP {status}'
+      }
+    },
+    injection: {
+      description:
+        '使用上方的连接配置，发送 3 条长度已知的测试请求（“hi” 后面分别加 0、200、800 个 “ hello”），把上游报告的输入 token 数（input + cache_creation + cache_read）和无注入时的真实值对比，估算上游每次请求额外注入了多少 token，以及是否按比例虚报 token。整个分析约消耗 2,000 个输入 token，上游注入的部分另计。',
+      scopeNote:
+        '只能分析这几条内置的测试请求。对于不同类型的请求（比如带工具、带 Claude Code 请求头的请求），上游注入的内容可能不同。',
+      start: '分析注入量',
+      progress: '正在发送测试请求：已完成 {done}/{total}',
+      verdict: {
+        none: '未发现注入',
+        minor: '少量注入',
+        major: '大量注入'
+      },
+      inflatedTag: '疑似按比例虚报 token',
+      injectedLabel: '估算的注入量',
+      injectedValue: '约 {n} token / 每次请求',
+      injectedNote: '误差约 ±10 token。超过 500 token 通常是注入了整段系统提示词，例如伪装成 Claude Code。',
+      inflationLabel: '虚报倍率',
+      inflationNote: '上游报告的 token 数与真实值之比，正常为 1.00x。',
+      table: {
+        units: '填充单位数',
+        expected: '真实 token 数（无注入时）',
+        reported: '上游报告合计'
+      },
+      hints: {
+        uncalibrated: '该模型不在校准表中，使用了默认基线，注入量误差可能更大，也无法计算虚报倍率。',
+        unstable: '三条请求的计数不在一条直线上，上游计数不稳定，结果仅供参考。',
+        cached: '测试请求本身没有开启缓存，但上游报告了缓存 token，说明上游自己加了缓存，注入的内容很可能被缓存了。',
+        belowBaseline: '上游报告的 token 数比无注入时的真实值还少，可能截断了内容或改写了计数。'
       }
     }
   }

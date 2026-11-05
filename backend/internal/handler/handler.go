@@ -45,6 +45,7 @@ type AdminHandlers struct {
 	AuditLog               *admin.AuditLogHandler
 	SignatureVerify        *admin.SignatureVerifyHandler
 	AzureVerify            *admin.AzureVerifyHandler
+	BedrockVerify          *admin.BedrockVerifyHandler
 }
 
 // Handlers contains all HTTP handlers

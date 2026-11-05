@@ -21,7 +21,7 @@ export default {
     },
     models: {
       title: 'Models to probe',
-      selectGpt6: 'gpt-6 only',
+      selectDefault: 'gpt-6 only',
       selectAll: 'Select all',
       clear: 'Clear',
       start: 'Start ({n})',
@@ -30,7 +30,7 @@ export default {
     },
     results: {
       title: 'Results',
-      summary: '{finished}/{total} done: {azure} Azure, {notAzure} not Azure, {failed} failed',
+      summary: '{finished}/{total} done: {match} Azure, {notMatch} not Azure, {failed} failed',
       servedModel: 'Deployed as {model}',
       suspicious: 'Both Azure markers and non-Azure behavior were seen. This may be a mixed channel, or forged Azure headers.',
       details: 'Show evidence',
@@ -39,8 +39,8 @@ export default {
       states: {
         pending: 'Pending',
         running: 'Probing',
-        azure: 'Azure',
-        notAzure: 'Not Azure',
+        match: 'Azure',
+        notMatch: 'Not Azure',
         failed: 'Failed',
         unavailable: 'Model unavailable'
       },

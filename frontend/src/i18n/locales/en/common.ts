@@ -216,6 +216,7 @@ export default {
     auditLogs: 'Audit Logs',
     signatureDecoder: 'Signature Decoder',
     azureVerify: 'Azure Verify',
+    bedrockVerify: 'Bedrock Verify',
   },
 
   // Auth

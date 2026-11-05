@@ -1,54 +1,28 @@
 import { apiClient } from '@/api/client'
+import {
+  UPSTREAM_VERIFY_MODELS_TIMEOUT_MS,
+  UPSTREAM_VERIFY_PROBE_TIMEOUT_MS,
+  type UpstreamVerifyConnection,
+  type UpstreamVerifyEvidence,
+  type UpstreamVerifyModelsResponse,
+  type UpstreamVerifyProbeBase,
+  type UpstreamVerifyStep
+} from '@/api/admin/upstreamVerify'
 
-export interface AzureVerifyConnection {
-  base_url: string
-  api_key: string
-}
-
-/** `status` is the upstream HTTP status of GET /v1/models (0 when the request never got a reply). */
-export interface AzureVerifyModelsResponse {
-  status: number
-  models: string[]
-  error?: string
-}
-
+export type AzureVerifyConnection = UpstreamVerifyConnection
+export type AzureVerifyModelsResponse = UpstreamVerifyModelsResponse
 export type AzureVerifyEvidenceKind = 'azure' | 'non_azure' | 'info'
+export type AzureVerifyEvidence = UpstreamVerifyEvidence
+export type AzureVerifyStep = UpstreamVerifyStep
 
-export interface AzureVerifyEvidence {
-  kind: AzureVerifyEvidenceKind
-  detail: string
-  value?: string
-}
-
-export interface AzureVerifyStep {
-  name: 'chat_completions' | 'chat_completions_stream' | 'responses_continuation'
-  status: number
-  ok: boolean
-  duration_ms: number
-  headers?: Record<string, string[]>
-  error?: string
-}
-
-export interface AzureVerifyProbeResponse {
-  model: string
-  status: 'ok' | 'failed'
+export interface AzureVerifyProbeResponse extends UpstreamVerifyProbeBase {
   is_azure: boolean
-  suspicious: boolean
-  model_unavailable: boolean
-  served_model?: string
-  evidences: AzureVerifyEvidence[] | null
-  steps: AzureVerifyStep[] | null
-  error?: string
 }
-
-const MODELS_TIMEOUT_MS = 2 * 60 * 1000
-// One probe sends four upstream requests, each allowed up to two minutes.
-const PROBE_TIMEOUT_MS = 6 * 60 * 1000
 
 export const adminAzureVerifyAPI = {
   async listModels(conn: AzureVerifyConnection): Promise<AzureVerifyModelsResponse> {
     const { data } = await apiClient.post<AzureVerifyModelsResponse>('/admin/azure-verify/models', conn, {
-      timeout: MODELS_TIMEOUT_MS
+      timeout: UPSTREAM_VERIFY_MODELS_TIMEOUT_MS
     })
     return data
   },
@@ -57,7 +31,7 @@ export const adminAzureVerifyAPI = {
     const { data } = await apiClient.post<AzureVerifyProbeResponse>(
       '/admin/azure-verify/probe',
       { ...conn, model },
-      { timeout: PROBE_TIMEOUT_MS }
+      { timeout: UPSTREAM_VERIFY_PROBE_TIMEOUT_MS }
     )
     return data
   }

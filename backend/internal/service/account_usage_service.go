@@ -117,13 +117,14 @@ const (
 
 // UsageCache 封装账户使用量相关的缓存
 type UsageCache struct {
-	apiCache          sync.Map           // accountID -> *apiUsageCache
-	windowStatsCache  sync.Map           // accountID -> *windowStatsCache
-	antigravityCache  sync.Map           // accountID -> *antigravityUsageCache
-	apiFlight         singleflight.Group // 防止同一账号的并发请求击穿缓存（Anthropic）
-	antigravityFlight singleflight.Group // 防止同一 Antigravity 账号的并发请求击穿缓存
-	openAIProbeCache  sync.Map           // accountID -> time.Time
-	grokProbeCache    sync.Map           // accountID -> last billing probe attempt
+	apiCache                 sync.Map           // accountID -> *apiUsageCache
+	windowStatsCache         sync.Map           // accountID -> *windowStatsCache
+	sevenDayWindowStatsCache sync.Map           // accountID -> *windowStatsCache（Anthropic 7d 窗口）
+	antigravityCache         sync.Map           // accountID -> *antigravityUsageCache
+	apiFlight                singleflight.Group // 防止同一账号的并发请求击穿缓存（Anthropic）
+	antigravityFlight        singleflight.Group // 防止同一 Antigravity 账号的并发请求击穿缓存
+	openAIProbeCache         sync.Map           // accountID -> time.Time
+	grokProbeCache           sync.Map           // accountID -> last billing probe attempt
 }
 
 // NewUsageCache 创建 UsageCache 实例
@@ -1388,6 +1389,35 @@ func (s *AccountUsageService) addWindowStats(ctx context.Context, account *Accou
 	if usage.FiveHour != nil {
 		usage.FiveHour.WindowStats = windowStats
 	}
+
+	// 为 SevenDay 添加 WindowStats（7d 窗口统计，用于前端估算 7d 总额）
+	if usage.SevenDay != nil {
+		usage.SevenDay.WindowStats = s.sevenDayWindowStats(ctx, account.ID, usage.SevenDay)
+	}
+}
+
+// sevenDayWindowStats 查询 Anthropic 7d 窗口内的本地用量统计（独立 1 分钟缓存）。
+// 窗口起点取 resets_at - 7d；resets_at 缺失或已过期时退回 now - 7d。
+func (s *AccountUsageService) sevenDayWindowStats(ctx context.Context, accountID int64, progress *UsageProgress) *WindowStats {
+	if cached, ok := s.cache.sevenDayWindowStatsCache.Load(accountID); ok {
+		if cache, ok := cached.(*windowStatsCache); ok && time.Since(cache.timestamp) < windowStatsCacheTTL {
+			return cache.stats
+		}
+	}
+
+	startTime := codexWindowStatsStart(progress, 7*24*time.Hour, time.Now())
+	stats, err := s.usageLogRepo.GetAccountWindowStats(ctx, accountID, startTime)
+	if err != nil {
+		log.Printf("Failed to get 7d window stats for account %d: %v", accountID, err)
+		return nil
+	}
+
+	windowStats := windowStatsFromAccountStats(stats)
+	s.cache.sevenDayWindowStatsCache.Store(accountID, &windowStatsCache{
+		stats:     windowStats,
+		timestamp: time.Now(),
+	})
+	return windowStats
 }
 
 // GetTodayStats 获取账号今日统计

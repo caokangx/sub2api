@@ -49,6 +49,7 @@ func ProvideAdminHandlers(
 	auditLogHandler *admin.AuditLogHandler,
 	signatureVerifyHandler *admin.SignatureVerifyHandler,
 	azureVerifyHandler *admin.AzureVerifyHandler,
+	bedrockVerifyHandler *admin.BedrockVerifyHandler,
 	upstreamBillingProbe *service.UpstreamBillingProbeService,
 	ollamaCloudUsage *service.OllamaCloudUsageService,
 	opencodeGoUsage *service.OpenCodeGoUsageService,
@@ -97,6 +98,7 @@ func ProvideAdminHandlers(
 		AuditLog:               auditLogHandler,
 		SignatureVerify:        signatureVerifyHandler,
 		AzureVerify:            azureVerifyHandler,
+		BedrockVerify:          bedrockVerifyHandler,
 	}
 }
 
@@ -297,6 +299,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewAuditLogHandler,
 	admin.NewSignatureVerifyHandler,
 	admin.NewAzureVerifyHandler,
+	admin.NewBedrockVerifyHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

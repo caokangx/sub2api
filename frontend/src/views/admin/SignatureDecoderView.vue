@@ -287,6 +287,16 @@
           </div>
         </details>
       </div>
+
+      <!-- ==================== Section 3: injection analysis ==================== -->
+      <div class="flex items-center gap-2 pt-4">
+        <Icon name="calculator" size="md" class="text-gray-500 dark:text-gray-400" />
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+          {{ t('admin.signatureDecoder.sections.injection') }}
+        </h2>
+      </div>
+
+      <SignatureInjectionAnalysis :conn="conn" />
     </div>
   </AppLayout>
 </template>
@@ -296,6 +306,7 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
+import SignatureInjectionAnalysis from '@/components/admin/SignatureInjectionAnalysis.vue'
 import {
   flattenProtoFields,
   KNOWN_SIGNATURE_FIELDS,
