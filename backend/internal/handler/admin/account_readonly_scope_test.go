@@ -93,9 +93,75 @@ func TestAccountHandlerListReadonlyAdminRedactsProxy(t *testing.T) {
 		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts?page=1&page_size=20"+query, nil))
 		require.Equal(t, http.StatusOK, rec.Code)
 		body := rec.Body.String()
-		require.Contains(t, body, "hk-proxy")
+		require.Contains(t, body, "h****y")
+		require.NotContains(t, body, "hk-proxy")
 		require.NotContains(t, body, "10.0.0.1")
 		require.NotContains(t, body, "secret-user")
+	}
+}
+
+func TestAccountHandlerListReadonlyAdminMasksIdentityAndCapacity(t *testing.T) {
+	now := time.Now().UTC()
+	newAccount := func() service.Account {
+		return service.Account{
+			ID: 1, Name: "alice.work@example.com", Platform: service.PlatformAnthropic, Type: service.AccountTypeOAuth,
+			Status: service.StatusActive, Concurrency: 37,
+			Extra: map[string]any{
+				"email_address":              "alice.work@example.com",
+				"org_uuid":                   "org-uuid-secret",
+				"account_uuid":               "account-uuid-secret",
+				"window_cost_sticky_reserve": 17.0,
+				"max_sessions":               41,
+				"base_rpm":                   53,
+				"privacy_mode":               "training_off",
+			},
+			CreatedAt: now, UpdatedAt: now,
+		}
+	}
+
+	for _, query := range []string{"", "&lite=1"} {
+		router, adminSvc := setupReadonlyAccountRouter(service.RoleReadonlyAdmin)
+		adminSvc.accounts = []service.Account{newAccount()}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts?page=1&page_size=20"+query, nil))
+		require.Equal(t, http.StatusOK, rec.Code)
+		body := rec.Body.String()
+
+		require.NotContains(t, body, "alice.work")
+		require.Contains(t, body, "al****rk@e****e.com")
+		require.NotContains(t, body, "uuid-secret")
+		for _, key := range []string{"window_cost_sticky_reserve", "max_sessions", "base_rpm"} {
+			require.NotContains(t, body, `"`+key+`"`)
+		}
+		require.NotContains(t, body, `"concurrency":37`)
+		require.Contains(t, body, "training_off", "非敏感 extra 字段应保留")
+	}
+
+	t.Run("admin_unmasked", func(t *testing.T) {
+		router, adminSvc := setupReadonlyAccountRouter(service.RoleAdmin)
+		adminSvc.accounts = []service.Account{newAccount()}
+		rec := httptest.NewRecorder()
+		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts?page=1&page_size=20", nil))
+		require.Equal(t, http.StatusOK, rec.Code)
+		require.Contains(t, rec.Body.String(), "alice.work@example.com")
+		require.Contains(t, rec.Body.String(), `"concurrency":37`)
+	})
+}
+
+func TestMaskReadonlyIdentity(t *testing.T) {
+	cases := map[string]string{
+		"":                       "",
+		"a":                      "a****",
+		"bob":                    "b****",
+		"claude":                 "c****e",
+		"hk-proxy":               "h****y",
+		"claude-setup":           "cl****up",
+		"bob@x.io":               "b****@x****.io",
+		"alice.work@example.com": "al****rk@e****e.com",
+		"中文账号名称":                 "中****称",
+	}
+	for input, want := range cases {
+		require.Equal(t, want, maskReadonlyIdentity(input), input)
 	}
 }
 
@@ -126,7 +192,9 @@ func TestAccountHandlerGetByIDReadonlyAdminScope(t *testing.T) {
 		rec := httptest.NewRecorder()
 		router.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/api/v1/admin/accounts/7", nil))
 		require.Equal(t, http.StatusOK, rec.Code)
-		require.Contains(t, rec.Body.String(), "jp-proxy")
+		require.Contains(t, rec.Body.String(), "j****y")
+		require.Contains(t, rec.Body.String(), "cl****up")
+		require.NotContains(t, rec.Body.String(), "jp-proxy")
 		require.NotContains(t, rec.Body.String(), "192.168.1.9")
 	})
 }

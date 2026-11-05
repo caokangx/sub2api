@@ -287,7 +287,8 @@
             </div>
           </template>
           <template #cell-capacity="{ row }">
-            <AccountCapacityCell :account="row" />
+            <span v-if="readonly" class="font-mono text-sm text-gray-400 dark:text-dark-500">****</span>
+            <AccountCapacityCell v-else :account="row" />
           </template>
           <template #cell-status="{ row }">
             <div class="flex items-center gap-1.5">

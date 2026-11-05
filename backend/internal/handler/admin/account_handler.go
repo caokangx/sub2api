@@ -819,9 +819,6 @@ func (h *AccountHandler) List(c *gin.Context) {
 				accountResponse.GroupIDs = filterSimpleModeGroupIDs(accountResponse.GroupIDs, simpleModeCompositeServiceGroupIDs(acc))
 			}
 		}
-		if readonlyAdmin {
-			redactAccountForReadonlyAdmin(accountResponse)
-		}
 		item := AccountWithConcurrency{
 			Account:            accountResponse,
 			simpleMode:         h.isSimpleMode(),
@@ -855,6 +852,11 @@ func (h *AccountHandler) List(c *gin.Context) {
 	}
 
 	h.enrichShadowParents(c.Request.Context(), result)
+	if readonlyAdmin {
+		for i := range result {
+			redactAccountForReadonlyAdmin(&result[i])
+		}
+	}
 
 	if lite {
 		compact := make([]AccountListItemWithConcurrency, len(result))
@@ -985,7 +987,7 @@ func (h *AccountHandler) GetByID(c *gin.Context) {
 
 	item := h.buildAccountResponseWithRuntime(c.Request.Context(), account)
 	if readonlyAdmin {
-		redactAccountForReadonlyAdmin(item.Account)
+		redactAccountForReadonlyAdmin(&item)
 	}
 	response.Success(c, item)
 }

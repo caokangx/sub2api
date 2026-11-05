@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"os"
 	"strings"
@@ -10,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/config"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/require"
 	"github.com/tidwall/gjson"
@@ -121,8 +123,9 @@ func TestClaudeAgentSDKStatelessRewrite(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "user", gjson.GetBytes(body, "messages.0.role").String())
 	require.Equal(t, "system", gjson.GetBytes(body, "messages.1.role").String())
-	require.Contains(t, gjson.GetBytes(body, "messages.1.content.0.text").String(), "Primary working directory: /sdk/work")
-	require.Equal(t, "ephemeral", gjson.GetBytes(body, "messages.1.content.0.cache_control.type").String())
+	require.Equal(t, gjson.String, gjson.GetBytes(body, "messages.1.content").Type)
+	require.Contains(t, gjson.GetBytes(body, "messages.1.content").String(), "Primary working directory: /sdk/work")
+	require.NotContains(t, string(body), "cache_control", "the gateway adds no breakpoint of its own")
 	require.Equal(t, "system", gjson.GetBytes(body, "messages.2.role").String())
 	require.Equal(t, "CLIENT SYSTEM", gjson.GetBytes(body, "messages.2.content").String())
 	require.Len(t, gjson.GetBytes(body, "system").Array(), 3)
@@ -246,12 +249,225 @@ func TestAgentSDKInsertClientSystemNeverLeadsMessages(t *testing.T) {
 		{"no user message", []any{map[string]any{"role": "assistant", "content": "ok"}}, true, 1},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			out := agentSDKMessages(tc.messages, "CLIENT SYSTEM", "claude-sonnet-5-5", profile, false, tc.inject, 1000)
+			out, _ := agentSDKMessages(tc.messages, agentSDKMessagesOptions{
+				Model: "claude-sonnet-5-5", Profile: profile, Inject: tc.inject, RemainingTokens: 1000,
+				ClientSystem: agentSDKClientSystem{Text: "CLIENT SYSTEM"},
+			})
 			require.NotEqual(t, "system", out[0].(map[string]any)["role"])
 			got := out[tc.want].(map[string]any)
 			require.Equal(t, "system", got["role"])
 			require.Equal(t, "CLIENT SYSTEM", got["content"])
 		})
 	}
-	require.Empty(t, agentSDKMessages(nil, "CLIENT SYSTEM", "claude-sonnet-5-5", profile, false, true, 1000))
+	out, _ := agentSDKMessages(nil, agentSDKMessagesOptions{
+		Model: "claude-sonnet-5-5", Profile: profile, Inject: true, RemainingTokens: 1000,
+		ClientSystem: agentSDKClientSystem{Text: "CLIENT SYSTEM"},
+	})
+	require.Empty(t, out)
+}
+
+type agentSDKLoopHarness struct {
+	t       *testing.T
+	svc     *GatewayService
+	account *Account
+	ctx     context.Context
+	c       *gin.Context
+	head    string
+	msgs    []string
+	turn    int
+}
+
+func newAgentSDKLoopHarness(t *testing.T, settings *ClaudeAntiBanSettings, head string) *agentSDKLoopHarness {
+	svc := &GatewayService{settingService: &SettingService{}, cache: &agentSDKTestCache{}}
+	svc.settingService.claudeAntiBanRuntime.Store(settings)
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
+	return &agentSDKLoopHarness{
+		t: t, svc: svc, c: c, head: head,
+		account: &Account{ID: 21, Platform: PlatformAnthropic, Type: AccountTypeSetupToken},
+		ctx:     WithClaudeAgentSDKPolicy(context.Background(), &Group{Platform: PlatformAnthropic, SimulateClaudeAgentSDK: true}),
+		msgs:    []string{`{"role":"user","content":"do it"}`},
+	}
+}
+
+// send forwards the current history and simulates a successful upstream reply.
+func (h *agentSDKLoopHarness) send() []byte {
+	h.t.Helper()
+	body := h.head + `"messages":[` + strings.Join(h.msgs, ",") + `]}`
+	ctx, out, err := h.svc.prepareClaudeAgentSDK(h.ctx, h.c, h.account, []byte(body), "claude-sonnet-5-5")
+	require.NoError(h.t, err)
+	h.turn++
+	h.svc.recordClaudeAgentSDKResponse(ctx, fmt.Sprintf("msg_%d", h.turn), fmt.Sprintf("req_%d", h.turn))
+	h.svc.recordClaudeAgentSDKUsage(ctx, map[string]any{
+		"input_tokens": float64(3), "cache_read_input_tokens": float64(9249), "cache_creation_input_tokens": float64(1000 * h.turn),
+	}, true)
+	h.svc.recordClaudeAgentSDKUsage(ctx, map[string]any{"output_tokens": float64(200)}, false)
+	return out
+}
+
+func (h *agentSDKLoopHarness) toolRoundTrip(cacheLatest bool) {
+	id := fmt.Sprintf("tu_%d", len(h.msgs))
+	result := `{"type":"tool_result","tool_use_id":"` + id + `","content":"ok"}`
+	if cacheLatest {
+		for i, msg := range h.msgs {
+			h.msgs[i] = strings.ReplaceAll(msg, `,"cache_control":{"type":"ephemeral"}`, "")
+		}
+		result = `{"type":"tool_result","tool_use_id":"` + id + `","content":"ok","cache_control":{"type":"ephemeral"}}`
+	}
+	h.msgs = append(h.msgs,
+		`{"role":"assistant","content":[{"type":"tool_use","id":"`+id+`","name":"t","input":{}}]}`,
+		`{"role":"user","content":[`+result+`]}`)
+}
+
+func agentSDKStrippedMessages(t *testing.T, body []byte) []string {
+	t.Helper()
+	var messages []any
+	require.NoError(t, json.Unmarshal([]byte(gjson.GetBytes(body, "messages").Raw), &messages))
+	out := make([]string, len(messages))
+	for i, msg := range messages {
+		encoded, err := json.Marshal(agentSDKStripCacheControl(msg))
+		require.NoError(t, err)
+		out[i] = string(encoded)
+	}
+	return out
+}
+
+func agentSDKTotalTokens(body []byte) []string {
+	out := []string{}
+	for _, msg := range gjson.GetBytes(body, "messages").Array() {
+		text := msg.Get("content").String()
+		if msg.Get("role").String() == "system" && strings.HasPrefix(text, "<total_tokens>") {
+			out = append(out, text)
+		}
+	}
+	return out
+}
+
+const agentSDKLoopHead = `{"model":"claude-sonnet-5-5","tools":[{"name":"t","description":"x","input_schema":{"type":"object"}}],` +
+	`"metadata":{"user_id":"{\"device_id\":\"d\",\"account_uuid\":\"\",\"session_id\":\"33333333-3333-4333-8333-333333333333\"}"},`
+
+func TestClaudeAgentSDKToolLoopKeepsHistoryPrefixStable(t *testing.T) {
+	h := newAgentSDKLoopHarness(t, DefaultClaudeAntiBanSettings(), agentSDKLoopHead)
+	previous, previousTokens := []string{}, []string{}
+	for i := 0; i < 5; i++ {
+		out := h.send()
+		current := agentSDKStrippedMessages(t, out)
+		require.GreaterOrEqual(t, len(current), len(previous))
+		require.Equal(t, previous, current[:len(previous)], "request %d rewrote history", i+1)
+		tokens := agentSDKTotalTokens(out)
+		require.Equal(t, previousTokens, tokens[:len(previousTokens)])
+		if i > 0 {
+			require.Len(t, tokens, len(previousTokens)+1)
+		}
+		previous, previousTokens = current, tokens
+		h.toolRoundTrip(true)
+	}
+	require.Len(t, previousTokens, 4)
+	require.NotEqual(t, previousTokens[0], previousTokens[3], "new messages still use the current budget")
+}
+
+func TestClaudeAgentSDKNewTurnKeepsHistoryTokens(t *testing.T) {
+	h := newAgentSDKLoopHarness(t, DefaultClaudeAntiBanSettings(), agentSDKLoopHead)
+	h.send()
+	h.toolRoundTrip(false)
+	h.send()
+	h.toolRoundTrip(false)
+	before := agentSDKTotalTokens(h.send())
+	require.Len(t, before, 2)
+	h.msgs = append(h.msgs,
+		`{"role":"assistant","content":[{"type":"text","text":"done"}]}`,
+		`{"role":"user","content":"next question"}`)
+	after := agentSDKTotalTokens(h.send())
+	require.Len(t, after, 3)
+	require.Equal(t, before, after[:2])
+	require.Equal(t, "<total_tokens>15000000 tokens left</total_tokens>", after[2])
+}
+
+func TestClaudeAgentSDKEditedHistoryRecomputesFromChange(t *testing.T) {
+	h := newAgentSDKLoopHarness(t, DefaultClaudeAntiBanSettings(), agentSDKLoopHead)
+	h.send()
+	for i := 0; i < 3; i++ {
+		h.toolRoundTrip(false)
+		h.send()
+	}
+	h.toolRoundTrip(false)
+	before := agentSDKTotalTokens(h.send())
+	require.Len(t, before, 4)
+
+	h.msgs[4] = strings.Replace(h.msgs[4], `"content":"ok"`, `"content":"edited"`, 1)
+	after := agentSDKTotalTokens(h.send())
+	require.Len(t, after, 4)
+	require.Equal(t, before[0], after[0], "messages before the edit keep their value")
+	require.NotEqual(t, before[1], after[1], "the edited message takes the current value")
+	require.Equal(t, after[1], after[2])
+	require.Equal(t, after[1], after[3])
+}
+
+func TestClaudeAgentSDKEnvironmentDateIsFixedPerSession(t *testing.T) {
+	h := newAgentSDKLoopHarness(t, DefaultClaudeAntiBanSettings(), agentSDKLoopHead)
+	body := h.head + `"messages":[` + strings.Join(h.msgs, ",") + `]}`
+	ctx, _, err := h.svc.prepareClaudeAgentSDK(h.ctx, h.c, h.account, []byte(body), "claude-sonnet-5-5")
+	require.NoError(t, err)
+	info := ctx.Value(claudeAgentSDKContextKey{}).(*claudeAgentSDKRequestContext)
+	state := info.Pending
+	state.MessageID = "msg_1"
+	state.EnvironmentDate = "2026-11-04"
+	h.svc.saveClaudeAgentSDKState(ctx, info.StateKey, state)
+
+	h.toolRoundTrip(false)
+	out := h.send()
+	require.True(t, strings.HasSuffix(gjson.GetBytes(out, "messages.1.content").String(), "Today's date is 2026-11-04."))
+}
+
+func TestClaudeAgentSDKThreadModeContinuesAcrossToolLoops(t *testing.T) {
+	settings := DefaultClaudeAntiBanSettings()
+	settings.AgentSDK.ConversationMode = ClaudeAgentSDKConversationThread
+	h := newAgentSDKLoopHarness(t, settings, agentSDKLoopHead)
+	require.Equal(t, "create", gjson.GetBytes(h.send(), "thread.type").String())
+	for i := 0; i < 3; i++ {
+		h.toolRoundTrip(true)
+		out := h.send()
+		require.Equal(t, "continue", gjson.GetBytes(out, "thread.type").String(), "round trip %d", i+1)
+		require.Equal(t, fmt.Sprintf("msg_%d", i+1), gjson.GetBytes(out, "thread.previous_message_id").String())
+	}
+}
+
+func TestClaudeAgentSDKKeepsClientSystemBreakpointAsIs(t *testing.T) {
+	h := newAgentSDKLoopHarness(t, DefaultClaudeAntiBanSettings(),
+		`{"model":"claude-sonnet-5-5","system":[{"type":"text","text":"CLIENT A"},{"type":"text","text":"CLIENT B","cache_control":{"type":"ephemeral"}}],`)
+	out := h.send()
+	require.Equal(t, "system", gjson.GetBytes(out, "messages.2.role").String())
+	require.Equal(t, "CLIENT A\n\nCLIENT B", gjson.GetBytes(out, "messages.2.content.0.text").String())
+	require.Equal(t, "ephemeral", gjson.GetBytes(out, "messages.2.content.0.cache_control.type").String())
+	require.False(t, gjson.GetBytes(out, "messages.2.content.0.cache_control.ttl").Exists(), "client 5m breakpoint is not raised to 1h")
+	require.Equal(t, 1, strings.Count(string(out), "cache_control"))
+}
+
+func TestClaudeAgentSDKNormalizesClientSystemDateline(t *testing.T) {
+	for _, tc := range []struct {
+		enabled string
+		want    string
+	}{
+		{"true", "Today's date is 2026-11-05."},
+		{"false", "Today’s date is 2026/11/05."},
+	} {
+		t.Run(tc.enabled, func(t *testing.T) {
+			repo := &gatewayTTLSettingRepo{data: map[string]string{SettingKeyEnableClientDatelineNormalization: tc.enabled}}
+			gatewayForwardingCache.Store(&cachedGatewayForwardingSettings{})
+			t.Cleanup(func() { gatewayForwardingCache.Store(&cachedGatewayForwardingSettings{}) })
+			svc := &GatewayService{settingService: NewSettingService(repo, &config.Config{}), cache: &agentSDKTestCache{}}
+			svc.settingService.claudeAntiBanRuntime.Store(DefaultClaudeAntiBanSettings())
+			account := &Account{ID: 22, Platform: PlatformAnthropic, Type: AccountTypeSetupToken}
+			ctx := WithClaudeAgentSDKPolicy(context.Background(), &Group{Platform: PlatformAnthropic, SimulateClaudeAgentSDK: true})
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
+			_, out, err := svc.prepareClaudeAgentSDK(ctx, c, account, []byte(`{
+				"model":"claude-sonnet-5-5","system":"Policy. Today’s date is 2026/11/05.",
+				"messages":[{"role":"user","content":"hello"}]
+			}`), "claude-sonnet-5-5")
+			require.NoError(t, err)
+			require.Equal(t, "Policy. "+tc.want, gjson.GetBytes(out, "messages.2.content").String())
+			require.Contains(t, gjson.GetBytes(out, "messages.1.content").String(), "Today's date is ")
+		})
+	}
 }

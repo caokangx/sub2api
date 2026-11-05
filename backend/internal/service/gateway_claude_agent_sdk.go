@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Wei-Shaw/sub2api/internal/pkg/anthropicfp"
 	"github.com/Wei-Shaw/sub2api/internal/pkg/claude"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -66,6 +67,32 @@ type claudeAgentSDKThreadState struct {
 	ResponseInputTokens int64  `json:"response_input_tokens,omitempty"`
 	TurnBaseTokens      int64  `json:"turn_base_tokens,omitempty"`
 	LastRequestTime     int64  `json:"last_request_time,omitempty"`
+	// InjectedTokens[k] is the <total_tokens> value assigned to the k-th source
+	// user message. History must be replayed byte-for-byte or the upstream
+	// prompt cache prefix stops matching.
+	InjectedTokens  []agentSDKInjectedTokens `json:"injected_tokens,omitempty"`
+	EnvironmentDate string                   `json:"environment_date,omitempty"`
+}
+
+type agentSDKInjectedTokens struct {
+	Hash   string `json:"h"`
+	Tokens int64  `json:"t"`
+}
+
+type agentSDKClientSystem struct {
+	Text         string
+	CacheControl map[string]any
+}
+
+type agentSDKMessagesOptions struct {
+	Model           string
+	Profile         ClaudeEnvironmentProfile
+	HasTools        bool
+	Inject          bool
+	RemainingTokens int64
+	EnvironmentDate string
+	History         []agentSDKInjectedTokens
+	ClientSystem    agentSDKClientSystem
 }
 
 func WithClaudeAgentSDKPolicy(ctx context.Context, group *Group) context.Context {
@@ -94,7 +121,10 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 		return ctx, nil, fmt.Errorf("Claude Agent SDK profile requires a JSON object: %w", err)
 	}
 
-	clientSystem := agentSDKSystemText(root["system"])
+	clientSystem := agentSDKClientSystemFrom(root["system"])
+	if strings.Contains(clientSystem.Text, " date is ") && s.shouldNormalizeClientDateline(ctx, account) {
+		clientSystem.Text, _ = anthropicfp.NormalizeText(clientSystem.Text)
+	}
 	messages, _ := root["messages"].([]any)
 	tools, _ := root["tools"].([]any)
 	hasTools := len(tools) > 0
@@ -121,9 +151,8 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 	}
 	if hasTools {
 		system = append(system, map[string]any{
-			"type":          "text",
-			"text":          strings.TrimSpace(claudeAgentSDKWebSearch),
-			"cache_control": map[string]any{"type": "ephemeral", "ttl": "1h"},
+			"type": "text",
+			"text": strings.TrimSpace(claudeAgentSDKWebSearch),
 		})
 	}
 	root["system"] = system
@@ -135,7 +164,20 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 			remainingTokens = 0
 		}
 	}
-	transformed := agentSDKMessages(messages, clientSystem, model, profile, hasTools, settings.AgentSDK.InjectSystemMessages, remainingTokens)
+	environmentDate := state.EnvironmentDate
+	if environmentDate == "" {
+		environmentDate = time.Now().Format("2006-01-02")
+	}
+	transformed, injectedTokens := agentSDKMessages(messages, agentSDKMessagesOptions{
+		Model:           model,
+		Profile:         profile,
+		HasTools:        hasTools,
+		Inject:          settings.AgentSDK.InjectSystemMessages,
+		RemainingTokens: remainingTokens,
+		EnvironmentDate: environmentDate,
+		History:         state.InjectedTokens,
+		ClientSystem:    clientSystem,
+	})
 	root["messages"] = transformed
 	root["context_management"] = map[string]any{"edits": []any{map[string]any{"type": "clear_thinking_20251015", "keep": "all"}}}
 	delete(root, "temperature")
@@ -158,6 +200,8 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 	next.ToolsHash = agentSDKHash(fullTools)
 	next.Model = model
 	next.LastRequestTime = time.Now().Unix()
+	next.InjectedTokens = injectedTokens
+	next.EnvironmentDate = environmentDate
 
 	mode := settings.AgentSDK.ConversationMode
 	createRoot := make(map[string]any, len(root)+1)
@@ -200,36 +244,57 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 	return ctx, enforceCacheControlLimit(encoded), nil
 }
 
-func agentSDKSystemText(value any) string {
+// agentSDKClientSystemFrom flattens the caller's system prompt and keeps the
+// caller's last breakpoint so it can follow the text into messages.
+func agentSDKClientSystemFrom(value any) agentSDKClientSystem {
 	switch v := value.(type) {
 	case string:
-		return strings.TrimSpace(v)
+		return agentSDKClientSystem{Text: strings.TrimSpace(v)}
 	case []any:
 		var out []string
+		var cacheControl map[string]any
 		for _, item := range v {
-			if block, ok := item.(map[string]any); ok && block["type"] == "text" {
-				if text, ok := block["text"].(string); ok && strings.TrimSpace(text) != "" &&
-					!strings.HasPrefix(text, "x-anthropic-billing-header:") {
-					out = append(out, text)
-				}
+			block, ok := item.(map[string]any)
+			if !ok || block["type"] != "text" {
+				continue
+			}
+			if cc, ok := block["cache_control"].(map[string]any); ok {
+				cacheControl = cc
+			}
+			if text, ok := block["text"].(string); ok && strings.TrimSpace(text) != "" &&
+				!strings.HasPrefix(text, "x-anthropic-billing-header:") {
+				out = append(out, text)
 			}
 		}
-		return strings.TrimSpace(strings.Join(out, "\n\n"))
+		text := strings.TrimSpace(strings.Join(out, "\n\n"))
+		if text == "" {
+			cacheControl = nil
+		}
+		return agentSDKClientSystem{Text: text, CacheControl: cacheControl}
 	default:
-		return ""
+		return agentSDKClientSystem{}
 	}
 }
 
-func agentSDKMessages(messages []any, clientSystem, model string, profile ClaudeEnvironmentProfile, hasTools, inject bool, remainingTokens int64) []any {
+func agentSDKMessages(messages []any, opts agentSDKMessagesOptions) ([]any, []agentSDKInjectedTokens) {
 	out := make([]any, 0, len(messages)*2+1)
+	var assigned []agentSDKInjectedTokens
 	firstUser := true
-	injected := make([]int, 0, len(messages))
+	historyMatches := true
 	for i, raw := range messages {
 		out = append(out, raw)
 		msg, _ := raw.(map[string]any)
-		if !inject || msg["role"] != "user" {
+		if !opts.Inject || msg["role"] != "user" {
 			continue
 		}
+		ordinal := len(assigned)
+		entry := agentSDKInjectedTokens{Hash: agentSDKContentHash(raw), Tokens: opts.RemainingTokens}
+		if historyMatches && ordinal < len(opts.History) && opts.History[ordinal].Hash == entry.Hash {
+			entry.Tokens = opts.History[ordinal].Tokens
+		} else {
+			historyMatches = false
+		}
+		assigned = append(assigned, entry)
 		// Do not duplicate an Agent SDK control message already supplied after
 		// this user message. An unrelated client system message is preserved and
 		// does not suppress the SDK environment/token message.
@@ -241,36 +306,53 @@ func agentSDKMessages(messages []any, clientSystem, model string, profile Claude
 		}
 		text := ""
 		if firstUser {
-			text = renderAgentSDKEnvironment(profile, model, hasTools)
+			text = renderAgentSDKEnvironment(opts.Profile, opts.Model, opts.HasTools, opts.EnvironmentDate)
 			firstUser = false
 		} else {
-			text = fmt.Sprintf("<total_tokens>%d tokens left</total_tokens>", remainingTokens)
+			text = fmt.Sprintf("<total_tokens>%d tokens left</total_tokens>", entry.Tokens)
 		}
 		out = append(out, map[string]any{"role": "system", "content": text})
-		injected = append(injected, len(out)-1)
 	}
-	if len(injected) > 0 {
-		last := injected[len(injected)-1]
-		msg := out[last].(map[string]any)
-		text, _ := msg["content"].(string)
-		msg["content"] = []any{map[string]any{
-			"type": "text", "text": text,
-			"cache_control": map[string]any{"type": "ephemeral", "ttl": "1h"},
-		}}
+	if opts.ClientSystem.Text != "" {
+		out = agentSDKInsertClientSystem(out, opts.ClientSystem)
 	}
-	if clientSystem != "" {
-		out = agentSDKInsertClientSystem(out, clientSystem)
-	}
-	if hasTools {
+	if opts.HasTools {
 		agentSDKPrependGitAttribution(out)
 	}
-	return out
+	return out, assigned
+}
+
+// agentSDKContentHash identifies a message regardless of where the client put
+// its cache breakpoints, which clients move to the newest message every turn.
+func agentSDKContentHash(value any) string {
+	encoded, _ := json.Marshal(value)
+	var decoded any
+	if json.Unmarshal(encoded, &decoded) != nil {
+		return agentSDKHash(encoded)[:16]
+	}
+	encoded, _ = json.Marshal(agentSDKStripCacheControl(decoded))
+	return agentSDKHash(encoded)[:16]
+}
+
+func agentSDKStripCacheControl(value any) any {
+	switch v := value.(type) {
+	case map[string]any:
+		delete(v, "cache_control")
+		for key, item := range v {
+			v[key] = agentSDKStripCacheControl(item)
+		}
+	case []any:
+		for i, item := range v {
+			v[i] = agentSDKStripCacheControl(item)
+		}
+	}
+	return value
 }
 
 // agentSDKInsertClientSystem places the caller's system prompt after the first
 // user message and the system messages that follow it. The upstream rejects a
 // content-bearing system message at messages[0].
-func agentSDKInsertClientSystem(messages []any, clientSystem string) []any {
+func agentSDKInsertClientSystem(messages []any, clientSystem agentSDKClientSystem) []any {
 	if len(messages) == 0 {
 		return messages
 	}
@@ -288,9 +370,13 @@ func agentSDKInsertClientSystem(messages []any, clientSystem string) []any {
 		}
 		position++
 	}
+	var content any = clientSystem.Text
+	if clientSystem.CacheControl != nil {
+		content = []any{map[string]any{"type": "text", "text": clientSystem.Text, "cache_control": clientSystem.CacheControl}}
+	}
 	out := make([]any, 0, len(messages)+1)
 	out = append(out, messages[:position]...)
-	out = append(out, map[string]any{"role": "system", "content": clientSystem})
+	out = append(out, map[string]any{"role": "system", "content": content})
 	return append(out, messages[position:]...)
 }
 
@@ -330,7 +416,7 @@ func agentSDKPrependGitAttribution(messages []any) {
 	}
 }
 
-func renderAgentSDKEnvironment(profile ClaudeEnvironmentProfile, model string, hasTools bool) string {
+func renderAgentSDKEnvironment(profile ClaudeEnvironmentProfile, model string, hasTools bool, date string) string {
 	base := renderProfileEnvironment(profile) + "\n\n" + claude.ModelIdentityText(model)
 	if hasTools {
 		template := claudeAgentSDKEnvironmentWithTools
@@ -344,7 +430,7 @@ func renderAgentSDKEnvironment(profile ClaudeEnvironmentProfile, model string, h
 	}
 	return strings.TrimSpace(base) +
 		fmt.Sprintf("\n\n<total_tokens>%d tokens left</total_tokens>\n\nToday's date is %s.",
-			claudeAgentSDKTokenBudget, time.Now().Format("2006-01-02"))
+			claudeAgentSDKTokenBudget, date)
 }
 
 func agentSDKNormalizeThinking(root map[string]any, model string) {
@@ -544,6 +630,7 @@ func agentSDKMessagesHash(messages []any) string {
 			normalized[i] = raw
 			continue
 		}
+		agentSDKStripCacheControl(msg)
 		if msg["role"] == "system" {
 			if content, ok := msg["content"].([]any); ok && len(content) == 1 {
 				if block, ok := content[0].(map[string]any); ok && block["type"] == "text" {
