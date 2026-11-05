@@ -215,6 +215,7 @@ export default {
     promptAudit: 'Prompt Audit',
     auditLogs: 'Audit Logs',
     signatureDecoder: 'Signature Decoder',
+    azureVerify: 'Azure Verify',
   },
 
   // Auth

@@ -158,6 +158,8 @@ var auditBodyOmittedRoutes = map[string]struct{}{
 	"POST /api/v1/admin/prompt-audit/events/delete-preview":     {},
 	"POST /api/v1/admin/prompt-audit/events/delete-by-filter":   {},
 	"POST /api/v1/admin/signature-verify/messages":              {},
+	"POST /api/v1/admin/azure-verify/models":                    {},
+	"POST /api/v1/admin/azure-verify/probe":                     {},
 }
 
 // NewAuditLogMiddleware 创建审计中间件。

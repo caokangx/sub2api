@@ -40,6 +40,9 @@ func RegisterAdminRoutes(
 		// 签名真假校验（转发到管理员填写的网关）
 		registerSignatureVerifyRoutes(admin, h)
 
+		// Azure 真假测试（探测管理员填写的中转站）
+		registerAzureVerifyRoutes(admin, h)
+
 		// 用户管理
 		registerUserManagementRoutes(admin, h)
 
@@ -164,6 +167,11 @@ func registerAuditLogRoutes(admin *gin.RouterGroup, h *handler.Handlers, _ middl
 
 func registerSignatureVerifyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	admin.POST("/signature-verify/messages", h.Admin.SignatureVerify.Messages)
+}
+
+func registerAzureVerifyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	admin.POST("/azure-verify/models", h.Admin.AzureVerify.Models)
+	admin.POST("/azure-verify/probe", h.Admin.AzureVerify.Probe)
 }
 
 func registerAdminComplianceRoutes(admin *gin.RouterGroup, h *handler.Handlers) {

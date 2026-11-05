@@ -450,6 +450,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/azure-verify',
+    name: 'AdminAzureVerify',
+    component: () => import('@/views/admin/AzureVerifyView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Azure Verify',
+      titleKey: 'admin.azureVerify.title'
+    }
+  },
+  {
     path: '/admin/users',
     name: 'AdminUsers',
     component: () => import('@/views/admin/UsersView.vue'),
