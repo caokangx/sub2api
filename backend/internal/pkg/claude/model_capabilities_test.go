@@ -26,3 +26,22 @@ func TestOutputBudgetCatalog(t *testing.T) {
 		})
 	}
 }
+
+func TestSupportsMidConversationSystem(t *testing.T) {
+	for _, tt := range []struct {
+		model     string
+		supported bool
+	}{
+		{"claude-3-7-sonnet-latest", false}, {"claude-3-5-haiku-20241022", false},
+		{"claude-sonnet-4-20250514", false}, {"claude-sonnet-4-5", false}, {"claude-sonnet-4-6", false}, {"claude-sonnet-4-6[1m]", false},
+		{"claude-haiku-4-5-20251001", false}, {"claude-haiku-4-5", false},
+		{"claude-opus-4-20250514", false}, {"claude-opus-4-1-20250805", false}, {"claude-opus-4-5", false},
+		{"claude-opus-4-6", false}, {"claude-opus-4-7", false},
+		{"claude-opus-4-8", true}, {"claude-opus-5", true}, {"claude-opus-5-5", true},
+		{"claude-sonnet-5", true}, {"claude-sonnet-5-5", true}, {"claude-fable-5-1", true}, {"claude-mythos-5", true},
+	} {
+		t.Run(tt.model, func(t *testing.T) {
+			require.Equal(t, tt.supported, SupportsMidConversationSystem(tt.model))
+		})
+	}
+}

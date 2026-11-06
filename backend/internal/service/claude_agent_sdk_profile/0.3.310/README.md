@@ -12,4 +12,7 @@
 - 环境消息里的 `Today's date is …` 在会话首次注入时取服务器当天日期，之后同一会话固定不变（会话状态 1h 无活动后过期）。
 - 缓存断点：真实抓包在身份块、WebSearch 块和最后一条注入 system 消息上都带 1h `cache_control`；本方案按产品决定不主动插入任何断点，只透传客户端自己的断点。客户端 system 被挪进 messages 时，其最后一个 `cache_control` 原样带到这条 system 消息上。
 
+- 不支持消息中间 system 的模型（claude-3 与 opus-4-8 之前的 4.x）：不发 `role: "system"`，也不发 `mid-conversation-system*`、`per-turn-control` beta。原本 system 消息里的每一节（环境、模型身份、deferred tools、agent types、skills、`<total_tokens>`、日期）各成一个 `<system-reminder>` 文本块，插在它前面那条 user 消息的开头（`tool_result` 之后）。连续 reminder 中只有紧挨着非 reminder 内容的最后一块末尾多一个 `\n`。样本见 `testdata/create_no_tools_sonnet46.json`。
+- `max_tokens` 取模型目录的 default（不是上限）；无工具时不发 `advanced-tool-use`；Haiku 不发 `effort`，`claude-code` 排在 `prompt-caching-scope` 之后。
+
 `testdata/` 已将 device/session/message/request/prompt 动态值替换为占位符，未包含 Authorization。

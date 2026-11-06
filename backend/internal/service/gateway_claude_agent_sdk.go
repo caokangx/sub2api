@@ -51,6 +51,7 @@ type claudeAgentSDKRequestContext struct {
 	PromptID     string
 	Pending      claudeAgentSDKThreadState
 	CreateBody   []byte
+	Betas        string
 }
 
 type claudeAgentSDKThreadState struct {
@@ -93,6 +94,9 @@ type agentSDKMessagesOptions struct {
 	EnvironmentDate string
 	History         []agentSDKInjectedTokens
 	ClientSystem    agentSDKClientSystem
+	// MidConversationSystem selects {role:"system"} messages over folding the
+	// same content into <system-reminder> blocks on user messages.
+	MidConversationSystem bool
 }
 
 func WithClaudeAgentSDKPolicy(ctx context.Context, group *Group) context.Context {
@@ -178,6 +182,8 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 		EnvironmentDate: environmentDate,
 		History:         state.InjectedTokens,
 		ClientSystem:    clientSystem,
+
+		MidConversationSystem: claude.SupportsMidConversationSystem(model),
 	})
 	root["messages"] = transformed
 	root["context_management"] = map[string]any{"edits": []any{map[string]any{"type": "clear_thinking_20251015", "keep": "all"}}}
@@ -237,6 +243,7 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 
 	ctx = context.WithValue(ctx, claudeAgentSDKContextKey{}, &claudeAgentSDKRequestContext{
 		StateKey: stateKey, RequestClass: requestClass, PromptID: state.PromptID, Pending: next, CreateBody: createBody,
+		Betas: agentSDKBetas(model, hasTools),
 	})
 	encoded, err := marshalProfileJSON(root)
 	if err != nil {
@@ -414,14 +421,23 @@ func agentSDKMessages(messages []any, opts agentSDKMessagesOptions) ([]any, []ag
 				continue
 			}
 		}
-		text := ""
+		var content any
 		if firstUser {
-			text = renderAgentSDKEnvironment(opts.Profile, opts.Model, opts.HasTools, opts.EnvironmentDate)
+			sections := agentSDKEnvironmentSections(opts.Profile, opts.Model, opts.HasTools, opts.EnvironmentDate)
+			if opts.MidConversationSystem {
+				content = strings.Join(sections, "\n\n")
+			} else {
+				blocks := make([]any, len(sections))
+				for k, section := range sections {
+					blocks[k] = map[string]any{"type": "text", "text": section}
+				}
+				content = blocks
+			}
 			firstUser = false
 		} else {
-			text = fmt.Sprintf("<total_tokens>%d tokens left</total_tokens>", entry.Tokens)
+			content = fmt.Sprintf("<total_tokens>%d tokens left</total_tokens>", entry.Tokens)
 		}
-		out = append(out, map[string]any{"role": "system", "content": text})
+		out = append(out, map[string]any{"role": "system", "content": content})
 	}
 	if opts.ClientSystem.Text != "" {
 		out = agentSDKInsertClientSystem(out, opts.ClientSystem)
@@ -429,7 +445,110 @@ func agentSDKMessages(messages []any, opts agentSDKMessagesOptions) ([]any, []ag
 	if opts.HasTools {
 		agentSDKPrependGitAttribution(out)
 	}
+	if !opts.MidConversationSystem {
+		out = agentSDKFoldSystemIntoUser(out)
+	}
 	return out, assigned
+}
+
+// agentSDKFoldSystemIntoUser reshapes the request for models that reject
+// {role:"system"} messages, the way the CLI does: every text block of a system
+// message becomes its own <system-reminder> block on the user message before
+// it. Only the last reminder of a run gains a trailing newline, and only when
+// non-reminder content follows it. tool_result blocks must stay first in a
+// user message, so reminders go after them.
+func agentSDKFoldSystemIntoUser(messages []any) []any {
+	out := make([]any, 0, len(messages))
+	var pending []any
+	userIndex := -1
+	flush := func() {
+		if userIndex < 0 || len(pending) == 0 {
+			return
+		}
+		out[userIndex] = agentSDKInsertReminders(out[userIndex].(map[string]any), pending)
+		pending = nil
+	}
+	for _, raw := range messages {
+		msg, _ := raw.(map[string]any)
+		switch msg["role"] {
+		case "system":
+			pending = append(pending, agentSDKSystemReminders(msg["content"])...)
+			continue
+		case "user":
+			if userIndex >= 0 {
+				flush()
+			}
+			userIndex = len(out)
+			if len(pending) > 0 {
+				out = append(out, agentSDKInsertReminders(msg, pending))
+				pending = nil
+				continue
+			}
+		}
+		out = append(out, raw)
+	}
+	flush()
+	return out
+}
+
+func agentSDKSystemReminders(content any) []any {
+	var reminders []any
+	for _, raw := range agentSDKContentBlocks(content) {
+		block, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		text, _ := block["text"].(string)
+		if strings.TrimSpace(text) == "" {
+			continue
+		}
+		reminder := map[string]any{"type": "text", "text": wrapSystemReminder(text)}
+		if cc, ok := block["cache_control"]; ok {
+			reminder["cache_control"] = cc
+		}
+		reminders = append(reminders, reminder)
+	}
+	return reminders
+}
+
+func agentSDKInsertReminders(msg map[string]any, reminders []any) map[string]any {
+	blocks := agentSDKContentBlocks(msg["content"])
+	position := 0
+	for i, raw := range blocks {
+		if block, ok := raw.(map[string]any); ok && block["type"] == "tool_result" {
+			position = i + 1
+		}
+	}
+	inserted := make([]any, len(reminders))
+	copy(inserted, reminders)
+	if position < len(blocks) && !agentSDKIsReminderBlock(blocks[position]) {
+		last := inserted[len(inserted)-1].(map[string]any)
+		withNewline := make(map[string]any, len(last))
+		for key, value := range last {
+			withNewline[key] = value
+		}
+		withNewline["text"] = last["text"].(string) + "\n"
+		inserted[len(inserted)-1] = withNewline
+	}
+	content := make([]any, 0, len(blocks)+len(inserted))
+	content = append(content, blocks[:position]...)
+	content = append(content, inserted...)
+	content = append(content, blocks[position:]...)
+	merged := make(map[string]any, len(msg))
+	for key, value := range msg {
+		merged[key] = value
+	}
+	merged["content"] = content
+	return merged
+}
+
+func agentSDKIsReminderBlock(raw any) bool {
+	block, ok := raw.(map[string]any)
+	if !ok || block["type"] != "text" {
+		return false
+	}
+	text, _ := block["text"].(string)
+	return strings.HasPrefix(text, "<system-reminder>")
 }
 
 // agentSDKContentHash identifies a message regardless of where the client put
@@ -515,7 +634,7 @@ func agentSDKPrependGitAttribution(messages []any) {
 		if msg["role"] != "user" {
 			continue
 		}
-		block := map[string]any{"type": "text", "text": strings.TrimSpace(claudeAgentSDKGitAttribution)}
+		block := map[string]any{"type": "text", "text": claudeAgentSDKGitAttribution}
 		switch content := msg["content"].(type) {
 		case string:
 			msg["content"] = []any{block, map[string]any{"type": "text", "text": content}}
@@ -527,20 +646,43 @@ func agentSDKPrependGitAttribution(messages []any) {
 }
 
 func renderAgentSDKEnvironment(profile ClaudeEnvironmentProfile, model string, hasTools bool, date string) string {
-	base := renderProfileEnvironment(profile) + "\n\n" + claude.ModelIdentityText(model)
+	return strings.Join(agentSDKEnvironmentSections(profile, model, hasTools, date), "\n\n")
+}
+
+// agentSDKEnvironmentSections returns the CLI attachments that make up the
+// first-turn environment message, in send order. Models with mid-conversation
+// system support receive them joined into one system message; the others
+// receive one <system-reminder> block per section.
+func agentSDKEnvironmentSections(profile ClaudeEnvironmentProfile, model string, hasTools bool, date string) []string {
+	sections := []string{renderProfileEnvironment(profile), claude.ModelIdentityText(model)}
 	if hasTools {
-		template := claudeAgentSDKEnvironmentWithTools
-		if idx := strings.Index(template, "The following deferred tools"); idx >= 0 {
-			suffix := template[idx:]
-			if date := strings.Index(suffix, "Today's date is "); date >= 0 {
-				suffix = suffix[:date]
-			}
-			base += "\n\n" + strings.TrimSpace(suffix)
+		sections = append(sections, agentSDKToolSections()...)
+	}
+	return append(sections,
+		fmt.Sprintf("<total_tokens>%d tokens left</total_tokens>", claudeAgentSDKTokenBudget),
+		"Today's date is "+date+".")
+}
+
+// agentSDKToolSections extracts the deferred tools, agent types and skills
+// attachments from the recorded with-tools environment message.
+func agentSDKToolSections() []string {
+	template := claudeAgentSDKEnvironmentWithTools
+	start := strings.Index(template, "The following deferred tools")
+	if start < 0 {
+		return nil
+	}
+	suffix := template[start:]
+	if end := strings.Index(suffix, "<total_tokens>"); end >= 0 {
+		suffix = suffix[:end]
+	}
+	var sections []string
+	for _, marker := range []string{"\n\nAvailable agent types", "\n\nThe following skills"} {
+		if idx := strings.Index(suffix, marker); idx >= 0 {
+			sections = append(sections, strings.TrimSpace(suffix[:idx]))
+			suffix = suffix[idx:]
 		}
 	}
-	return strings.TrimSpace(base) +
-		fmt.Sprintf("\n\n<total_tokens>%d tokens left</total_tokens>\n\nToday's date is %s.",
-			claudeAgentSDKTokenBudget, date)
+	return append(sections, strings.TrimSpace(suffix))
 }
 
 func agentSDKNormalizeThinking(root map[string]any, model string) {
@@ -564,15 +706,9 @@ func applyClaudeAgentSDKOutputBudget(body []byte, model string) ([]byte, error) 
 	if err := json.Unmarshal(body, &root); err != nil {
 		return nil, err
 	}
-	_, upper := claude.OutputBudget(model)
-	switch {
-	case strings.Contains(claude.NormalizeModelID(model), "haiku-4-5"):
-		root["max_tokens"] = 32000
-	case upper >= 128000:
-		root["max_tokens"] = 128000
-	default:
-		root["max_tokens"] = upper
-	}
+	// The CLI sends the catalog default; the upper limit only caps
+	// CLAUDE_CODE_MAX_OUTPUT_TOKENS.
+	root["max_tokens"], _ = claude.OutputBudget(model)
 	return marshalProfileJSON(root)
 }
 
@@ -766,6 +902,51 @@ func anthropicUpstreamRequestID(headers http.Header) string {
 	return headers.Get("x-request-id")
 }
 
+const (
+	betaAgentSDKMidConversationSystem        = "mid-conversation-system-2026-04-07"
+	betaAgentSDKMidConversationSystemClearAt = "mid-conversation-system-clear-at-2026-08-21"
+	betaAgentSDKPerTurnControl               = "per-turn-control-2026-07-01"
+	betaAgentSDKAdvancedToolUse              = "advanced-tool-use-2025-11-20"
+)
+
+// agentSDKBetas filters the recorded SDK beta set the way the CLI gates it per
+// request: mid-conversation system and per-turn control only for models that
+// accept system messages, tool search only with tools, and Haiku without effort
+// and with claude-code after the caching scope beta.
+func agentSDKBetas(model string, hasTools bool) string {
+	midConversationSystem := claude.SupportsMidConversationSystem(model)
+	haiku := strings.Contains(claude.CanonicalModelID(model), "haiku")
+	var out []string
+	for _, token := range strings.Fields(claudeAgentSDKBetas) {
+		switch token {
+		case betaAgentSDKMidConversationSystem, betaAgentSDKMidConversationSystemClearAt, betaAgentSDKPerTurnControl:
+			if !midConversationSystem {
+				continue
+			}
+		case betaAgentSDKAdvancedToolUse:
+			if !hasTools {
+				continue
+			}
+		case claude.BetaEffort, claude.BetaClaudeCode:
+			if haiku {
+				continue
+			}
+		}
+		out = append(out, token)
+		if haiku && token == claude.BetaPromptCachingScope {
+			out = append(out, claude.BetaClaudeCode)
+		}
+	}
+	return strings.Join(out, ",")
+}
+
+func claudeAgentSDKBetaHeader(ctx context.Context) string {
+	if info, _ := ctx.Value(claudeAgentSDKContextKey{}).(*claudeAgentSDKRequestContext); info != nil && info.Betas != "" {
+		return info.Betas
+	}
+	return strings.Join(strings.Fields(claudeAgentSDKBetas), ",")
+}
+
 func applyClaudeAgentSDKHeaders(ctx context.Context, account *Account, headers http.Header, stream bool) {
 	if !simulateClaudeAgentSDK(ctx, account) {
 		return
@@ -774,7 +955,7 @@ func applyClaudeAgentSDKHeaders(ctx context.Context, account *Account, headers h
 	setHeaderRaw(headers, "x-app", "cli")
 	setHeaderRaw(headers, "anthropic-dangerous-direct-browser-access", "true")
 	setHeaderRaw(headers, "anthropic-dispatch-id", claudeAgentSDKDispatchID)
-	setHeaderRaw(headers, "anthropic-beta", strings.Join(strings.Fields(claudeAgentSDKBetas), ","))
+	setHeaderRaw(headers, "anthropic-beta", claudeAgentSDKBetaHeader(ctx))
 	if info, _ := ctx.Value(claudeAgentSDKContextKey{}).(*claudeAgentSDKRequestContext); info != nil {
 		setHeaderRaw(headers, "x-claude-code-request-class", info.RequestClass)
 		setHeaderRaw(headers, "x-claude-code-prompt-id", info.PromptID)

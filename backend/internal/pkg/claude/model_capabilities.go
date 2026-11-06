@@ -39,6 +39,22 @@ func OutputBudget(model string) (defaultTokens, upperTokens int) {
 	}
 }
 
+// SupportsMidConversationSystem mirrors the CLI gate for content-bearing
+// {role:"system"} messages: Claude 3 and every 4.x model before Opus 4.8 are
+// rejected upstream with "role 'system' is not supported on this model".
+func SupportsMidConversationSystem(model string) bool {
+	id := CanonicalModelID(model)
+	if strings.HasPrefix(id, "claude-3-") {
+		return false
+	}
+	switch id {
+	case "claude-opus-4", "claude-opus-4-0", "claude-sonnet-4", "claude-sonnet-4-0", "claude-opus-4-1",
+		"claude-sonnet-4-5", "claude-haiku-4-5", "claude-opus-4-5", "claude-opus-4-6", "claude-sonnet-4-6", "claude-opus-4-7":
+		return false
+	}
+	return true
+}
+
 func SupportsThinking(model string) bool {
 	id := CanonicalModelID(model)
 	if id == "claude-3-7-sonnet" {

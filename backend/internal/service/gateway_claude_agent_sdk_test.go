@@ -21,7 +21,7 @@ import (
 func TestClaudeAgentSDKGoldenFixtures(t *testing.T) {
 	for _, name := range []string{
 		"create_no_tools.json", "create_with_tools.json", "continue_tool_result.json",
-		"stateless_opus.json", "image_input.json",
+		"stateless_opus.json", "image_input.json", "create_no_tools_sonnet46.json",
 	} {
 		raw, err := os.ReadFile("claude_agent_sdk_profile/0.3.310/testdata/" + name)
 		require.NoError(t, err, name)
@@ -33,6 +33,39 @@ func TestClaudeAgentSDKGoldenFixtures(t *testing.T) {
 	require.Equal(t, "create", gjson.GetBytes(mustReadAgentSDKFixture(t, "create_no_tools.json"), "thread.type").String())
 	require.Equal(t, "continue", gjson.GetBytes(mustReadAgentSDKFixture(t, "continue_tool_result.json"), "thread.type").String())
 	require.False(t, gjson.GetBytes(mustReadAgentSDKFixture(t, "stateless_opus.json"), "thread").Exists())
+	sonnet46 := mustReadAgentSDKFixture(t, "create_no_tools_sonnet46.json")
+	require.Equal(t, int64(32000), gjson.GetBytes(sonnet46, "max_tokens").Int())
+	requireNoAgentSDKSystemRole(t, sonnet46)
+}
+
+func requireNoAgentSDKSystemRole(t *testing.T, body []byte) {
+	t.Helper()
+	for i, msg := range gjson.GetBytes(body, "messages").Array() {
+		require.NotEqual(t, "system", msg.Get("role").String(), "messages.%d: %s", i, gjson.GetBytes(body, "messages").Raw)
+	}
+}
+
+var agentSDKFixtureProfile = ClaudeEnvironmentProfile{
+	WorkingDirectory: "/Users/developer/project", GitRepository: true,
+	Platform: "darwin", Shell: "zsh", OSVersion: "Darwin 24.5.0",
+}
+
+func TestAgentSDKEnvironmentMatchesFixtures(t *testing.T) {
+	for _, tc := range []struct {
+		fixture  string
+		hasTools bool
+	}{{"create_no_tools.json", false}, {"create_with_tools.json", true}} {
+		t.Run(tc.fixture, func(t *testing.T) {
+			raw := mustReadAgentSDKFixture(t, tc.fixture)
+			require.Equal(t, "system", gjson.GetBytes(raw, "messages.1.role").String())
+			want := gjson.GetBytes(raw, "messages.1.content.0.text").String()
+			got := renderAgentSDKEnvironment(agentSDKFixtureProfile, "claude-sonnet-5-5", tc.hasTools, "2026-11-03")
+			require.Equal(t, want, got)
+			require.Equal(t, 1, strings.Count(got, "<total_tokens>"))
+		})
+	}
+	raw := mustReadAgentSDKFixture(t, "create_with_tools.json")
+	require.Equal(t, gjson.GetBytes(raw, "messages.0.content.0.text").String(), claudeAgentSDKGitAttribution)
 }
 
 func mustReadAgentSDKFixture(t *testing.T, name string) []byte {
@@ -252,7 +285,7 @@ func TestAgentSDKInsertClientSystemNeverLeadsMessages(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			out, _ := agentSDKMessages(tc.messages, agentSDKMessagesOptions{
 				Model: "claude-sonnet-5-5", Profile: profile, Inject: tc.inject, RemainingTokens: 1000,
-				ClientSystem: agentSDKClientSystem{Text: "CLIENT SYSTEM"},
+				ClientSystem: agentSDKClientSystem{Text: "CLIENT SYSTEM"}, MidConversationSystem: true,
 			})
 			require.NotEqual(t, "system", out[0].(map[string]any)["role"])
 			got := out[tc.want].(map[string]any)
@@ -262,7 +295,7 @@ func TestAgentSDKInsertClientSystemNeverLeadsMessages(t *testing.T) {
 	}
 	out, _ := agentSDKMessages(nil, agentSDKMessagesOptions{
 		Model: "claude-sonnet-5-5", Profile: profile, Inject: true, RemainingTokens: 1000,
-		ClientSystem: agentSDKClientSystem{Text: "CLIENT SYSTEM"},
+		ClientSystem: agentSDKClientSystem{Text: "CLIENT SYSTEM"}, MidConversationSystem: true,
 	})
 	require.Empty(t, out)
 }
@@ -359,6 +392,7 @@ type agentSDKLoopHarness struct {
 	ctx     context.Context
 	c       *gin.Context
 	head    string
+	model   string
 	msgs    []string
 	turn    int
 }
@@ -369,7 +403,7 @@ func newAgentSDKLoopHarness(t *testing.T, settings *ClaudeAntiBanSettings, head 
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
 	return &agentSDKLoopHarness{
-		t: t, svc: svc, c: c, head: head,
+		t: t, svc: svc, c: c, head: head, model: "claude-sonnet-5-5",
 		account: &Account{ID: 21, Platform: PlatformAnthropic, Type: AccountTypeSetupToken},
 		ctx:     WithClaudeAgentSDKPolicy(context.Background(), &Group{Platform: PlatformAnthropic, SimulateClaudeAgentSDK: true}),
 		msgs:    []string{`{"role":"user","content":"do it"}`},
@@ -380,7 +414,7 @@ func newAgentSDKLoopHarness(t *testing.T, settings *ClaudeAntiBanSettings, head 
 func (h *agentSDKLoopHarness) send() []byte {
 	h.t.Helper()
 	body := h.head + `"messages":[` + strings.Join(h.msgs, ",") + `]}`
-	ctx, out, err := h.svc.prepareClaudeAgentSDK(h.ctx, h.c, h.account, []byte(body), "claude-sonnet-5-5")
+	ctx, out, err := h.svc.prepareClaudeAgentSDK(h.ctx, h.c, h.account, []byte(body), h.model)
 	require.NoError(h.t, err)
 	requireAgentSDKSystemOrder(h.t, out)
 	h.turn++
@@ -556,5 +590,229 @@ func TestClaudeAgentSDKNormalizesClientSystemDateline(t *testing.T) {
 			require.Equal(t, "Policy. "+tc.want, gjson.GetBytes(out, "messages.2.content").String())
 			require.Contains(t, gjson.GetBytes(out, "messages.1.content").String(), "Today's date is ")
 		})
+	}
+}
+
+func agentSDKFoldedMessages(t *testing.T, messages string, opts agentSDKMessagesOptions) []any {
+	t.Helper()
+	var source []any
+	require.NoError(t, json.Unmarshal([]byte(messages), &source))
+	if opts.Model == "" {
+		opts.Model = "claude-sonnet-4-6"
+	}
+	opts.Profile, opts.Inject, opts.EnvironmentDate = agentSDKFixtureProfile, true, "2026-11-06"
+	if opts.RemainingTokens == 0 {
+		opts.RemainingTokens = claudeAgentSDKTokenBudget
+	}
+	opts.MidConversationSystem = false
+	out, _ := agentSDKMessages(agentSDKNormalizeSourceMessages(source), opts)
+	return out
+}
+
+func agentSDKBlockTexts(t *testing.T, message any) []string {
+	t.Helper()
+	var texts []string
+	for _, raw := range message.(map[string]any)["content"].([]any) {
+		block := raw.(map[string]any)
+		if block["type"] == "text" {
+			texts = append(texts, block["text"].(string))
+		} else {
+			texts = append(texts, "["+block["type"].(string)+"]")
+		}
+	}
+	return texts
+}
+
+func TestAgentSDKFoldMatchesSonnet46Fixture(t *testing.T) {
+	fixture := mustReadAgentSDKFixture(t, "create_no_tools_sonnet46.json")
+	var want []any
+	require.NoError(t, json.Unmarshal([]byte(gjson.GetBytes(fixture, "messages").Raw), &want))
+	clientBlocks := want[0].(map[string]any)["content"].([]any)[4:]
+	client, err := json.Marshal([]any{map[string]any{"role": "user", "content": clientBlocks}})
+	require.NoError(t, err)
+
+	got := agentSDKFoldedMessages(t, string(client), agentSDKMessagesOptions{})
+	require.Equal(t, want, got)
+}
+
+func TestAgentSDKFoldMultiTurnMatchesHaikuShape(t *testing.T) {
+	out := agentSDKFoldedMessages(t,
+		`[{"role":"user","content":"你好"},{"role":"assistant","content":[{"type":"text","text":"ok"}]},{"role":"user","content":"你能读取本地文件吗"}]`,
+		agentSDKMessagesOptions{Model: "claude-haiku-4-5-20251001"})
+	require.Len(t, out, 3)
+	first := agentSDKBlockTexts(t, out[0])
+	require.Len(t, first, 5)
+	require.True(t, strings.HasPrefix(first[0], "<system-reminder>\n# Environment\n"))
+	require.Equal(t, "<system-reminder>\nYou are powered by the model named Haiku 4.5. The exact model ID is claude-haiku-4-5-20251001. Assistant knowledge cutoff is February 2025.\n</system-reminder>", first[1])
+	require.Equal(t, "<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>", first[2])
+	require.Equal(t, "<system-reminder>\nToday's date is 2026-11-06.\n</system-reminder>\n", first[3])
+	require.Equal(t, "你好", first[4])
+	require.Equal(t, []string{
+		"<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>\n", "你能读取本地文件吗",
+	}, agentSDKBlockTexts(t, out[2]))
+}
+
+func TestAgentSDKFoldWithToolsMatchesHaikuOrder(t *testing.T) {
+	out := agentSDKFoldedMessages(t, `[{"role":"user","content":"用一句话解释什么是幂等性。"}]`,
+		agentSDKMessagesOptions{Model: "claude-haiku-4-5-20251001", HasTools: true})
+	require.Len(t, out, 1)
+	texts := agentSDKBlockTexts(t, out[0])
+	prefixes := []string{
+		"<system-reminder>\n# Environment\n",
+		"<system-reminder>\nYou are powered by the model named Haiku 4.5.",
+		"<system-reminder>\nThe following deferred tools are now available via ToolSearch.",
+		"<system-reminder>\nAvailable agent types for the Agent tool:\n",
+		"<system-reminder>\nThe following skills are available for use with the Skill tool:\n",
+		"<system-reminder>\n<total_tokens>15000000 tokens left</total_tokens>\n</system-reminder>",
+		"<system-reminder>\nToday's date is 2026-11-06.\n</system-reminder>",
+		"<system-reminder>\nAttribution for git commits and pull requests",
+		"用一句话解释什么是幂等性。",
+	}
+	require.Len(t, texts, len(prefixes))
+	for i, prefix := range prefixes {
+		require.True(t, strings.HasPrefix(texts[i], prefix), "block %d: %q", i, texts[i])
+	}
+	require.True(t, strings.HasSuffix(texts[3], "so they run concurrently.\n</system-reminder>"))
+	require.True(t, strings.HasSuffix(texts[6], "</system-reminder>"), "a reminder followed by another reminder gets no newline")
+	require.True(t, strings.HasSuffix(texts[7], "</system-reminder>\n"))
+}
+
+func TestAgentSDKFoldPlacesRemindersAfterToolResults(t *testing.T) {
+	out := agentSDKFoldedMessages(t, `[{"role":"user","content":"do it"},`+
+		`{"role":"assistant","content":[{"type":"tool_use","id":"tu","name":"t","input":{}}]},`+
+		`{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu","content":"ok"}]}]`,
+		agentSDKMessagesOptions{RemainingTokens: 14984604})
+	require.Len(t, out, 3)
+	require.Equal(t, []string{
+		"[tool_result]", "<system-reminder>\n<total_tokens>14984604 tokens left</total_tokens>\n</system-reminder>",
+	}, agentSDKBlockTexts(t, out[2]))
+}
+
+func TestAgentSDKFoldKeepsClientSystemBreakpoint(t *testing.T) {
+	out := agentSDKFoldedMessages(t, `[{"role":"user","content":"hello"}]`, agentSDKMessagesOptions{
+		ClientSystem: agentSDKClientSystem{Text: "CLIENT SYSTEM", CacheControl: map[string]any{"type": "ephemeral"}},
+	})
+	require.Len(t, out, 1)
+	content := out[0].(map[string]any)["content"].([]any)
+	client := content[4].(map[string]any)
+	require.Equal(t, "<system-reminder>\nCLIENT SYSTEM\n</system-reminder>\n", client["text"])
+	require.Equal(t, map[string]any{"type": "ephemeral"}, client["cache_control"])
+	require.Equal(t, "<system-reminder>\nToday's date is 2026-11-06.\n</system-reminder>", content[3].(map[string]any)["text"])
+}
+
+// The production request rejected with "role 'system' is not supported on this
+// model": a Claude Code client on Sonnet 4.6 with a top-level system prompt and
+// two adjacent user messages.
+func TestClaudeAgentSDKSonnet46SendsNoSystemRole(t *testing.T) {
+	input := []byte(`{
+		"model":"claude-sonnet-4-6","max_tokens":1024,"stream":true,"thinking":{"type":"disabled"},
+		"output_config":{"effort":"high"},
+		"metadata":{"user_id":"{\"device_id\":\"device\",\"account_uuid\":\"\",\"session_id\":\"5db67606-2eb6-4413-9158-27732d2d7989\"}"},
+		"system":[{"type":"text","text":"You are Claude Code, Anthropic's official CLI for Claude.","cache_control":{"type":"ephemeral"}}],
+		"messages":[
+			{"role":"user","content":[{"type":"text","text":"<system-reminder>\nNotice from the API gateway.\n</system-reminder>"}]},
+			{"role":"user","content":[{"type":"text","text":"ping","cache_control":{"type":"ephemeral"}}]}
+		]
+	}`)
+	for _, inject := range []bool{true, false} {
+		t.Run(fmt.Sprintf("inject=%v", inject), func(t *testing.T) {
+			settings := DefaultClaudeAntiBanSettings()
+			settings.AgentSDK.InjectSystemMessages = inject
+			svc := &GatewayService{settingService: &SettingService{}, cache: &agentSDKTestCache{}}
+			svc.settingService.claudeAntiBanRuntime.Store(settings)
+			account := &Account{ID: 24, Platform: PlatformAnthropic, Type: AccountTypeSetupToken}
+			ctx := WithClaudeAgentSDKPolicy(context.Background(), &Group{Platform: PlatformAnthropic, SimulateClaudeAgentSDK: true})
+			c, _ := gin.CreateTestContext(httptest.NewRecorder())
+			c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
+
+			ctx, out, err := svc.prepareClaudeAgentSDK(ctx, c, account, input, "claude-sonnet-4-6")
+			require.NoError(t, err)
+			requireNoAgentSDKSystemRole(t, out)
+			require.Len(t, gjson.GetBytes(out, "messages").Array(), 1)
+			texts := gjson.GetBytes(out, "messages.0.content.#.text").Array()
+			require.Equal(t, "ping", texts[len(texts)-1].String())
+			require.Equal(t, "<system-reminder>\nYou are Claude Code, Anthropic's official CLI for Claude.\n</system-reminder>", texts[len(texts)-3].String())
+			require.Equal(t, "adaptive", gjson.GetBytes(out, "thinking.type").String())
+			require.NotContains(t, claudeAgentSDKBetaHeader(ctx), "mid-conversation-system")
+
+			wire, err := applyClaudeAgentSDKOutputBudget(out, "claude-sonnet-4-6")
+			require.NoError(t, err)
+			require.Equal(t, int64(32000), gjson.GetBytes(wire, "max_tokens").Int())
+
+			wireSvc := &GatewayService{cache: svc.cache}
+			req, wire, err := wireSvc.buildUpstreamRequest(ctx, c, account, wire, "token", "oauth", "claude-sonnet-4-6", true, true)
+			require.NoError(t, err)
+			require.Equal(t, agentSDKBetas("claude-sonnet-4-6", false), getHeaderRaw(req.Header, "anthropic-beta"))
+			requireNoAgentSDKSystemRole(t, wire)
+		})
+	}
+}
+
+func newSonnet46LoopHarness(t *testing.T, settings *ClaudeAntiBanSettings) *agentSDKLoopHarness {
+	h := newAgentSDKLoopHarness(t, settings, strings.Replace(agentSDKLoopHead, "claude-sonnet-5-5", "claude-sonnet-4-6", 1))
+	h.model = "claude-sonnet-4-6"
+	return h
+}
+
+func TestClaudeAgentSDKSonnet46ToolLoopKeepsHistoryPrefixStable(t *testing.T) {
+	h := newSonnet46LoopHarness(t, DefaultClaudeAntiBanSettings())
+	previous := []string{}
+	for i := 0; i < 4; i++ {
+		out := h.send()
+		requireNoAgentSDKSystemRole(t, out)
+		current := agentSDKStrippedMessages(t, out)
+		require.Len(t, current, 2*i+1)
+		require.Equal(t, previous, current[:len(previous)], "request %d rewrote history", i+1)
+		if i > 0 {
+			require.Contains(t, current[len(current)-1], `"type":"tool_result"`)
+			require.Contains(t, current[len(current)-1], "\\u003ctotal_tokens\\u003e")
+		}
+		previous = current
+		h.toolRoundTrip(true)
+	}
+}
+
+func TestClaudeAgentSDKSonnet46ThreadModeContinuesAcrossToolLoops(t *testing.T) {
+	settings := DefaultClaudeAntiBanSettings()
+	settings.AgentSDK.ConversationMode = ClaudeAgentSDKConversationThread
+	h := newSonnet46LoopHarness(t, settings)
+	first := h.send()
+	requireNoAgentSDKSystemRole(t, first)
+	require.Equal(t, "create", gjson.GetBytes(first, "thread.type").String())
+	for i := 0; i < 3; i++ {
+		h.toolRoundTrip(true)
+		out := h.send()
+		requireNoAgentSDKSystemRole(t, out)
+		require.Equal(t, "continue", gjson.GetBytes(out, "thread.type").String(), "round trip %d", i+1)
+		require.Equal(t, fmt.Sprintf("msg_%d", i+1), gjson.GetBytes(out, "thread.previous_message_id").String())
+		require.Len(t, gjson.GetBytes(out, "messages").Array(), 2, "only the new assistant/user pair is sent")
+	}
+}
+
+func TestAgentSDKBetasMatchCaptures(t *testing.T) {
+	const (
+		sonnet55NoTools = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,mid-conversation-system-2026-04-07,per-turn-control-2026-07-01,advisor-tool-2026-03-01,mid-conversation-system-clear-at-2026-08-21,effort-2025-11-24,thinking-binding-controls-2026-08-01,thinking-display-updates-2026-08-18,extended-cache-ttl-2025-04-11,cache-diagnosis-2026-04-07,message-threads-2026-08-12"
+		sonnet55Tools   = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,mid-conversation-system-2026-04-07,per-turn-control-2026-07-01,advisor-tool-2026-03-01,advanced-tool-use-2025-11-20,mid-conversation-system-clear-at-2026-08-21,effort-2025-11-24,thinking-binding-controls-2026-08-01,thinking-display-updates-2026-08-18,extended-cache-ttl-2025-04-11,cache-diagnosis-2026-04-07,message-threads-2026-08-12"
+		sonnet46NoTools = "claude-code-20250219,oauth-2025-04-20,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,advisor-tool-2026-03-01,effort-2025-11-24,thinking-binding-controls-2026-08-01,thinking-display-updates-2026-08-18,extended-cache-ttl-2025-04-11,cache-diagnosis-2026-04-07,message-threads-2026-08-12"
+		haikuNoTools    = "oauth-2025-04-20,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,claude-code-20250219,advisor-tool-2026-03-01,thinking-binding-controls-2026-08-01,thinking-display-updates-2026-08-18,extended-cache-ttl-2025-04-11,cache-diagnosis-2026-04-07,message-threads-2026-08-12"
+		haikuTools      = "oauth-2025-04-20,interleaved-thinking-2025-05-14,thinking-token-count-2026-05-13,context-management-2025-06-27,prompt-caching-scope-2026-01-05,claude-code-20250219,advisor-tool-2026-03-01,advanced-tool-use-2025-11-20,thinking-binding-controls-2026-08-01,thinking-display-updates-2026-08-18,extended-cache-ttl-2025-04-11,cache-diagnosis-2026-04-07,message-threads-2026-08-12"
+	)
+	require.Equal(t, sonnet55NoTools, agentSDKBetas("claude-sonnet-5-5", false))
+	require.Equal(t, sonnet55Tools, agentSDKBetas("claude-sonnet-5-5", true))
+	require.Equal(t, sonnet46NoTools, agentSDKBetas("claude-sonnet-4-6", false))
+	require.Equal(t, haikuNoTools, agentSDKBetas("claude-haiku-4-5-20251001", false))
+	require.Equal(t, haikuTools, agentSDKBetas("claude-haiku-4-5-20251001", true))
+	require.Equal(t, strings.Join(strings.Fields(claudeAgentSDKBetas), ","), claudeAgentSDKBetaHeader(context.Background()))
+}
+
+func TestApplyClaudeAgentSDKOutputBudgetUsesCatalogDefault(t *testing.T) {
+	for model, want := range map[string]int64{
+		"claude-sonnet-4-6": 32000, "claude-haiku-4-5-20251001": 32000, "claude-opus-4-5": 32000,
+		"claude-opus-4-7": 64000, "claude-opus-5": 64000, "claude-sonnet-5": 64000,
+		"claude-sonnet-5-5": 128000, "claude-opus-5-5": 128000,
+	} {
+		out, err := applyClaudeAgentSDKOutputBudget([]byte(`{"max_tokens":1}`), model)
+		require.NoError(t, err)
+		require.Equal(t, want, gjson.GetBytes(out, "max_tokens").Int(), model)
 	}
 }

@@ -142,7 +142,7 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 		finalBetaShouldSet, mimicClaudeCode = true, true
 	}
 	if agentSDKProfile {
-		finalBetaHeader = strings.Join(strings.Fields(claudeAgentSDKBetas), ",")
+		finalBetaHeader = claudeAgentSDKBetaHeader(ctx)
 		finalBetaShouldSet, mimicClaudeCode = true, true
 	}
 
