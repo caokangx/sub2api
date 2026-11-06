@@ -27,11 +27,11 @@ export const adminAzureVerifyAPI = {
     return data
   },
 
-  async probe(conn: AzureVerifyConnection, model: string): Promise<AzureVerifyProbeResponse> {
+  async probe(conn: AzureVerifyConnection, model: string, signal?: AbortSignal): Promise<AzureVerifyProbeResponse> {
     const { data } = await apiClient.post<AzureVerifyProbeResponse>(
       '/admin/azure-verify/probe',
       { ...conn, model },
-      { timeout: UPSTREAM_VERIFY_PROBE_TIMEOUT_MS }
+      { timeout: UPSTREAM_VERIFY_PROBE_TIMEOUT_MS, signal }
     )
     return data
   }

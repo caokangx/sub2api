@@ -25,8 +25,8 @@ export default {
       selectAll: 'Select all',
       clear: 'Clear',
       start: 'Start ({n})',
-      stop: 'Stop after current model',
-      hint: 'Models are probed one at a time; each usually takes 10 to 60 seconds.'
+      stop: 'Stop',
+      hint: 'All selected models are probed at once; this usually finishes within 10 to 60 seconds.'
     },
     results: {
       title: 'Results',
@@ -37,8 +37,8 @@ export default {
       evidences: 'Evidence',
       steps: 'Probe requests',
       states: {
-        pending: 'Pending',
         running: 'Probing',
+        stopped: 'Stopped',
         match: 'Azure',
         notMatch: 'Not Azure',
         failed: 'Failed',

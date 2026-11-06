@@ -25,8 +25,8 @@ export default {
       selectAll: '全选',
       clear: '清空',
       start: '开始测试（{n} 个）',
-      stop: '测完当前模型后停止',
-      hint: '按顺序逐个测试，每个模型通常需要 10 到 60 秒。'
+      stop: '停止测试',
+      hint: '所有选中的模型同时测试，通常 10 到 60 秒内全部完成。'
     },
     results: {
       title: '测试结果',
@@ -37,8 +37,8 @@ export default {
       evidences: '判断依据',
       steps: '探测请求',
       states: {
-        pending: '等待中',
         running: '测试中',
+        stopped: '已停止',
         match: '是 Azure',
         notMatch: '不是 Azure',
         failed: '测试失败',

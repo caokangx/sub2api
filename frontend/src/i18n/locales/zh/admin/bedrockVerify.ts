@@ -25,8 +25,8 @@ export default {
       selectAll: '全选',
       clear: '清空',
       start: '开始测试（{n} 个）',
-      stop: '测完当前模型后停止',
-      hint: '按顺序逐个测试，每个模型通常需要 5 到 20 秒。'
+      stop: '停止测试',
+      hint: '所有选中的模型同时测试，通常 5 到 20 秒内全部完成。'
     },
     results: {
       title: '测试结果',
@@ -48,8 +48,8 @@ export default {
         forced_tool_choice_unsupported: '不支持强制工具调用（tool_choice 为 tool / any）'
       },
       states: {
-        pending: '等待中',
         running: '测试中',
+        stopped: '已停止',
         match: '是 Bedrock',
         notMatch: '不是 Bedrock',
         failed: '测试失败',

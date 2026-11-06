@@ -25,11 +25,11 @@ export const adminBedrockVerifyAPI = {
     return data
   },
 
-  async probe(conn: UpstreamVerifyConnection, model: string): Promise<BedrockVerifyProbeResponse> {
+  async probe(conn: UpstreamVerifyConnection, model: string, signal?: AbortSignal): Promise<BedrockVerifyProbeResponse> {
     const { data } = await apiClient.post<BedrockVerifyProbeResponse>(
       '/admin/bedrock-verify/probe',
       { ...conn, model },
-      { timeout: UPSTREAM_VERIFY_PROBE_TIMEOUT_MS }
+      { timeout: UPSTREAM_VERIFY_PROBE_TIMEOUT_MS, signal }
     )
     return data
   }

@@ -119,7 +119,7 @@
             <Icon name="play" size="xs" />
             {{ tk('models.start', { n: selected.length }) }}
           </button>
-          <button v-else type="button" class="btn btn-secondary btn-sm" :disabled="stopRequested" @click="stopRequested = true">
+          <button v-else type="button" class="btn btn-secondary btn-sm" @click="stopProbe">
             <Icon name="x" size="xs" />
             {{ tk('models.stop') }}
           </button>
@@ -214,7 +214,7 @@
 </template>
 
 <script setup lang="ts" generic="R extends UpstreamVerifyProbeBase">
-import { computed, ref, type Ref } from 'vue'
+import { computed, onBeforeUnmount, ref, type Ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import Icon from '@/components/icons/Icon.vue'
 import type {
@@ -234,7 +234,7 @@ const props = defineProps<{
   referenceModels: string[]
   defaultSelect: (models: string[]) => string[]
   listModels: (conn: UpstreamVerifyConnection) => Promise<UpstreamVerifyModelsResponse>
-  probe: (conn: UpstreamVerifyConnection, model: string) => Promise<R>
+  probe: (conn: UpstreamVerifyConnection, model: string, signal?: AbortSignal) => Promise<R>
   isMatch: (result: R) => boolean
   /** Evidence kinds rendered green / red; anything else is neutral. */
   matchKind: string
@@ -247,7 +247,7 @@ defineSlots<{
 
 const { t } = useI18n()
 
-type RowState = 'pending' | 'running' | 'done' | 'error'
+type RowState = 'running' | 'done' | 'error' | 'stopped'
 type ReferenceState = 'missing' | 'unavailable' | 'listed'
 
 interface ProbeRow {
@@ -267,7 +267,7 @@ const loadingModels = ref(false)
 // Typed via a cast: ref<T>() would deep-unwrap the generic R and break `isMatch(result)`.
 const rows = ref([]) as Ref<ProbeRow[]>
 const running = ref(false)
-const stopRequested = ref(false)
+let probeAbort: AbortController | null = null
 
 const canConnect = computed(() => !!conn.value.baseUrl.trim() && !!conn.value.apiKey.trim())
 
@@ -307,27 +307,38 @@ async function startProbe(): Promise<void> {
   const target = connection()
   // Probe in the listing order so results line up with the checkbox grid.
   const queue = models.value.filter((m) => selected.value.includes(m))
-  rows.value = queue.map((model) => ({ model, state: 'pending' }))
+  rows.value = queue.map((model) => ({ model, state: 'running' }))
   running.value = true
-  stopRequested.value = false
+  const abort = new AbortController()
+  probeAbort = abort
   try {
-    // Sequential on purpose: parallel probes quickly trip upstream per-deployment rate limits.
-    for (const row of rows.value) {
-      if (stopRequested.value) break
-      row.state = 'running'
-      try {
-        const result = await props.probe(target, row.model)
-        row.result = result
-        row.state = result.status === 'ok' ? 'done' : 'error'
-      } catch (err) {
-        row.state = 'error'
-        row.requestError = extractApiErrorMessage(err, t('common.error'))
-      }
-    }
+    await Promise.all(
+      rows.value.map(async (row) => {
+        try {
+          const result = await props.probe(target, row.model, abort.signal)
+          row.result = result
+          row.state = result.status === 'ok' ? 'done' : 'error'
+        } catch (err) {
+          if (abort.signal.aborted) {
+            row.state = 'stopped'
+            return
+          }
+          row.state = 'error'
+          row.requestError = extractApiErrorMessage(err, t('common.error'))
+        }
+      })
+    )
   } finally {
+    if (probeAbort === abort) probeAbort = null
     running.value = false
   }
 }
+
+function stopProbe(): void {
+  probeAbort?.abort()
+}
+
+onBeforeUnmount(stopProbe)
 
 const referenceStatus = computed<{ model: string; state: ReferenceState }[]>(() =>
   props.referenceModels.map((model) => {
@@ -355,8 +366,8 @@ function rowMatches(row: ProbeRow): boolean {
 }
 
 function verdictLabel(row: ProbeRow): string {
-  if (row.state === 'pending') return tk('results.states.pending')
   if (row.state === 'running') return tk('results.states.running')
+  if (row.state === 'stopped') return tk('results.states.stopped')
   if (row.state === 'error') {
     return row.result?.model_unavailable ? tk('results.states.unavailable') : tk('results.states.failed')
   }
@@ -364,7 +375,7 @@ function verdictLabel(row: ProbeRow): string {
 }
 
 function verdictClass(row: ProbeRow): string {
-  if (row.state === 'pending' || row.state === 'running') {
+  if (row.state === 'running' || row.state === 'stopped') {
     return 'bg-gray-50 text-gray-600 ring-gray-200 dark:bg-dark-800 dark:text-gray-300 dark:ring-dark-600'
   }
   if (row.state === 'error') {

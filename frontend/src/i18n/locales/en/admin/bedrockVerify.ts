@@ -25,8 +25,8 @@ export default {
       selectAll: 'Select all',
       clear: 'Clear',
       start: 'Start ({n})',
-      stop: 'Stop after current model',
-      hint: 'Models are probed one at a time; each usually takes 5 to 20 seconds.'
+      stop: 'Stop',
+      hint: 'All selected models are probed at once; this usually finishes within 5 to 20 seconds.'
     },
     results: {
       title: 'Results',
@@ -48,8 +48,8 @@ export default {
         forced_tool_choice_unsupported: 'Forced tool use (tool_choice tool / any) is not supported'
       },
       states: {
-        pending: 'Pending',
         running: 'Probing',
+        stopped: 'Stopped',
         match: 'Bedrock',
         notMatch: 'Not Bedrock',
         failed: 'Failed',
