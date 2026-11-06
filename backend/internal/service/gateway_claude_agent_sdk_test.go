@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http/httptest"
 	"os"
+	"reflect"
 	"strings"
 	"sync"
 	"testing"
@@ -266,6 +267,91 @@ func TestAgentSDKInsertClientSystemNeverLeadsMessages(t *testing.T) {
 	require.Empty(t, out)
 }
 
+// requireAgentSDKSystemOrder enforces the upstream rule: a content-bearing
+// system message must precede an assistant message or end the array.
+func requireAgentSDKSystemOrder(t *testing.T, body []byte) {
+	t.Helper()
+	messages := gjson.GetBytes(body, "messages").Array()
+	for i, msg := range messages {
+		if msg.Get("role").String() != "system" {
+			continue
+		}
+		next := i + 1
+		for next < len(messages) && messages[next].Get("role").String() == "system" {
+			next++
+		}
+		if next < len(messages) {
+			require.Equal(t, "assistant", messages[next].Get("role").String(),
+				"messages.%d: system must precede an assistant message or end the array: %s", i, gjson.GetBytes(body, "messages").Raw)
+		}
+	}
+}
+
+func TestClaudeAgentSDKNormalizesHistoryForSystemOrder(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		messages string
+		users    int
+	}{
+		{"consecutive users", `[{"role":"user","content":"ctx"},{"role":"user","content":"hi"},{"role":"assistant","content":"ok"}]`, 1},
+		{"tool result then text", `[{"role":"user","content":"hi"},{"role":"assistant","content":[{"type":"tool_use","id":"tu","name":"t","input":{}}]},` +
+			`{"role":"user","content":[{"type":"tool_result","tool_use_id":"tu","content":"ok"}]},{"role":"user","content":"interject"}]`, 2},
+		{"directive between users", `[{"role":"user","content":"a"},{"role":"system","content":[],"output_config":{"effort":"high"}},{"role":"user","content":"b"}]`, 1},
+		{"client system before user", `[{"role":"system","content":"lead"},{"role":"user","content":"a"},{"role":"assistant","content":"ok"},` +
+			`{"role":"system","content":[{"type":"text","text":"be nice"}]},{"role":"user","content":"b"}]`, 2},
+		{"three users at the end", `[{"role":"user","content":"a"},{"role":"assistant","content":"ok"},{"role":"user","content":"b"},{"role":"user","content":"c"},{"role":"user","content":"d"}]`, 2},
+	} {
+		for _, inject := range []bool{true, false} {
+			t.Run(fmt.Sprintf("%s/inject=%v", tc.name, inject), func(t *testing.T) {
+				settings := DefaultClaudeAntiBanSettings()
+				settings.AgentSDK.InjectSystemMessages = inject
+				svc := &GatewayService{settingService: &SettingService{}, cache: &agentSDKTestCache{}}
+				svc.settingService.claudeAntiBanRuntime.Store(settings)
+				account := &Account{ID: 23, Platform: PlatformAnthropic, Type: AccountTypeSetupToken}
+				ctx := WithClaudeAgentSDKPolicy(context.Background(), &Group{Platform: PlatformAnthropic, SimulateClaudeAgentSDK: true})
+				c, _ := gin.CreateTestContext(httptest.NewRecorder())
+				c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
+				_, out, err := svc.prepareClaudeAgentSDK(ctx, c, account,
+					[]byte(`{"model":"claude-sonnet-5-5","system":"CLIENT SYSTEM","messages":`+tc.messages+`}`), "claude-sonnet-5-5")
+				require.NoError(t, err)
+				requireAgentSDKSystemOrder(t, out)
+				users := 0
+				for _, msg := range gjson.GetBytes(out, "messages").Array() {
+					if msg.Get("role").String() == "user" {
+						users++
+					}
+				}
+				require.Equal(t, tc.users, users)
+				require.NotContains(t, string(out), "output_config\":{\"effort\":\"high\"}}", "directive-only messages are dropped")
+			})
+		}
+	}
+}
+
+func TestAgentSDKNormalizeSourceMessages(t *testing.T) {
+	user := map[string]any{"role": "user", "content": "hi"}
+	alternating := []any{user, map[string]any{"role": "assistant", "content": "ok"}, map[string]any{"role": "system", "content": "tail"}}
+	out := agentSDKNormalizeSourceMessages(alternating)
+	require.Len(t, out, 3)
+	for i := range alternating {
+		require.Equal(t, reflect.ValueOf(alternating[i]).Pointer(), reflect.ValueOf(out[i]).Pointer(), "untouched messages keep their value")
+	}
+
+	cached := map[string]any{"type": "text", "text": "b", "cache_control": map[string]any{"type": "ephemeral"}}
+	out = agentSDKNormalizeSourceMessages([]any{
+		user,
+		map[string]any{"role": "system", "content": "rules"},
+		map[string]any{"role": "user", "content": []any{cached}},
+	})
+	require.Len(t, out, 1)
+	require.Equal(t, []any{
+		map[string]any{"type": "text", "text": "hi"},
+		map[string]any{"type": "text", "text": "<system-reminder>\nrules\n</system-reminder>"},
+		cached,
+	}, out[0].(map[string]any)["content"])
+	require.Equal(t, "hi", user["content"], "the source message is not mutated")
+}
+
 type agentSDKLoopHarness struct {
 	t       *testing.T
 	svc     *GatewayService
@@ -296,6 +382,7 @@ func (h *agentSDKLoopHarness) send() []byte {
 	body := h.head + `"messages":[` + strings.Join(h.msgs, ",") + `]}`
 	ctx, out, err := h.svc.prepareClaudeAgentSDK(h.ctx, h.c, h.account, []byte(body), "claude-sonnet-5-5")
 	require.NoError(h.t, err)
+	requireAgentSDKSystemOrder(h.t, out)
 	h.turn++
 	h.svc.recordClaudeAgentSDKResponse(ctx, fmt.Sprintf("msg_%d", h.turn), fmt.Sprintf("req_%d", h.turn))
 	h.svc.recordClaudeAgentSDKUsage(ctx, map[string]any{

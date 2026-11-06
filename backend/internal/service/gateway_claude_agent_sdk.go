@@ -125,7 +125,8 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 	if strings.Contains(clientSystem.Text, " date is ") && s.shouldNormalizeClientDateline(ctx, account) {
 		clientSystem.Text, _ = anthropicfp.NormalizeText(clientSystem.Text)
 	}
-	messages, _ := root["messages"].([]any)
+	rawMessages, _ := root["messages"].([]any)
+	messages := agentSDKNormalizeSourceMessages(rawMessages)
 	tools, _ := root["tools"].([]any)
 	hasTools := len(tools) > 0
 
@@ -274,6 +275,115 @@ func agentSDKClientSystemFrom(value any) agentSDKClientSystem {
 	default:
 		return agentSDKClientSystem{}
 	}
+}
+
+// agentSDKNormalizeSourceMessages reshapes client history into what the Agent
+// SDK itself sends: no two adjacent user messages. The upstream only accepts a
+// content-bearing system message right before an assistant message or at the
+// end of the array, and agentSDKMessages injects one after every user message.
+//   - Empty system messages are dropped: the SDK beta set has no
+//     mid-conversation-output-config, so the directive form is stripped before
+//     sending anyway, which would otherwise rejoin the user messages around it.
+//   - A content-bearing system message followed by a user message becomes a
+//     <system-reminder> block at the start of that user message.
+//   - Adjacent user messages are merged into one block array.
+//
+// Messages that need no change keep their original value.
+func agentSDKNormalizeSourceMessages(messages []any) []any {
+	kept := make([]any, 0, len(messages))
+	for _, raw := range messages {
+		if msg, ok := raw.(map[string]any); ok && msg["role"] == "system" && agentSDKSystemText(msg["content"]) == "" {
+			continue
+		}
+		kept = append(kept, raw)
+	}
+
+	out := make([]any, 0, len(kept))
+	var reminders []any
+	for i, raw := range kept {
+		msg, _ := raw.(map[string]any)
+		switch msg["role"] {
+		case "system":
+			if agentSDKNextNonSystemRole(kept, i+1) == "user" {
+				reminders = append(reminders, map[string]any{
+					"type": "text",
+					"text": "<system-reminder>\n" + agentSDKSystemText(msg["content"]) + "\n</system-reminder>",
+				})
+				continue
+			}
+		case "user":
+			var previous map[string]any
+			if len(out) > 0 {
+				if last, ok := out[len(out)-1].(map[string]any); ok && last["role"] == "user" {
+					previous = last
+				}
+			}
+			if previous == nil && len(reminders) == 0 {
+				break
+			}
+			var content []any
+			if previous != nil {
+				content = append(content, agentSDKContentBlocks(previous["content"])...)
+			}
+			content = append(content, reminders...)
+			content = append(content, agentSDKContentBlocks(msg["content"])...)
+			reminders = nil
+			base := msg
+			if previous != nil {
+				base = previous
+				out = out[:len(out)-1]
+			}
+			merged := make(map[string]any, len(base))
+			for key, value := range base {
+				merged[key] = value
+			}
+			merged["content"] = content
+			out = append(out, merged)
+			continue
+		}
+		out = append(out, raw)
+	}
+	return out
+}
+
+func agentSDKNextNonSystemRole(messages []any, start int) any {
+	for _, raw := range messages[start:] {
+		if msg, ok := raw.(map[string]any); !ok || msg["role"] != "system" {
+			return msg["role"]
+		}
+	}
+	return nil
+}
+
+func agentSDKSystemText(content any) string {
+	switch value := content.(type) {
+	case string:
+		return strings.TrimSpace(value)
+	case []any:
+		var parts []string
+		for _, item := range value {
+			if block, ok := item.(map[string]any); ok {
+				if text, ok := block["text"].(string); ok && strings.TrimSpace(text) != "" {
+					parts = append(parts, text)
+				}
+			}
+		}
+		return strings.TrimSpace(strings.Join(parts, "\n\n"))
+	}
+	return ""
+}
+
+func agentSDKContentBlocks(content any) []any {
+	switch value := content.(type) {
+	case string:
+		if value == "" {
+			return nil
+		}
+		return []any{map[string]any{"type": "text", "text": value}}
+	case []any:
+		return value
+	}
+	return nil
 }
 
 func agentSDKMessages(messages []any, opts agentSDKMessagesOptions) ([]any, []agentSDKInjectedTokens) {
