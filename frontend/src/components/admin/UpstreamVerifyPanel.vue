@@ -236,9 +236,10 @@ const props = defineProps<{
   listModels: (conn: UpstreamVerifyConnection) => Promise<UpstreamVerifyModelsResponse>
   probe: (conn: UpstreamVerifyConnection, model: string, signal?: AbortSignal) => Promise<R>
   isMatch: (result: R) => boolean
-  /** Evidence kinds rendered green / red; anything else is neutral. */
+  /** Evidence kinds rendered green / red / amber; anything else is neutral. */
   matchKind: string
   counterKind: string
+  warnKind?: string
 }>()
 
 defineSlots<{
@@ -400,6 +401,9 @@ function referenceClass(state: ReferenceState): string {
 function evidenceClass(kind: string): string {
   if (kind === props.matchKind) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
   if (kind === props.counterKind) return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+  if (props.warnKind && kind === props.warnKind) {
+    return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+  }
   return 'bg-gray-100 text-gray-600 dark:bg-dark-700 dark:text-gray-300'
 }
 

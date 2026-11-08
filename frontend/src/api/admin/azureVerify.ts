@@ -11,12 +11,14 @@ import {
 
 export type AzureVerifyConnection = UpstreamVerifyConnection
 export type AzureVerifyModelsResponse = UpstreamVerifyModelsResponse
-export type AzureVerifyEvidenceKind = 'azure' | 'non_azure' | 'info'
+export type AzureVerifyEvidenceKind = 'azure' | 'non_azure' | 'relay_tamper' | 'info'
 export type AzureVerifyEvidence = UpstreamVerifyEvidence
 export type AzureVerifyStep = UpstreamVerifyStep
 
 export interface AzureVerifyProbeResponse extends UpstreamVerifyProbeBase {
   is_azure: boolean
+  /** The relay drops parameters, injects prompts or rewrites responses / usage, whatever the backend is. */
+  relay_tampered: boolean
 }
 
 export const adminAzureVerifyAPI = {

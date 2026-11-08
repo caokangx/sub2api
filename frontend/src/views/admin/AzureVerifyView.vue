@@ -10,14 +10,24 @@
       :is-match="(r) => r.is_azure"
       match-kind="azure"
       counter-kind="non_azure"
-    />
+      warn-kind="relay_tamper"
+    >
+      <template #result-extra="{ result }">
+        <p v-if="result.relay_tampered" class="mt-2 text-xs text-amber-700 dark:text-amber-300">
+          {{ t('admin.azureVerify.results.relayTampered') }}
+        </p>
+      </template>
+    </UpstreamVerifyPanel>
   </AppLayout>
 </template>
 
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import UpstreamVerifyPanel from '@/components/admin/UpstreamVerifyPanel.vue'
 import { adminAzureVerifyAPI } from '@/api/admin/azureVerify'
+
+const { t } = useI18n()
 
 // Newer models a genuine Azure reseller is expected to carry; missing ones are flagged.
 const REFERENCE_MODELS = [

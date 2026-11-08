@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -80,13 +81,28 @@ func azureLikeUpstream() *azureVerifyFakeUpstream {
 		h.Set("Content-Type", "application/json")
 		return h
 	}
+	const chatID = "chatcmpl-jrY5qN53RHx6UQwTW3eWEU97sh7X5"
+	var cacheMu sync.Mutex
+	longCalls := 0
 	return &azureVerifyFakeUpstream{respond: func(req *http.Request, body string) (int, http.Header, string) {
 		switch {
 		case req.URL.Path == "/v1/chat/completions" && strings.Contains(body, `"stream":true`):
 			return http.StatusOK, azureHeaders(), "data: {\"choices\":[],\"created\":0,\"id\":\"\",\"model\":\"\",\"object\":\"\",\"prompt_filter_results\":[{\"prompt_index\":0}]}\n\n" +
-				"data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}],\"id\":\"chatcmpl-1\"}\n\n"
+				"data: {\"choices\":[{\"delta\":{\"content\":\"Hi\"}}],\"id\":\"" + chatID + "\"}\n\n"
+		case req.URL.Path == "/v1/chat/completions" && strings.Contains(body, "prompt_cache_key"):
+			if strings.Count(body, "Rule 0:") == 1 {
+				return http.StatusOK, azureHeaders(), `{"id":"` + chatID + `","choices":[{"finish_reason":"length","message":{"content":""}}],"usage":{"prompt_tokens":526,"completion_tokens":16}}`
+			}
+			cacheMu.Lock()
+			longCalls++
+			cached := 0
+			if longCalls > 1 {
+				cached = 1408
+			}
+			cacheMu.Unlock()
+			return http.StatusOK, azureHeaders(), `{"id":"` + chatID + `","choices":[{"finish_reason":"length","message":{"content":""}}],"usage":{"prompt_tokens":1524,"completion_tokens":16,"prompt_tokens_details":{"cached_tokens":` + strconv.Itoa(cached) + `}}}`
 		case req.URL.Path == "/v1/chat/completions":
-			return http.StatusOK, azureHeaders(), `{"id":"chatcmpl-1","model":"gpt-6-sol-2026-09-22","choices":[{"finish_reason":"length","message":{"content":""},"content_filter_results":{}}],"prompt_filter_results":[],"usage":{"prompt_tokens":17,"completion_tokens":64}}`
+			return http.StatusOK, azureHeaders(), `{"id":"` + chatID + `","model":"gpt-6-sol-2026-09-22","choices":[{"finish_reason":"length","message":{"content":""},"content_filter_results":{}}],"prompt_filter_results":[],"usage":{"prompt_tokens":17,"completion_tokens":64}}`
 		case req.URL.Path == "/v1/responses" && strings.Contains(body, "previous_response_id"):
 			return http.StatusOK, azureHeaders(), `{"id":"resp_2","output":[{"type":"message","content":[{"type":"output_text","text":"4729"}]}]}`
 		case req.URL.Path == "/v1/responses":
@@ -110,22 +126,30 @@ func TestAzureVerifyProbeDetectsAzure(t *testing.T) {
 	require.Equal(t, service.AzureVerifyStatusOK, res.Status)
 	require.True(t, res.IsAzure)
 	require.False(t, res.Suspicious)
+	require.False(t, res.RelayTampered, "%+v", res.Evidences)
 	require.Equal(t, "gpt-6-sol-2026-09-22", res.ServedModel)
-	require.Len(t, res.Steps, 3)
+	require.Len(t, res.Steps, 4)
 	for _, step := range res.Steps {
 		require.True(t, step.OK, step.Name)
 	}
+	require.Equal(t, service.AzureVerifyStepPromptCache, res.Steps[3].Name)
 	require.Contains(t, res.Steps[0].Headers, "apim-request-id")
 	require.NotContains(t, res.Steps[0].Headers, "content-type")
 
-	require.Len(t, up.requests, 4)
+	require.Len(t, up.requests, 7)
 	for _, req := range up.requests {
 		require.Equal(t, "relay.example.com", req.URL.Host)
 		require.Equal(t, "Bearer sk-test", req.Header.Get("Authorization"))
 		require.True(t, service.HTTPUpstreamRedirectsDisabled(req.Context()))
 		require.True(t, service.HTTPUpstreamPublicHostsOnly(req.Context()))
 	}
-	require.Contains(t, up.bodies[3], `"previous_response_id":"resp_1"`)
+	continuations := 0
+	for _, body := range up.bodies {
+		if strings.Contains(body, `"previous_response_id":"resp_1"`) {
+			continuations++
+		}
+	}
+	require.Equal(t, 1, continuations)
 }
 
 func TestAzureVerifyProbeReportsUnavailableModel(t *testing.T) {

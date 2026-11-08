@@ -39,6 +39,21 @@ func OutputBudget(model string) (defaultTokens, upperTokens int) {
 	}
 }
 
+// AgentSDKDefaultEffort returns the default sent by Claude Code 2.1.284 when
+// Agent SDK 0.3.310 does not receive an explicit effort. Keep this deliberately
+// narrower than EffortLevelsForModel: unknown or uncaptured models must not
+// acquire a guessed reasoning policy.
+func AgentSDKDefaultEffort(model string) (string, bool) {
+	switch CanonicalModelID(model) {
+	case "claude-opus-5-5", "claude-sonnet-5-5":
+		return "medium", true
+	case "claude-opus-4-8", "claude-sonnet-4-6":
+		return "high", true
+	default:
+		return "", false
+	}
+}
+
 // SupportsMidConversationSystem mirrors the CLI gate for content-bearing
 // {role:"system"} messages: Claude 3 and every 4.x model before Opus 4.8 are
 // rejected upstream with "role 'system' is not supported on this model".

@@ -27,6 +27,27 @@ func TestOutputBudgetCatalog(t *testing.T) {
 	}
 }
 
+func TestAgentSDKDefaultEffortCatalog(t *testing.T) {
+	for _, tt := range []struct {
+		model  string
+		effort string
+		ok     bool
+	}{
+		{"claude-sonnet-5-5", "medium", true},
+		{"anthropic/claude-opus-5-5", "medium", true},
+		{"claude-sonnet-4-6[1m]", "high", true},
+		{"claude-opus-4-8", "high", true},
+		{"claude-haiku-4-5-20251001", "", false},
+		{"custom-model", "", false},
+	} {
+		t.Run(tt.model, func(t *testing.T) {
+			effort, ok := AgentSDKDefaultEffort(tt.model)
+			require.Equal(t, tt.ok, ok)
+			require.Equal(t, tt.effort, effort)
+		})
+	}
+}
+
 func TestSupportsMidConversationSystem(t *testing.T) {
 	for _, tt := range []struct {
 		model     string

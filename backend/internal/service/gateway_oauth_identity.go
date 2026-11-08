@@ -98,20 +98,24 @@ func (s *GatewayService) rewriteAnthropicOAuthIdentity(ctx context.Context, c *g
 			}
 		}
 	}
-	fields := map[string]any{"device_id": device, "account_uuid": accountUUID, "session_id": session}
-	if parsed != nil && parsed.IsNewFormat {
-		var extra map[string]json.RawMessage
-		if json.Unmarshal([]byte(raw), &extra) == nil {
-			for _, key := range []string{"parent_session_id", "ti", "tk"} {
-				var value string
-				if json.Unmarshal(extra[key], &value) == nil && len(value) <= 512 && !strings.ContainsAny(value, "\r\n\x00") {
-					fields[key] = value
+	if agentSDK {
+		uid = formatClaudeAgentSDKMetadataUserID(raw, device, accountUUID, session)
+	} else {
+		fields := map[string]any{"device_id": device, "account_uuid": accountUUID, "session_id": session}
+		if parsed != nil && parsed.IsNewFormat {
+			var extra map[string]json.RawMessage
+			if json.Unmarshal([]byte(raw), &extra) == nil {
+				for _, key := range []string{"parent_session_id", "ti", "tk"} {
+					var value string
+					if json.Unmarshal(extra[key], &value) == nil && len(value) <= 512 && !strings.ContainsAny(value, "\r\n\x00") {
+						fields[key] = value
+					}
 				}
 			}
 		}
+		encoded, _ := json.Marshal(fields)
+		uid = string(encoded)
 	}
-	encoded, _ := json.Marshal(fields)
-	uid = string(encoded)
 	if c != nil {
 		if identities == nil {
 			identities = make(map[int64]oauthRequestIdentity)

@@ -2,7 +2,7 @@ export default {
   azureVerify: {
     title: 'Azure Verify',
     description:
-      'Enter a relay Base URL and API key. The server sends a few probe requests (non-streaming, streaming, Responses continuation) and uses Azure-specific response headers, content-filter fields and parameter behavior to judge whether each model is really served by Azure OpenAI. Each model costs a few hundred tokens.',
+      'Enter a relay Base URL and API key. The server sends a few probe requests (non-streaming, streaming, Responses continuation, prompt cache) and uses Azure-specific content-filter fields, response headers and parameter behavior to judge whether each model is really served by Azure OpenAI, and checks whether the relay tampers with parameters, responses or usage. Easily forged evidence such as headers alone never counts as Azure. Each model costs about 4,000 input tokens.',
     connection: {
       baseUrl: 'Base URL',
       apiKey: 'API Key',
@@ -33,6 +33,8 @@ export default {
       summary: '{finished}/{total} done: {match} Azure, {notMatch} not Azure, {failed} failed',
       servedModel: 'Deployed as {model}',
       suspicious: 'Both Azure markers and non-Azure behavior were seen. This may be a mixed channel, or forged Azure headers.',
+      relayTampered:
+        'The relay tampers with request parameters, responses or usage (for example it drops the length limit, injects a prompt or over-reports input tokens). Billing may be off whatever the backend is.',
       details: 'Show evidence',
       evidences: 'Evidence',
       steps: 'Probe requests',
@@ -47,12 +49,14 @@ export default {
       evidenceKinds: {
         azure: 'For Azure',
         non_azure: 'Against Azure',
+        relay_tamper: 'Relay tampering',
         info: 'Info'
       },
       stepNames: {
         chat_completions: 'Chat Completions',
         chat_completions_stream: 'Chat Completions (stream)',
-        responses_continuation: 'Responses continuation'
+        responses_continuation: 'Responses continuation',
+        prompt_cache: 'Prompt cache & usage check'
       }
     }
   }

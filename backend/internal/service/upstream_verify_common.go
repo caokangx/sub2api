@@ -23,7 +23,7 @@ const (
 	upstreamVerifyMaxErrorChars    = 2000
 	upstreamVerifyMaxEvidenceChars = 200
 	// The probe prompt is ~17-24 tokens; anything far above means the relay injects its own prompt.
-	upstreamVerifyInjectedPromptTokens = 200
+	upstreamVerifyInjectedPromptTokens = 60
 	upstreamVerifyProbePrompt          = "写一篇 800 字的文章介绍长城"
 )
 

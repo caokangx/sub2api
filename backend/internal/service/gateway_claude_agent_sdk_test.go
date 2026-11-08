@@ -38,6 +38,51 @@ func TestClaudeAgentSDKGoldenFixtures(t *testing.T) {
 	requireNoAgentSDKSystemRole(t, sonnet46)
 }
 
+func TestClaudeAgentSDKOrderedMarshalMatchesGoldenStructure(t *testing.T) {
+	for _, name := range []string{
+		"create_no_tools.json", "create_with_tools.json", "continue_tool_result.json",
+		"stateless_opus.json", "image_input.json", "create_no_tools_sonnet46.json",
+	} {
+		t.Run(name, func(t *testing.T) {
+			raw := mustReadAgentSDKFixture(t, name)
+			var decoded map[string]any
+			require.NoError(t, json.Unmarshal(raw, &decoded))
+			encoded, err := marshalClaudeAgentSDKJSON(decoded)
+			require.NoError(t, err)
+			require.Equal(t, agentSDKObjectKeys(t, raw), agentSDKObjectKeys(t, encoded))
+
+			for _, path := range []string{"messages", "system", "tools"} {
+				wantItems := gjson.GetBytes(raw, path).Array()
+				gotItems := gjson.GetBytes(encoded, path).Array()
+				require.Len(t, gotItems, len(wantItems), path)
+				for i := range wantItems {
+					require.Equal(t,
+						agentSDKObjectKeys(t, []byte(wantItems[i].Raw)),
+						agentSDKObjectKeys(t, []byte(gotItems[i].Raw)),
+						"%s.%d", path, i,
+					)
+					if path != "messages" {
+						continue
+					}
+					wantBlocks := wantItems[i].Get("content").Array()
+					gotBlocks := gotItems[i].Get("content").Array()
+					require.Len(t, gotBlocks, len(wantBlocks), "messages.%d.content", i)
+					for j := range wantBlocks {
+						if !wantBlocks[j].IsObject() {
+							continue
+						}
+						require.Equal(t,
+							agentSDKObjectKeys(t, []byte(wantBlocks[j].Raw)),
+							agentSDKObjectKeys(t, []byte(gotBlocks[j].Raw)),
+							"messages.%d.content.%d", i, j,
+						)
+					}
+				}
+			}
+		})
+	}
+}
+
 func requireNoAgentSDKSystemRole(t *testing.T, body []byte) {
 	t.Helper()
 	for i, msg := range gjson.GetBytes(body, "messages").Array() {
@@ -73,6 +118,27 @@ func mustReadAgentSDKFixture(t *testing.T, name string) []byte {
 	raw, err := os.ReadFile("claude_agent_sdk_profile/0.3.310/testdata/" + name)
 	require.NoError(t, err)
 	return raw
+}
+
+func agentSDKObjectKeys(t *testing.T, raw []byte) []string {
+	t.Helper()
+	decoder := json.NewDecoder(strings.NewReader(string(raw)))
+	token, err := decoder.Token()
+	require.NoError(t, err)
+	require.Equal(t, json.Delim('{'), token)
+	var keys []string
+	for decoder.More() {
+		token, err = decoder.Token()
+		require.NoError(t, err)
+		key, ok := token.(string)
+		require.True(t, ok)
+		keys = append(keys, key)
+		var value json.RawMessage
+		require.NoError(t, decoder.Decode(&value))
+	}
+	_, err = decoder.Token()
+	require.NoError(t, err)
+	return keys
 }
 
 func agentSDKBillingField(text, field string) string {
@@ -171,10 +237,15 @@ func TestClaudeAgentSDKStatelessRewrite(t *testing.T) {
 	require.False(t, gjson.GetBytes(body, "thread").Exists())
 	require.True(t, gjson.GetBytes(body, "diagnostics.previous_message_id").Exists())
 	require.Contains(t, gjson.GetBytes(body, "system.0.text").String(), "cc_entrypoint=sdk-ts")
+	require.Equal(t,
+		[]string{"model", "messages", "system", "tools", "metadata", "max_tokens", "thinking", "context_management", "output_config", "diagnostics"},
+		agentSDKObjectKeys(t, body),
+	)
 
 	wire, err := applyClaudeAgentSDKOutputBudget(body, "claude-sonnet-5-5")
 	require.NoError(t, err)
 	require.Equal(t, int64(128000), gjson.GetBytes(wire, "max_tokens").Int())
+	require.Equal(t, agentSDKObjectKeys(t, body), agentSDKObjectKeys(t, wire), "output budget update must preserve key order")
 
 	wireSvc := &GatewayService{cache: svc.cache}
 	req, wire, err := wireSvc.buildUpstreamRequest(ctx, c, account, wire, "token", "oauth", "claude-sonnet-5-5", true, true)
@@ -182,9 +253,12 @@ func TestClaudeAgentSDKStatelessRewrite(t *testing.T) {
 	require.Equal(t, claudeAgentSDKUserAgent, req.Header.Get("User-Agent"))
 	require.Contains(t, gjson.GetBytes(wire, "system.0.text").String(), "cc_entrypoint=sdk-ts")
 	require.NotContains(t, gjson.GetBytes(wire, "system.0.text").String(), "cch=00000")
+	require.Equal(t, agentSDKObjectKeys(t, body), agentSDKObjectKeys(t, wire), "wire mutations must preserve top-level order")
 	parsed := ParseMetadataUserID(gjson.GetBytes(wire, "metadata.user_id").String())
 	require.NotNil(t, parsed)
 	require.Empty(t, parsed.AccountUUID)
+	assertJSONTokenOrder(t, gjson.GetBytes(wire, "metadata.user_id").String(),
+		`"device_id"`, `"account_uuid"`, `"session_id"`)
 }
 
 func TestClaudeAgentSDKThreadCreateThenContinue(t *testing.T) {
@@ -203,6 +277,19 @@ func TestClaudeAgentSDKThreadCreateThenContinue(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "create", gjson.GetBytes(body1, "thread.type").String())
 	require.Len(t, gjson.GetBytes(body1, "system").Array(), 2, "no-tools shape omits the WebSearch system block")
+	require.True(t, gjson.GetBytes(body1, "tools").IsArray())
+	require.Empty(t, gjson.GetBytes(body1, "tools").Array())
+	info1, _ := ctx1.Value(claudeAgentSDKContextKey{}).(*claudeAgentSDKRequestContext)
+	require.NotNil(t, info1)
+	require.True(t, gjson.GetBytes(info1.CreateBody, "tools").IsArray())
+	fallbackSvc := &GatewayService{cache: cache}
+	_, fallbackWire, err := fallbackSvc.buildUpstreamRequest(ctx1, c, account, info1.CreateBody, "token", "oauth", "claude-sonnet-5-5", true, true)
+	require.NoError(t, err)
+	require.NotContains(t, gjson.GetBytes(fallbackWire, "system.0.text").String(), "cch=00000")
+	require.Equal(t,
+		[]string{"model", "messages", "system", "tools", "metadata", "max_tokens", "thinking", "context_management", "output_config", "thread", "diagnostics"},
+		agentSDKObjectKeys(t, fallbackWire),
+	)
 	svc.recordClaudeAgentSDKResponse(ctx1, "msg_first", "req_first")
 
 	second := []byte(`{"model":"claude-sonnet-5-5","metadata":{"user_id":"{\"device_id\":\"device\",\"account_uuid\":\"\",\"session_id\":\"22222222-2222-4222-8222-222222222222\"}"},"messages":[{"role":"user","content":"first"},{"role":"assistant","content":[{"type":"text","text":"answer"}]},{"role":"user","content":"second"}]}`)
@@ -213,6 +300,7 @@ func TestClaudeAgentSDKThreadCreateThenContinue(t *testing.T) {
 	require.Len(t, gjson.GetBytes(body2, "system").Array(), 1)
 	require.Contains(t, gjson.GetBytes(body2, "system.0.text").String(), "cc_prev_req=req_first")
 	require.NotEmpty(t, gjson.GetBytes(body2, "messages").Array())
+	require.False(t, gjson.GetBytes(body2, "tools").Exists(), "unchanged tools are omitted on thread continue")
 }
 
 func TestClaudeAgentSDKCanDisableSystemMessageInjection(t *testing.T) {
@@ -300,6 +388,46 @@ func TestAgentSDKInsertClientSystemNeverLeadsMessages(t *testing.T) {
 	require.Empty(t, out)
 }
 
+func TestAgentSDKMovesHermesClientSystemIntoFirstUser(t *testing.T) {
+	out, _ := agentSDKMessages([]any{
+		map[string]any{"role": "user", "content": "hello"},
+	}, agentSDKMessagesOptions{
+		Model: "claude-sonnet-5-5", Profile: agentSDKFixtureProfile, Inject: true,
+		RemainingTokens: claudeAgentSDKTokenBudget, EnvironmentDate: "2026-11-08",
+		ClientSystem: agentSDKClientSystem{
+			Text:         "You are Hermes Agent, created by Nous Research.",
+			CacheControl: map[string]any{"type": "ephemeral"},
+		},
+		MidConversationSystem: true,
+	})
+
+	require.Len(t, out, 2)
+	require.Equal(t, "user", out[0].(map[string]any)["role"])
+	content := out[0].(map[string]any)["content"].([]any)
+	require.Len(t, content, 2)
+	require.Equal(t,
+		"You are Hermes Agent, created by Nous Research.",
+		content[0].(map[string]any)["text"],
+	)
+	require.Equal(t, map[string]any{"type": "ephemeral"}, content[0].(map[string]any)["cache_control"])
+	require.Equal(t, "hello", content[1].(map[string]any)["text"])
+	require.Equal(t, "system", out[1].(map[string]any)["role"], "the Agent SDK environment remains a system message")
+	require.NotContains(t, agentSDKSystemText(out[1].(map[string]any)["content"]), "Hermes")
+}
+
+func TestAgentSDKHermesClientSystemMatchIsConservative(t *testing.T) {
+	for text, want := range map[string]bool{
+		"You are Hermes Agent": true,
+		"Policy.\nYou are Hermes Agent, created by Nous Research": true,
+		"You are a Hermes Agent":                                  false,
+		"you are Hermes Agent":                                    false,
+		"Hermes Agent documentation":                              false,
+		"Hermes":                                                  false,
+	} {
+		require.Equal(t, want, agentSDKIsHermesClientSystem(text), text)
+	}
+}
+
 // requireAgentSDKSystemOrder enforces the upstream rule: a content-bearing
 // system message must precede an assistant message or end the array.
 func requireAgentSDKSystemOrder(t *testing.T, body []byte) {
@@ -385,6 +513,56 @@ func TestAgentSDKNormalizeSourceMessages(t *testing.T) {
 	require.Equal(t, "hi", user["content"], "the source message is not mutated")
 }
 
+func TestAgentSDKTextualizesOnlyNonAnthropicToolHistory(t *testing.T) {
+	const anthropicID = "toolu_01T1VRUqA2rPiR3k5UaBEAcC"
+	source := []any{
+		map[string]any{"role": "assistant", "content": []any{
+			map[string]any{"type": "text", "text": "checking"},
+			map[string]any{"type": "tool_use", "id": "call_00_foreign", "name": "terminal", "input": map[string]any{"command": "ls"}},
+			map[string]any{"type": "tool_use", "id": anthropicID, "name": "Read", "input": map[string]any{"path": "a.txt"}},
+		}},
+		map[string]any{"role": "user", "content": []any{
+			map[string]any{"type": "tool_result", "tool_use_id": "call_00_foreign", "content": "foreign output"},
+			map[string]any{"type": "tool_result", "tool_use_id": anthropicID, "content": "anthropic output"},
+			map[string]any{"type": "text", "text": "continue"},
+		}},
+	}
+
+	out := agentSDKTextualizeForeignToolHistory(source)
+	assistant := out[0].(map[string]any)["content"].([]any)
+	require.Equal(t, "text", assistant[1].(map[string]any)["type"])
+	require.Contains(t, assistant[1].(map[string]any)["text"], "[Imported tool call]\nTool: terminal")
+	require.NotContains(t, assistant[1].(map[string]any)["text"], "call_00_foreign")
+	require.Equal(t, "tool_use", assistant[2].(map[string]any)["type"])
+	require.Equal(t, anthropicID, assistant[2].(map[string]any)["id"])
+
+	user := out[1].(map[string]any)["content"].([]any)
+	require.Equal(t, "tool_result", user[0].(map[string]any)["type"], "retained tool results must stay before text")
+	require.Equal(t, anthropicID, user[0].(map[string]any)["tool_use_id"])
+	require.Equal(t, "text", user[1].(map[string]any)["type"])
+	require.Contains(t, user[1].(map[string]any)["text"], "[Imported tool result]\nTool: terminal")
+	require.Contains(t, user[1].(map[string]any)["text"], "foreign output")
+	require.Equal(t, "continue", user[2].(map[string]any)["text"])
+
+	originalAssistant := source[0].(map[string]any)["content"].([]any)
+	require.Equal(t, "tool_use", originalAssistant[1].(map[string]any)["type"], "source history is not mutated")
+}
+
+func TestAgentSDKDirectAnthropicToolUseIDFormat(t *testing.T) {
+	for id, want := range map[string]bool{
+		"toolu_01T1VRUqA2rPiR3k5UaBEAcC": true,
+		"toolu_012cgM8jxFX4MFSaAXJDxRDa": true,
+		"toolu_01":                       false,
+		"toolu_01bad-id":                 false,
+		"toolu_bdrk_123":                 false,
+		"toolu_vrtx_123":                 false,
+		"call_00_123":                    false,
+		"":                               false,
+	} {
+		require.Equal(t, want, agentSDKIsDirectAnthropicToolUseID(id), id)
+	}
+}
+
 type agentSDKLoopHarness struct {
 	t       *testing.T
 	svc     *GatewayService
@@ -427,7 +605,7 @@ func (h *agentSDKLoopHarness) send() []byte {
 }
 
 func (h *agentSDKLoopHarness) toolRoundTrip(cacheLatest bool) {
-	id := fmt.Sprintf("tu_%d", len(h.msgs))
+	id := fmt.Sprintf("toolu_01test%d", len(h.msgs))
 	result := `{"type":"tool_result","tool_use_id":"` + id + `","content":"ok"}`
 	if cacheLatest {
 		for i, msg := range h.msgs {
@@ -805,14 +983,162 @@ func TestAgentSDKBetasMatchCaptures(t *testing.T) {
 	require.Equal(t, strings.Join(strings.Fields(claudeAgentSDKBetas), ","), claudeAgentSDKBetaHeader(context.Background()))
 }
 
+func TestMarshalClaudeAgentSDKJSONMatchesCapturedKeyOrder(t *testing.T) {
+	body, err := marshalClaudeAgentSDKJSON(map[string]any{
+		"stream":      true,
+		"diagnostics": map[string]any{"previous_message_id": nil},
+		"thread":      map[string]any{"previous_message_id": "msg_1", "type": "continue"},
+		"output_config": map[string]any{
+			"task_budget": 100, "effort": "medium",
+		},
+		"context_management": map[string]any{
+			"edits": []any{map[string]any{"keep": "all", "type": "clear_thinking_20251015"}},
+		},
+		"thinking":   map[string]any{"display": "updates", "type": "adaptive"},
+		"max_tokens": 128000,
+		"metadata":   map[string]any{"user_id": "user"},
+		"tools": []any{map[string]any{
+			"input_schema": map[string]any{"type": "object"},
+			"description":  "tool",
+			"name":         "Read",
+		}},
+		"system": []any{map[string]any{
+			"cache_control": map[string]any{"ttl": "1h", "type": "ephemeral"},
+			"text":          "identity",
+			"type":          "text",
+		}},
+		"messages": []any{
+			map[string]any{
+				"output_config": map[string]any{"effort": "medium"},
+				"content": []any{
+					map[string]any{"input": map[string]any{"path": "x"}, "name": "Read", "id": "toolu_1", "type": "tool_use"},
+					map[string]any{"content": "ok", "type": "tool_result", "tool_use_id": "toolu_1"},
+				},
+				"role": "assistant",
+			},
+		},
+		"model": "claude-sonnet-5-5",
+	})
+	require.NoError(t, err)
+	require.Equal(t,
+		[]string{"model", "messages", "system", "tools", "metadata", "max_tokens", "thinking", "context_management", "output_config", "thread", "diagnostics", "stream"},
+		agentSDKObjectKeys(t, body),
+	)
+	assertJSONTokenOrder(t, gjson.GetBytes(body, "messages.0").Raw, `"role"`, `"content"`, `"output_config"`)
+	assertJSONTokenOrder(t, gjson.GetBytes(body, "messages.0.content.0").Raw, `"type"`, `"id"`, `"name"`, `"input"`)
+	assertJSONTokenOrder(t, gjson.GetBytes(body, "messages.0.content.1").Raw, `"tool_use_id"`, `"type"`, `"content"`)
+	assertJSONTokenOrder(t, gjson.GetBytes(body, "system.0").Raw, `"type"`, `"text"`, `"cache_control"`)
+	assertJSONTokenOrder(t, gjson.GetBytes(body, "system.0.cache_control").Raw, `"type"`, `"ttl"`)
+	assertJSONTokenOrder(t, gjson.GetBytes(body, "tools.0").Raw, `"name"`, `"description"`, `"input_schema"`)
+	assertJSONTokenOrder(t, gjson.GetBytes(body, "thinking").Raw, `"type"`, `"display"`)
+	assertJSONTokenOrder(t, gjson.GetBytes(body, "context_management.edits.0").Raw, `"type"`, `"keep"`)
+	assertJSONTokenOrder(t, gjson.GetBytes(body, "output_config").Raw, `"effort"`, `"task_budget"`)
+	assertJSONTokenOrder(t, gjson.GetBytes(body, "thread").Raw, `"type"`, `"previous_message_id"`)
+}
+
+func TestApplyClaudeAgentSDKDefaultEffort(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		model    string
+		explicit string
+		want     string
+		exists   bool
+	}{
+		{name: "sonnet 55 default", model: "claude-sonnet-5-5", want: "medium", exists: true},
+		{name: "opus 48 default", model: "claude-opus-4-8", want: "high", exists: true},
+		{name: "sonnet 46 default", model: "claude-sonnet-4-6", want: "high", exists: true},
+		{name: "explicit wins", model: "claude-sonnet-5-5", explicit: "max", want: "max", exists: true},
+		{name: "haiku omitted", model: "claude-haiku-4-5-20251001"},
+		{name: "unknown omitted", model: "custom-model"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := map[string]any{}
+			if tc.explicit != "" {
+				root["output_config"] = map[string]any{"effort": tc.explicit}
+			}
+			applyClaudeAgentSDKDefaultEffort(root, tc.model)
+			encoded, err := json.Marshal(root)
+			require.NoError(t, err)
+			got := gjson.GetBytes(encoded, "output_config.effort")
+			require.Equal(t, tc.exists, got.Exists())
+			require.Equal(t, tc.want, got.String())
+		})
+	}
+}
+
+func TestClaudeAgentSDKPreservesClientEagerInputStreaming(t *testing.T) {
+	tools := []any{
+		map[string]any{"name": "explicit", "input_schema": map[string]any{}, "eager_input_streaming": false},
+		map[string]any{"name": "absent", "input_schema": map[string]any{}},
+	}
+	body, err := marshalClaudeAgentSDKJSON(map[string]any{"model": "claude-sonnet-5-5", "tools": tools})
+	require.NoError(t, err)
+	require.True(t, gjson.GetBytes(body, "tools.0.eager_input_streaming").Exists())
+	require.False(t, gjson.GetBytes(body, "tools.0.eager_input_streaming").Bool())
+	require.False(t, gjson.GetBytes(body, "tools.1.eager_input_streaming").Exists())
+}
+
+func TestFormatClaudeAgentSDKMetadataUserIDOrderAndExtras(t *testing.T) {
+	raw := `{"tk":"token-index","parent_session_id":"","ti":"turn-index","ignored":"value"}`
+	got := formatClaudeAgentSDKMetadataUserID(raw, "device", "", "session")
+	assertJSONTokenOrder(t, got,
+		`"device_id"`, `"account_uuid"`, `"session_id"`, `"parent_session_id"`, `"ti"`, `"tk"`)
+	require.Equal(t, "", gjson.Get(got, "parent_session_id").String())
+	require.Equal(t, "turn-index", gjson.Get(got, "ti").String())
+	require.Equal(t, "token-index", gjson.Get(got, "tk").String())
+	require.False(t, gjson.Get(got, "ignored").Exists())
+}
+
+func TestClaudeAgentSDKBuildCanonicalizesSignatureRetryBody(t *testing.T) {
+	body, err := marshalClaudeAgentSDKJSON(map[string]any{
+		"model": "claude-sonnet-5-5",
+		"messages": []any{map[string]any{
+			"role": "assistant",
+			"content": []any{map[string]any{
+				"type": "thinking", "thinking": "preserved reasoning", "signature": "invalid",
+			}},
+		}},
+		"system": []any{map[string]any{
+			"type": "text",
+			"text": "x-anthropic-billing-header: cc_version=2.1.284.abc; cc_entrypoint=sdk-ts; cch=00000;",
+		}},
+		"tools":      []any{},
+		"metadata":   map[string]any{},
+		"max_tokens": 128000,
+		"thinking":   map[string]any{"type": "adaptive", "display": "updates"},
+		"context_management": map[string]any{
+			"edits": []any{map[string]any{"type": "clear_thinking_20251015", "keep": "all"}},
+		},
+		"output_config": map[string]any{"effort": "medium"},
+		"diagnostics":   map[string]any{"previous_message_id": nil},
+		"stream":        true,
+	})
+	require.NoError(t, err)
+	filtered := FilterThinkingBlocksForRetry(body, "claude-sonnet-5-5")
+	require.False(t, gjson.GetBytes(filtered, "thinking").Exists())
+
+	account := &Account{ID: 77, Platform: PlatformAnthropic, Type: AccountTypeSetupToken}
+	ctx := WithClaudeAgentSDKPolicy(context.Background(), &Group{Platform: PlatformAnthropic, SimulateClaudeAgentSDK: true})
+	c, _ := gin.CreateTestContext(httptest.NewRecorder())
+	c.Request = httptest.NewRequest("POST", "/v1/messages", nil)
+	svc := &GatewayService{}
+	_, wire, err := svc.buildUpstreamRequest(ctx, c, account, filtered, "token", "oauth", "claude-sonnet-5-5", true, true)
+	require.NoError(t, err)
+	assertJSONTokenOrder(t, gjson.GetBytes(wire, "messages.0").Raw, `"role"`, `"content"`)
+	assertJSONTokenOrder(t, gjson.GetBytes(wire, "messages.0.content.0").Raw, `"type"`, `"text"`)
+	require.NotContains(t, gjson.GetBytes(wire, "system.0.text").String(), "cch=00000")
+}
+
 func TestApplyClaudeAgentSDKOutputBudgetUsesCatalogDefault(t *testing.T) {
 	for model, want := range map[string]int64{
 		"claude-sonnet-4-6": 32000, "claude-haiku-4-5-20251001": 32000, "claude-opus-4-5": 32000,
 		"claude-opus-4-7": 64000, "claude-opus-5": 64000, "claude-sonnet-5": 64000,
 		"claude-sonnet-5-5": 128000, "claude-opus-5-5": 128000,
 	} {
-		out, err := applyClaudeAgentSDKOutputBudget([]byte(`{"max_tokens":1}`), model)
+		input := []byte(`{"model":"` + model + `","max_tokens":1,"messages":[]}`)
+		out, err := applyClaudeAgentSDKOutputBudget(input, model)
 		require.NoError(t, err)
 		require.Equal(t, want, gjson.GetBytes(out, "max_tokens").Int(), model)
+		require.Equal(t, []string{"model", "max_tokens", "messages"}, agentSDKObjectKeys(t, out), model)
 	}
 }

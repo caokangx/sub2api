@@ -99,6 +99,13 @@ func (s *GatewayService) buildUpstreamRequest(ctx context.Context, c *gin.Contex
 	}
 	oauthSessionID := ""
 	agentSDKProfile := simulateClaudeAgentSDK(ctx, account)
+	if agentSDKProfile {
+		orderedBody, err := canonicalizeClaudeAgentSDKJSON(body)
+		if err != nil {
+			return nil, nil, fmt.Errorf("canonicalize Claude Agent SDK request: %w", err)
+		}
+		body = orderedBody
+	}
 	if forceClaudeCodeProfile(ctx, account) || agentSDKProfile {
 		body, oauthSessionID = s.rewriteAnthropicOAuthIdentity(ctx, c, account, body, identityFingerprint, false)
 	} else if account.IsOAuth() && s.identityService != nil && identityFingerprint != nil {

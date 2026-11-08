@@ -16,6 +16,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 )
 
 const (
@@ -130,9 +131,20 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 		clientSystem.Text, _ = anthropicfp.NormalizeText(clientSystem.Text)
 	}
 	rawMessages, _ := root["messages"].([]any)
-	messages := agentSDKNormalizeSourceMessages(rawMessages)
+	messages := agentSDKNormalizeSourceMessages(agentSDKTextualizeForeignToolHistory(rawMessages))
 	tools, _ := root["tools"].([]any)
+	if _, exists := root["tools"]; !exists {
+		tools = []any{}
+		root["tools"] = tools
+	}
 	hasTools := len(tools) > 0
+	if _, exists := root["metadata"]; !exists {
+		root["metadata"] = map[string]any{}
+	}
+	if _, ok := root["max_tokens"]; !ok {
+		root["max_tokens"], _ = claude.OutputBudget(model)
+	}
+	applyClaudeAgentSDKDefaultEffort(root, model)
 
 	requestClass := agentSDKRequestClass(c, body)
 	rawSession := agentSDKRawSessionID(c, root)
@@ -194,7 +206,7 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 	if metadata, ok := root["metadata"].(map[string]any); ok {
 		if raw, ok := metadata["user_id"].(string); ok {
 			if parsed := ParseMetadataUserID(raw); parsed != nil {
-				metadata["user_id"] = FormatMetadataUserID(parsed.DeviceID, "", parsed.SessionID, claude.CLICurrentVersion)
+				metadata["user_id"] = formatClaudeAgentSDKMetadataUserID(raw, parsed.DeviceID, "", parsed.SessionID)
 			}
 		}
 	}
@@ -211,12 +223,17 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 	next.EnvironmentDate = environmentDate
 
 	mode := settings.AgentSDK.ConversationMode
+	if state.MessageID != "" {
+		root["diagnostics"] = map[string]any{"previous_message_id": state.MessageID}
+	} else {
+		root["diagnostics"] = map[string]any{"previous_message_id": nil}
+	}
 	createRoot := make(map[string]any, len(root)+1)
 	for key, value := range root {
 		createRoot[key] = value
 	}
 	createRoot["thread"] = map[string]any{"type": "create"}
-	createBody, _ := marshalProfileJSON(createRoot)
+	createBody, _ := marshalClaudeAgentSDKJSON(createRoot)
 	if mode == ClaudeAgentSDKConversationThread {
 		prefixMatches := state.MessageCount > 0 && state.Model == model &&
 			state.MessageCount <= len(transformed) &&
@@ -234,18 +251,13 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 		}
 	} else {
 		delete(root, "thread")
-		if state.MessageID != "" {
-			root["diagnostics"] = map[string]any{"previous_message_id": state.MessageID}
-		} else {
-			root["diagnostics"] = map[string]any{"previous_message_id": nil}
-		}
 	}
 
 	ctx = context.WithValue(ctx, claudeAgentSDKContextKey{}, &claudeAgentSDKRequestContext{
 		StateKey: stateKey, RequestClass: requestClass, PromptID: state.PromptID, Pending: next, CreateBody: createBody,
 		Betas: agentSDKBetas(model, hasTools),
 	})
-	encoded, err := marshalProfileJSON(root)
+	encoded, err := marshalClaudeAgentSDKJSON(root)
 	if err != nil {
 		return ctx, nil, err
 	}
@@ -393,6 +405,132 @@ func agentSDKContentBlocks(content any) []any {
 	return nil
 }
 
+// agentSDKTextualizeForeignToolHistory keeps direct Anthropic tool-use IDs in
+// their structured form and turns known foreign ID shapes into plain history.
+// Both sides of a foreign tool round-trip are rewritten so no dangling
+// tool_result references remain. This is intentionally a format check rather
+// than an ownership claim: without response-side provenance, toolu_01 only
+// means "Anthropic-shaped".
+func agentSDKTextualizeForeignToolHistory(messages []any) []any {
+	foreignTools := make(map[string]string)
+	for _, raw := range messages {
+		msg, _ := raw.(map[string]any)
+		if msg["role"] != "assistant" {
+			continue
+		}
+		content, _ := msg["content"].([]any)
+		for _, rawBlock := range content {
+			block, _ := rawBlock.(map[string]any)
+			if block["type"] != "tool_use" {
+				continue
+			}
+			id, _ := block["id"].(string)
+			if agentSDKIsDirectAnthropicToolUseID(id) {
+				continue
+			}
+			name, _ := block["name"].(string)
+			foreignTools[id] = name
+		}
+	}
+
+	out := make([]any, len(messages))
+	copy(out, messages)
+	for i, raw := range messages {
+		msg, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		content, ok := msg["content"].([]any)
+		if !ok {
+			continue
+		}
+		rewritten := false
+		next := make([]any, 0, len(content))
+		var retainedToolResults []any
+		for _, rawBlock := range content {
+			block, ok := rawBlock.(map[string]any)
+			if !ok {
+				next = append(next, rawBlock)
+				continue
+			}
+			switch block["type"] {
+			case "tool_use":
+				id, _ := block["id"].(string)
+				if agentSDKIsDirectAnthropicToolUseID(id) {
+					next = append(next, rawBlock)
+					continue
+				}
+				next = append(next, agentSDKForeignToolUseText(block))
+				rewritten = true
+			case "tool_result":
+				id, _ := block["tool_use_id"].(string)
+				if agentSDKIsDirectAnthropicToolUseID(id) {
+					retainedToolResults = append(retainedToolResults, rawBlock)
+					continue
+				}
+				next = append(next, agentSDKForeignToolResultText(block, foreignTools[id]))
+				rewritten = true
+			default:
+				next = append(next, rawBlock)
+			}
+		}
+		if len(retainedToolResults) > 0 {
+			// Anthropic requires structured tool_result blocks to precede text
+			// blocks in a user message.
+			next = append(retainedToolResults, next...)
+		}
+		if !rewritten {
+			continue
+		}
+		clone := make(map[string]any, len(msg))
+		for key, value := range msg {
+			clone[key] = value
+		}
+		clone["content"] = next
+		out[i] = clone
+	}
+	return out
+}
+
+func agentSDKIsDirectAnthropicToolUseID(id string) bool {
+	const prefix = "toolu_01"
+	if !strings.HasPrefix(id, prefix) || len(id) == len(prefix) {
+		return false
+	}
+	for _, r := range id[len(prefix):] {
+		if (r < 'a' || r > 'z') && (r < 'A' || r > 'Z') && (r < '0' || r > '9') {
+			return false
+		}
+	}
+	return true
+}
+
+func agentSDKForeignToolUseText(block map[string]any) map[string]any {
+	name, _ := block["name"].(string)
+	input, _ := marshalProfileJSON(block["input"])
+	text := "[Imported tool call]\nTool: " + name + "\nInput: " + string(input)
+	return map[string]any{"type": "text", "text": text}
+}
+
+func agentSDKForeignToolResultText(block map[string]any, toolName string) map[string]any {
+	var content string
+	if text, ok := block["content"].(string); ok {
+		content = text
+	} else {
+		encoded, _ := marshalProfileJSON(block["content"])
+		content = string(encoded)
+	}
+	text := "[Imported tool result]"
+	if toolName != "" {
+		text += "\nTool: " + toolName
+	}
+	if isError, _ := block["is_error"].(bool); isError {
+		text += "\nStatus: error"
+	}
+	text += "\nContent:\n" + content
+	return map[string]any{"type": "text", "text": text}
+}
+
 func agentSDKMessages(messages []any, opts agentSDKMessagesOptions) ([]any, []agentSDKInjectedTokens) {
 	out := make([]any, 0, len(messages)*2+1)
 	var assigned []agentSDKInjectedTokens
@@ -440,7 +578,11 @@ func agentSDKMessages(messages []any, opts agentSDKMessagesOptions) ([]any, []ag
 		out = append(out, map[string]any{"role": "system", "content": content})
 	}
 	if opts.ClientSystem.Text != "" {
-		out = agentSDKInsertClientSystem(out, opts.ClientSystem)
+		if agentSDKIsHermesClientSystem(opts.ClientSystem.Text) {
+			out = agentSDKMoveClientSystemIntoFirstUser(out, opts.ClientSystem)
+		} else {
+			out = agentSDKInsertClientSystem(out, opts.ClientSystem)
+		}
 	}
 	if opts.HasTools {
 		agentSDKPrependGitAttribution(out)
@@ -609,6 +751,47 @@ func agentSDKInsertClientSystem(messages []any, clientSystem agentSDKClientSyste
 	return append(out, messages[position:]...)
 }
 
+func agentSDKIsHermesClientSystem(text string) bool {
+	return strings.Contains(text, "You are Hermes Agent")
+}
+
+// agentSDKMoveClientSystemIntoFirstUser demotes a Hermes client prompt to an
+// ordinary user text block while preserving its cache breakpoint. The Agent
+// SDK's own system messages remain unchanged on models that support them.
+func agentSDKMoveClientSystemIntoFirstUser(messages []any, clientSystem agentSDKClientSystem) []any {
+	block := map[string]any{"type": "text", "text": clientSystem.Text}
+	if clientSystem.CacheControl != nil {
+		block["cache_control"] = clientSystem.CacheControl
+	}
+	for i, raw := range messages {
+		msg, ok := raw.(map[string]any)
+		if !ok || msg["role"] != "user" {
+			continue
+		}
+		content := agentSDKContentBlocks(msg["content"])
+		position := 0
+		for j, rawBlock := range content {
+			if item, ok := rawBlock.(map[string]any); ok && item["type"] == "tool_result" {
+				position = j + 1
+			}
+		}
+		nextContent := make([]any, 0, len(content)+1)
+		nextContent = append(nextContent, content[:position]...)
+		nextContent = append(nextContent, block)
+		nextContent = append(nextContent, content[position:]...)
+		clone := make(map[string]any, len(msg))
+		for key, value := range msg {
+			clone[key] = value
+		}
+		clone["content"] = nextContent
+		out := make([]any, len(messages))
+		copy(out, messages)
+		out[i] = clone
+		return out
+	}
+	return messages
+}
+
 func agentSDKControlSystemMessage(message map[string]any) bool {
 	if message["role"] != "system" {
 		return false
@@ -701,15 +884,33 @@ func agentSDKNormalizeThinking(root map[string]any, model string) {
 	root["thinking"] = map[string]any{"type": "enabled", "budget_tokens": min(31999, upper-1), "display": "updates"}
 }
 
-func applyClaudeAgentSDKOutputBudget(body []byte, model string) ([]byte, error) {
-	var root map[string]any
-	if err := json.Unmarshal(body, &root); err != nil {
-		return nil, err
+func applyClaudeAgentSDKDefaultEffort(root map[string]any, model string) {
+	rawOutputConfig, exists := root["output_config"]
+	outputConfig, validObject := rawOutputConfig.(map[string]any)
+	if exists {
+		if !validObject {
+			return
+		}
+		if _, explicit := outputConfig["effort"]; explicit {
+			return
+		}
 	}
+	effort, ok := claude.AgentSDKDefaultEffort(model)
+	if !ok {
+		return
+	}
+	if !exists {
+		outputConfig = map[string]any{}
+		root["output_config"] = outputConfig
+	}
+	outputConfig["effort"] = effort
+}
+
+func applyClaudeAgentSDKOutputBudget(body []byte, model string) ([]byte, error) {
 	// The CLI sends the catalog default; the upper limit only caps
 	// CLAUDE_CODE_MAX_OUTPUT_TOKENS.
-	root["max_tokens"], _ = claude.OutputBudget(model)
-	return marshalProfileJSON(root)
+	defaultTokens, _ := claude.OutputBudget(model)
+	return sjson.SetBytes(body, "max_tokens", defaultTokens)
 }
 
 func agentSDKRequestClass(c *gin.Context, body []byte) string {

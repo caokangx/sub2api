@@ -24,6 +24,7 @@ func TestEvaluateAzureEvidence(t *testing.T) {
 		wantStatus      string
 		wantAzure       bool
 		wantSuspicious  bool
+		wantTampered    bool
 		wantUnavailable bool
 		wantServed      string
 	}{
@@ -40,14 +41,49 @@ func TestEvaluateAzureEvidence(t *testing.T) {
 					"x-new-api-version", "v1.0.0-rc.47",
 				)},
 				ChatOK: true, ChatFinishReason: "length", ChatPromptTokens: 17, ChatOutputTokens: 64,
-				ChatFilterFields: true, ChatModel: "gpt-6-sol-2026-09-22",
-				StreamOK: true, StreamAzureChunk: true,
+				ChatFilterFields: true, ChatModel: "gpt-6-sol-2026-09-22", ChatID: "chatcmpl-EhCXKkAUH9aQrGzTCXc0xQLplhmNe",
+				StreamOK: true, StreamAzureChunk: true, StreamChunkID: "chatcmpl-jrY5qN53RHx6UQwTW3eWEU97sh7X5",
 				ContinuationTried: true, ContinuationOK: true,
+				CacheBaseTokens: 526, CacheLongTokens: []int64{1524, 1524}, CacheReadTokens: []int64{0, 1408},
 			},
 			wantStatus: AzureVerifyStatusOK, wantAzure: true, wantServed: "gpt-6-sol-2026-09-22",
 		},
 		{
-			// b.kylenqaq.com / metacode.cc: filter fields stripped, Azure headers kept.
+			// 88.216.255.233: every Azure marker passes through, but the one-api in front
+			// drops max_completion_tokens. That is the relay's fault, not a non-Azure backend.
+			name: "azure behind a relay that drops the length limit",
+			obs: azureVerifyObservation{
+				Model: "gpt-5.6-sol",
+				Headers: []http.Header{azureVerifyHeaders(
+					"apim-request-id", "14235179-eeec-4f22-bcd6-2b0db7391234",
+					"azureml-model-session", "d20261031094348-5846ed6c",
+					"x-ms-region", "East US 2",
+					"x-ms-served-model", "gpt-5.6-sol-2026-07-09",
+					"x-oneapi-request-id", "202611061136197369396498268d9d6BzEU26qR",
+				)},
+				ChatOK: true, ChatFinishReason: "stop", ChatPromptTokens: 17, ChatOutputTokens: 907,
+				ChatFilterFields: true, ChatID: "chatcmpl-jrY5qN53RHx6UQwTW3eWEU97sh7X5",
+				StreamOK: true, StreamAzureChunk: true, StreamChunkID: "chatcmpl-jrY5qN53RHx6UQwTW3eWEU97sh7X5",
+				CacheBaseTokens: 526, CacheLongTokens: []int64{1524, 1524}, CacheReadTokens: []int64{0, 1408},
+			},
+			wantStatus: AzureVerifyStatusOK, wantAzure: true, wantTampered: true, wantServed: "gpt-5.6-sol-2026-07-09",
+		},
+		{
+			// b.kylenqaq.com: Azure headers kept, filter fields stripped, stream ids regenerated,
+			// and the cache-miss call billed as 1.5 × the real prompt.
+			name: "azure headers with rewritten body and inflated usage",
+			obs: azureVerifyObservation{
+				Model:   "gpt-5.6-sol",
+				Headers: []http.Header{azureVerifyHeaders("apim-request-id", "2d74f244", "x-ms-region", "East US 2", "x-ms-rai-invoked", "true")},
+				ChatOK:  true, ChatFinishReason: "length", ChatPromptTokens: 17, ChatOutputTokens: 64,
+				ChatID:   "chatcmpl-EhCXKkAUH9aQrGzTCXc0xQLplhmNe",
+				StreamOK: true, StreamChunkID: "chatcmpl-c4755aa7",
+				ContinuationTried: true, ContinuationOK: true,
+				CacheBaseTokens: 526, CacheLongTokens: []int64{2286, 1524}, CacheReadTokens: []int64{0, 1390},
+			},
+			wantStatus: AzureVerifyStatusOK, wantSuspicious: true, wantTampered: true,
+		},
+		{
 			name: "azure headers only",
 			obs: azureVerifyObservation{
 				Model:   "gpt-6-astra",
@@ -55,7 +91,26 @@ func TestEvaluateAzureEvidence(t *testing.T) {
 				ChatOK:  true, ChatFinishReason: "length", ChatPromptTokens: 17, ChatOutputTokens: 64,
 				StreamOK: true, ContinuationTried: true, ContinuationOK: true,
 			},
-			wantStatus: AzureVerifyStatusOK, wantAzure: true,
+			wantStatus: AzureVerifyStatusOK, wantSuspicious: true,
+		},
+		{
+			name: "both cache-miss calls inflated",
+			obs: azureVerifyObservation{
+				Model:  "gpt-6-sol",
+				ChatOK: true, ChatFinishReason: "length", ChatPromptTokens: 17, ChatOutputTokens: 64,
+				ChatFilterFields: true,
+				CacheBaseTokens:  526, CacheLongTokens: []int64{2286, 2286}, CacheReadTokens: []int64{0, 0},
+			},
+			wantStatus: AzureVerifyStatusOK, wantAzure: true, wantTampered: true,
+		},
+		{
+			name: "injected prompt in front of real azure",
+			obs: azureVerifyObservation{
+				Model:  "gpt-6-sol",
+				ChatOK: true, ChatFinishReason: "length", ChatPromptTokens: 150, ChatOutputTokens: 64,
+				ChatFilterFields: true,
+			},
+			wantStatus: AzureVerifyStatusOK, wantAzure: true, wantTampered: true,
 		},
 		{
 			// api.xiaojue.cloud: no Azure markers, length limit ignored, ~4.4k injected prompt tokens.
@@ -157,6 +212,7 @@ func TestEvaluateAzureEvidence(t *testing.T) {
 			require.Equal(t, tc.wantStatus, v.Status)
 			require.Equal(t, tc.wantAzure, v.IsAzure)
 			require.Equal(t, tc.wantSuspicious, v.Suspicious)
+			require.Equal(t, tc.wantTampered, v.RelayTampered)
 			require.Equal(t, tc.wantUnavailable, v.ModelUnavailable)
 			require.Equal(t, tc.wantServed, v.ServedModel)
 		})

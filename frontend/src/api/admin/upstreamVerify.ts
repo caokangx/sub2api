@@ -40,5 +40,6 @@ export interface UpstreamVerifyProbeBase {
 }
 
 export const UPSTREAM_VERIFY_MODELS_TIMEOUT_MS = 2 * 60 * 1000
-// One probe sends up to four upstream requests, each allowed up to two minutes.
+// One probe sends up to four sequential upstream requests (Azure runs its cache check
+// alongside them), each allowed up to two minutes.
 export const UPSTREAM_VERIFY_PROBE_TIMEOUT_MS = 6 * 60 * 1000
