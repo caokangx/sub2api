@@ -150,6 +150,18 @@ type Model struct {
 // DefaultModels Claude Code 客户端支持的默认模型列表
 var DefaultModels = []Model{
 	{
+		ID:          "claude-fable-5-2",
+		Type:        "model",
+		DisplayName: "Claude Fable 5.2",
+		CreatedAt:   "2026-11-09T00:00:00Z",
+	},
+	{
+		ID:          "claude-mythos-5-2",
+		Type:        "model",
+		DisplayName: "Claude Mythos 5.2",
+		CreatedAt:   "2026-11-09T00:00:00Z",
+	},
+	{
 		ID:          "claude-fable-5-1",
 		Type:        "model",
 		DisplayName: "Claude Fable 5.1",
