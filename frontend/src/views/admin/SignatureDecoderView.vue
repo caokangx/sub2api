@@ -208,10 +208,10 @@
             {{ t('admin.signatureDecoder.verify.start') }}
           </button>
           <button
-            v-if="signature"
+            v-if="harvestedSignature"
             type="button"
             class="btn btn-secondary btn-sm"
-            :disabled="busy || !canConnect"
+            :disabled="busy || !canConnect || !signature.trim()"
             @click="retryReplay"
           >
             <Icon :name="step === 'replay' ? 'refresh' : 'key'" size="xs" :class="step === 'replay' ? 'animate-spin' : ''" />
@@ -240,25 +240,50 @@
           {{ t('admin.signatureDecoder.verify.verdict.notRecovered') }}
         </div>
 
-        <details v-if="signature" class="mt-5">
+        <details v-if="harvestedSignature" class="mt-5">
           <summary class="cursor-pointer select-none text-sm font-medium text-gray-700 dark:text-gray-300">
             {{ t('admin.signatureDecoder.verify.details.title') }}
           </summary>
           <div class="mt-3 space-y-4">
             <div>
               <div class="mb-1 flex flex-wrap items-center justify-between gap-2">
-                <label class="input-label mb-0">
+                <label class="input-label mb-0" for="verify-signature">
                   {{ t('admin.signatureDecoder.verify.details.signature') }}
                   <span class="ml-2 font-normal text-gray-500 dark:text-gray-400">
                     {{ t('admin.signatureDecoder.verify.details.signatureMeta', { model: boundModel || '-', chars: signature.length, tokens: thinkingTokens }) }}
                   </span>
+                  <span v-if="signatureEdited" class="ml-2 font-normal text-amber-600 dark:text-amber-400">
+                    {{ t('admin.signatureDecoder.verify.details.edited') }}
+                  </span>
                 </label>
-                <button type="button" class="btn btn-secondary btn-sm" @click="openInDecoder">
-                  <Icon name="search" size="xs" />
-                  {{ t('admin.signatureDecoder.verify.details.openInDecoder') }}
-                </button>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button
+                    v-if="signatureEdited"
+                    type="button"
+                    class="btn btn-secondary btn-sm"
+                    :disabled="busy"
+                    @click="signature = harvestedSignature"
+                  >
+                    <Icon name="refresh" size="xs" />
+                    {{ t('admin.signatureDecoder.verify.details.restore') }}
+                  </button>
+                  <button type="button" class="btn btn-secondary btn-sm" @click="openInDecoder">
+                    <Icon name="search" size="xs" />
+                    {{ t('admin.signatureDecoder.verify.details.openInDecoder') }}
+                  </button>
+                </div>
               </div>
-              <pre class="max-h-40 overflow-auto whitespace-pre-wrap break-all rounded-md bg-gray-50 p-3 font-mono text-xs text-gray-900 dark:bg-dark-800 dark:text-white">{{ signature }}</pre>
+              <textarea
+                id="verify-signature"
+                v-model="signature"
+                rows="5"
+                spellcheck="false"
+                :disabled="busy"
+                class="input break-all font-mono text-xs"
+              />
+              <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                {{ t('admin.signatureDecoder.verify.details.editHint') }}
+              </p>
             </div>
             <div v-if="replayRaw">
               <div class="mb-1 flex items-center justify-between">
@@ -386,7 +411,10 @@ const conn = ref<ReasoningConn>({
 const secret = ref('')
 // The secret the current signature was harvested with (retries keep checking against it).
 const checkedSecret = ref('')
+const harvestedSignature = ref('')
+// Editable copy of the harvested signature; replays always use this one.
 const signature = ref('')
+const signatureEdited = computed(() => signature.value !== harvestedSignature.value)
 const thinkingTokens = ref(0)
 const step = ref<'' | 'harvest' | 'replay'>('')
 const verdict = ref<'' | 'genuine' | 'notRecovered'>('')
@@ -439,7 +467,7 @@ async function runReplay(): Promise<void> {
   for (const elicit of VERIFY_ELICITORS) {
     const res = await replay(
       conn.value,
-      signature.value,
+      signature.value.trim(),
       { precedingUser: VERIFY_PRECEDING_USER, elicit },
       replayModel
     )
@@ -456,6 +484,7 @@ async function runReplay(): Promise<void> {
 async function startCheck(): Promise<void> {
   checkError.value = ''
   verdict.value = ''
+  harvestedSignature.value = ''
   signature.value = ''
   thinkingTokens.value = 0
   replayAnswer.value = ''
@@ -469,6 +498,7 @@ async function startCheck(): Promise<void> {
       checkError.value = t('admin.signatureDecoder.verify.noSignature')
       return
     }
+    harvestedSignature.value = res.signature
     signature.value = res.signature
     thinkingTokens.value = res.thinkingTokens
     await runReplay()

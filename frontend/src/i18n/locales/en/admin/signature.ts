@@ -87,6 +87,9 @@ export default {
         signature: 'Harvested signature',
         signatureMeta: 'Bound model {model} · {chars} chars · {tokens} hidden thinking tokens',
         openInDecoder: 'Decode above',
+        edited: 'Edited',
+        restore: 'Restore original',
+        editHint: 'You can edit the signature here. "Retry recovery with the same signature" will replay the edited signature.',
         recovered: 'Recovered by replay',
         rawResponse: 'Raw replay response',
         empty: '(no content returned)'

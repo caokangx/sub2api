@@ -87,6 +87,9 @@ export default {
         signature: '采集到的签名',
         signatureMeta: '绑定模型 {model} · {chars} 字符 · 隐藏推理 {tokens} tokens',
         openInDecoder: '放到上方解析',
+        edited: '已修改',
+        restore: '恢复原始签名',
+        editHint: '可直接修改签名，修改后点击“用同一签名重试还原”会使用修改后的签名回放。',
         recovered: '回放还原出的内容',
         rawResponse: '回放原始响应',
         empty: '（未返回内容）'
