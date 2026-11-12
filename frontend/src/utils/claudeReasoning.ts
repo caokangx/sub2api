@@ -135,6 +135,23 @@ function normalizeBaseUrl(baseUrl: string): string {
   return baseUrl.trim().replace(/\/+$/, '')
 }
 
+/**
+ * Build a copy-pasteable curl for the Messages request the backend relays upstream.
+ * It mirrors the relay exactly: POST {baseUrl}/v1/messages with the content-type,
+ * x-api-key and anthropic-version headers, so running it hits the same endpoint.
+ */
+export function buildMessagesCurl(conn: ReasoningConn, body: AnyRecord): string {
+  const base = normalizeBaseUrl(conn.baseUrl) || 'https://api.anthropic.com'
+  const sq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
+  return [
+    `curl ${sq(`${base}/v1/messages`)} \\`,
+    `  -H 'content-type: application/json' \\`,
+    `  -H ${sq(`x-api-key: ${conn.apiKey}`)} \\`,
+    `  -H 'anthropic-version: 2023-06-01' \\`,
+    `  --data-binary ${sq(JSON.stringify(body, null, 2))}`
+  ].join('\n')
+}
+
 /** Send one Messages request through the backend relay; throws ReasoningError on failure. */
 export async function callMessages(conn: ReasoningConn, body: AnyRecord): Promise<unknown> {
   const base = normalizeBaseUrl(conn.baseUrl)
@@ -173,21 +190,25 @@ export interface HarvestOptions {
   effort?: 'low' | 'medium' | 'high'
 }
 
-/** Harvest: run a normal request; the hidden CoT is sealed into the returned signature. */
-export async function harvest(
-  conn: ReasoningConn,
-  prompt: string,
-  opts: HarvestOptions = {}
-): Promise<HarvestResult> {
-  const body: AnyRecord = {
-    model: conn.model,
+/** Request body for a harvest: a normal request whose hidden CoT is sealed into the signature. */
+export function buildHarvestBody(model: string, prompt: string, opts: HarvestOptions = {}): AnyRecord {
+  return {
+    model,
     max_tokens: opts.maxTokens ?? 64000,
     // display:omitted seals the reasoning into the signature instead of returning plaintext.
     thinking: { type: 'adaptive', display: 'omitted' },
     output_config: { effort: opts.effort ?? 'high' },
     messages: [{ role: 'user', content: prompt }]
   }
-  const data = await callMessages(conn, body)
+}
+
+/** Harvest: run a normal request; the hidden CoT is sealed into the returned signature. */
+export async function harvest(
+  conn: ReasoningConn,
+  prompt: string,
+  opts: HarvestOptions = {}
+): Promise<HarvestResult> {
+  const data = await callMessages(conn, buildHarvestBody(conn.model, prompt, opts))
   return {
     signature: extractSignature(data),
     answer: extractAnswer(data),
@@ -201,15 +222,10 @@ export async function harvest(
  * the model to recite its prior private reasoning. `replayModel` should be the model
  * bound inside the signature so the AEAD auth check passes.
  */
-export async function replay(
-  conn: ReasoningConn,
-  signature: string,
-  prompts: ReplayPrompts,
-  replayModel?: string
-): Promise<ReplayResult> {
-  if (!signature.trim()) throw new ReasoningError('missingSignature')
-  const body: AnyRecord = {
-    model: replayModel || conn.model,
+/** Request body for a replay: paste the signature back as an assistant.thinking block. */
+export function buildReplayBody(model: string, signature: string, prompts: ReplayPrompts): AnyRecord {
+  return {
+    model,
     max_tokens: 1024,
     messages: [
       { role: 'user', content: prompts.precedingUser },
@@ -223,6 +239,15 @@ export async function replay(
       { role: 'user', content: prompts.elicit }
     ]
   }
-  const data = await callMessages(conn, body)
+}
+
+export async function replay(
+  conn: ReasoningConn,
+  signature: string,
+  prompts: ReplayPrompts,
+  replayModel?: string
+): Promise<ReplayResult> {
+  if (!signature.trim()) throw new ReasoningError('missingSignature')
+  const data = await callMessages(conn, buildReplayBody(replayModel || conn.model, signature, prompts))
   return { answer: extractAnswer(data), raw: data }
 }

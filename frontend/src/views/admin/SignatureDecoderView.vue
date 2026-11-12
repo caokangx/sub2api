@@ -222,6 +222,43 @@
           </span>
         </div>
 
+        <div class="mt-3 flex flex-wrap items-center gap-3">
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            :disabled="!canConnect"
+            @click="extractHarvestCurl"
+          >
+            <Icon name="terminal" size="xs" />
+            {{ t('admin.signatureDecoder.verify.curl.harvest') }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            :disabled="!canConnect || !replaySignatureSource"
+            @click="extractReplayCurl"
+          >
+            <Icon name="terminal" size="xs" />
+            {{ t('admin.signatureDecoder.verify.curl.replay') }}
+          </button>
+          <span v-if="!replaySignatureSource" class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t('admin.signatureDecoder.verify.curl.needSignature') }}
+          </span>
+        </div>
+
+        <div v-if="curlOutput" class="mt-3">
+          <div class="mb-1 flex items-center justify-between">
+            <label class="input-label mb-0">
+              {{ t(curlKind === 'harvest' ? 'admin.signatureDecoder.verify.curl.harvestTitle' : 'admin.signatureDecoder.verify.curl.replayTitle') }}
+            </label>
+            <button type="button" class="btn btn-secondary btn-sm" @click="copyText(curlOutput, 'curl')">
+              <Icon name="copy" size="xs" />
+              {{ copied === 'curl' ? t('admin.signatureDecoder.verify.copied') : t('admin.signatureDecoder.verify.copy') }}
+            </button>
+          </div>
+          <pre class="max-h-96 overflow-auto whitespace-pre-wrap break-all rounded-md bg-gray-50 p-3 font-mono text-xs text-gray-900 dark:bg-dark-800 dark:text-white">{{ curlOutput }}</pre>
+        </div>
+
         <p v-if="checkError" class="mt-3 text-sm text-red-600 dark:text-red-400">
           {{ checkError }}
         </p>
@@ -341,7 +378,10 @@ import {
   type ParsedClaudeSignature
 } from '@/utils/claudeSignature'
 import {
+  buildHarvestBody,
   buildMemorizePrompt,
+  buildMessagesCurl,
+  buildReplayBody,
   harvest,
   randomSecret,
   ReasoningError,
@@ -421,7 +461,11 @@ const verdict = ref<'' | 'genuine' | 'notRecovered'>('')
 const checkError = ref('')
 const replayAnswer = ref('')
 const replayRaw = ref('')
-const copied = ref<'answer' | 'raw' | ''>('')
+const copied = ref<'answer' | 'raw' | 'curl' | ''>('')
+
+// Generated curl for the first (harvest) or second (replay) request.
+const curlKind = ref<'' | 'harvest' | 'replay'>('')
+const curlOutput = ref('')
 
 const busy = computed(() => step.value !== '')
 const canConnect = computed(
@@ -526,7 +570,31 @@ function openInDecoder(): void {
   decodeSection.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-async function copyText(value: string, which: 'answer' | 'raw'): Promise<void> {
+// Signature the replay curl uses: the harvested/edited one, or whatever is in the decoder.
+const replaySignatureSource = computed(() => signature.value.trim() || input.value.trim())
+
+/** Build the curl for the first (harvest) request, planting the current random secret. */
+function extractHarvestCurl(): void {
+  if (!secret.value) secret.value = randomSecret()
+  const body = buildHarvestBody(conn.value.model, buildMemorizePrompt(secret.value))
+  curlOutput.value = buildMessagesCurl(conn.value, body)
+  curlKind.value = 'harvest'
+}
+
+/** Build the curl for the second (replay) request, replaying the current signature. */
+function extractReplayCurl(): void {
+  const sig = replaySignatureSource.value
+  if (!sig) return
+  const replayModel = boundModel.value || conn.value.model
+  const body = buildReplayBody(replayModel, sig, {
+    precedingUser: VERIFY_PRECEDING_USER,
+    elicit: VERIFY_ELICITORS[0]
+  })
+  curlOutput.value = buildMessagesCurl(conn.value, body)
+  curlKind.value = 'replay'
+}
+
+async function copyText(value: string, which: 'answer' | 'raw' | 'curl'): Promise<void> {
   try {
     await navigator.clipboard.writeText(value)
     copied.value = which

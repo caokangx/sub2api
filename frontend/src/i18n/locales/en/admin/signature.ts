@@ -73,6 +73,13 @@ export default {
       secretPending: 'Generated when the check starts',
       start: 'Start check',
       retry: 'Retry recovery with the same signature',
+      curl: {
+        harvest: 'Extract first request curl',
+        replay: 'Extract second request curl',
+        harvestTitle: 'First request (harvest signature) curl',
+        replayTitle: 'Second request (replay signature) curl',
+        needSignature: 'Harvest a signature first, or paste one above'
+      },
       steps: {
         harvest: 'Step 1: harvesting the signature while the model memorizes the secret in hidden reasoning…',
         replay: 'Step 2: replaying the signature to recover the secret…'

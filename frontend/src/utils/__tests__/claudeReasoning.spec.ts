@@ -6,7 +6,10 @@ vi.mock('@/api/admin/signatureVerify', () => ({
 }))
 
 import {
+  buildHarvestBody,
   buildMemorizePrompt,
+  buildMessagesCurl,
+  buildReplayBody,
   extractAnswer,
   extractSignature,
   harvest,
@@ -98,6 +101,35 @@ describe('verification prompts', () => {
     for (const elicit of VERIFY_ELICITORS) {
       expect(elicit).not.toContain(secret)
     }
+  })
+})
+
+describe('curl builder', () => {
+  it('mirrors the relay endpoint, headers and body for a harvest request', () => {
+    const body = buildHarvestBody('claude-sonnet-4-6', 'prompt')
+    const curl = buildMessagesCurl(conn, body)
+    expect(curl).toContain("curl 'https://gw.example.com/v1/messages'")
+    expect(curl).toContain("-H 'content-type: application/json'")
+    expect(curl).toContain("-H 'x-api-key:  sk-1 '")
+    expect(curl).toContain("-H 'anthropic-version: 2023-06-01'")
+    expect(curl).toContain('"display": "omitted"')
+    expect(curl).toContain('"content": "prompt"')
+  })
+
+  it('serializes the replayed signature into the second request body', () => {
+    const body = buildReplayBody('claude-opus-4-7', 'SIG', {
+      precedingUser: VERIFY_PRECEDING_USER,
+      elicit: VERIFY_ELICITORS[0]
+    })
+    const curl = buildMessagesCurl({ ...conn, baseUrl: 'https://api.anthropic.com' }, body)
+    expect(curl).toContain("curl 'https://api.anthropic.com/v1/messages'")
+    expect(curl).toContain('"signature": "SIG"')
+    expect(curl).toContain('"model": "claude-opus-4-7"')
+  })
+
+  it('single-quote-escapes an api key so the command stays valid', () => {
+    const curl = buildMessagesCurl({ ...conn, apiKey: "sk-a'b" }, buildHarvestBody('m', 'p'))
+    expect(curl).toContain("-H 'x-api-key: sk-a'\\''b'")
   })
 })
 

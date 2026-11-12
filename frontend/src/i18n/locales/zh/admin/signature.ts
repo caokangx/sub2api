@@ -73,6 +73,13 @@ export default {
       secretPending: '开始校验后随机生成',
       start: '开始校验',
       retry: '用同一签名重试还原',
+      curl: {
+        harvest: '提取第一次请求的 curl',
+        replay: '提取第二次请求的 curl',
+        harvestTitle: '第一次请求（采集签名）curl',
+        replayTitle: '第二次请求（回放签名）curl',
+        needSignature: '需先采集签名或在上方填入 signature'
+      },
       steps: {
         harvest: '第 1 步：采集签名，模型正在隐藏推理中记住秘密…',
         replay: '第 2 步：回放签名，尝试还原秘密…'
