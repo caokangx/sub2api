@@ -179,6 +179,7 @@ BIND_HOST=127.0.0.1
 - `JWT_SECRET` 和 `TOTP_ENCRYPTION_KEY` 部署后必须保持不变。
 - `ADMIN_EMAIL` 和 `ADMIN_PASSWORD` 主要用于首次初始化，系统创建管理员后，修改它们不会自动修改现有管理员。
 - 使用 Caddy 或 Nginx 提供 HTTPS 时保持 `BIND_HOST=127.0.0.1`。
+- 使用 Nginx 时，`client_max_body_size` 至少设为 `8m`，并把 `proxy_read_timeout` 调到 `900s`，否则签名解析页“功能测试”里的 920K 大海捞针用例会被代理拦截或超时。
 - 只有在暂时需要直接访问 `http://176.122.183.195:8080` 时，才设置 `BIND_HOST=0.0.0.0`，并通过防火墙限制访问来源。
 
 ### 5. 上传镜像

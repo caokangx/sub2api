@@ -23,6 +23,7 @@ type signatureVerifyFakeUpstream struct {
 	reqBody    []byte
 	status     int
 	respBody   string
+	respHeader http.Header
 	doErr      error
 	callsCount int
 }
@@ -36,10 +37,14 @@ func (f *signatureVerifyFakeUpstream) Do(req *http.Request, _ string, _ int64, _
 	if f.doErr != nil {
 		return nil, f.doErr
 	}
+	header := f.respHeader
+	if header == nil {
+		header = http.Header{}
+	}
 	return &http.Response{
 		StatusCode: f.status,
 		Body:       io.NopCloser(strings.NewReader(f.respBody)),
-		Header:     http.Header{},
+		Header:     header,
 	}, nil
 }
 
@@ -89,6 +94,8 @@ func TestSignatureVerifyForwardsRequest(t *testing.T) {
 	require.Equal(t, "https://gateway.example.com/v1/messages", up.req.URL.String())
 	require.Equal(t, "sk-test", up.req.Header.Get("x-api-key"))
 	require.Equal(t, "2023-06-01", up.req.Header.Get("anthropic-version"))
+	_, hasBeta := up.req.Header["Anthropic-Beta"]
+	require.False(t, hasBeta)
 	require.JSONEq(t, `{"model":"claude-sonnet-4-6","max_tokens":16}`, string(up.reqBody))
 	require.True(t, service.HTTPUpstreamRedirectsDisabled(up.req.Context()))
 	require.True(t, service.HTTPUpstreamPublicHostsOnly(up.req.Context()))
@@ -121,6 +128,50 @@ func TestSignatureVerifyNonJSONUpstream(t *testing.T) {
 	require.Equal(t, "<html>bad gateway</html>", env.Data.Text)
 }
 
+func TestSignatureVerifyForwardsAnthropicBeta(t *testing.T) {
+	up := &signatureVerifyFakeUpstream{
+		status:     http.StatusOK,
+		respBody:   `{"content":[]}`,
+		respHeader: http.Header{"Content-Type": []string{"application/json"}},
+	}
+	_, env := runSignatureVerify(t, &config.Config{}, up, map[string]any{
+		"base_url":       "https://gateway.example.com",
+		"api_key":        "k",
+		"body":           map[string]any{"model": "m"},
+		"anthropic_beta": "  computer-use-2025-11-24  ",
+	})
+
+	require.Equal(t, "computer-use-2025-11-24", up.req.Header.Get("anthropic-beta"))
+	require.Equal(t, "application/json", env.Data.ContentType)
+}
+
+func TestSignatureVerifyReturnsFullEventStream(t *testing.T) {
+	var sb strings.Builder
+	sb.WriteString("event: message_start\ndata: {\"type\":\"message_start\"}\n\n")
+	for i := 0; i < 200; i++ {
+		sb.WriteString("event: content_block_delta\ndata: {\"type\":\"content_block_delta\",\"delta\":{\"type\":\"text_delta\",\"text\":\"hello\"}}\n\n")
+	}
+	sb.WriteString("event: message_stop\ndata: {\"type\":\"message_stop\"}\n\n")
+	stream := sb.String()
+	require.Greater(t, len(stream), signatureVerifyMaxTextBytes)
+
+	up := &signatureVerifyFakeUpstream{
+		status:     http.StatusOK,
+		respBody:   stream,
+		respHeader: http.Header{"Content-Type": []string{"text/event-stream; charset=utf-8"}},
+	}
+	_, env := runSignatureVerify(t, &config.Config{}, up, map[string]any{
+		"base_url": "https://gateway.example.com",
+		"api_key":  "k",
+		"body":     map[string]any{"model": "m", "stream": true},
+	})
+
+	require.Equal(t, http.StatusOK, env.Data.Status)
+	require.Empty(t, env.Data.Body)
+	require.Equal(t, stream, env.Data.Text)
+	require.Equal(t, "text/event-stream; charset=utf-8", env.Data.ContentType)
+}
+
 func TestSignatureVerifyRejectsBadInput(t *testing.T) {
 	cases := map[string]map[string]any{
 		"private host":    {"base_url": "https://127.0.0.1:8080", "api_key": "k", "body": map[string]any{"model": "m"}},
@@ -130,6 +181,8 @@ func TestSignatureVerifyRejectsBadInput(t *testing.T) {
 		"blank key":       {"base_url": "https://gateway.example.com", "api_key": "   ", "body": map[string]any{"model": "m"}},
 		"body not object": {"base_url": "https://gateway.example.com", "api_key": "k", "body": []any{1, 2}},
 		"missing body":    {"base_url": "https://gateway.example.com", "api_key": "k"},
+		"beta newline":    {"base_url": "https://gateway.example.com", "api_key": "k", "body": map[string]any{"model": "m"}, "anthropic_beta": "a\r\nx-evil: 1"},
+		"beta too long":   {"base_url": "https://gateway.example.com", "api_key": "k", "body": map[string]any{"model": "m"}, "anthropic_beta": strings.Repeat("a", signatureVerifyMaxBetaBytes+1)},
 	}
 	for name, payload := range cases {
 		t.Run(name, func(t *testing.T) {

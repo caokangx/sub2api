@@ -177,9 +177,18 @@
             <label class="input-label" for="verify-model">
               {{ t('admin.signatureDecoder.verify.connection.model') }}
             </label>
-            <select id="verify-model" v-model="conn.model" class="input font-mono text-xs">
-              <option v-for="m in verifyModels" :key="m" :value="m">{{ m }}</option>
-            </select>
+            <input
+              id="verify-model"
+              v-model.trim="conn.model"
+              list="verify-model-options"
+              spellcheck="false"
+              autocomplete="off"
+              class="input font-mono text-xs"
+              :placeholder="t('admin.signatureDecoder.verify.connection.modelPlaceholder')"
+            />
+            <datalist id="verify-model-options">
+              <option v-for="m in verifyModels" :key="m" :value="m" />
+            </datalist>
           </div>
         </div>
       </div>
@@ -359,6 +368,16 @@
       </div>
 
       <SignatureInjectionAnalysis :conn="conn" />
+
+      <!-- ==================== Section 4: functional tests ==================== -->
+      <div class="flex items-center gap-2 pt-4">
+        <Icon name="beaker" size="md" class="text-gray-500 dark:text-gray-400" />
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">
+          {{ t('admin.signatureDecoder.sections.functional') }}
+        </h2>
+      </div>
+
+      <SignatureFunctionalTests :conn="conn" />
     </div>
   </AppLayout>
 </template>
@@ -369,6 +388,7 @@ import { useI18n } from 'vue-i18n'
 import AppLayout from '@/components/layout/AppLayout.vue'
 import Icon from '@/components/icons/Icon.vue'
 import SignatureInjectionAnalysis from '@/components/admin/SignatureInjectionAnalysis.vue'
+import SignatureFunctionalTests from '@/components/admin/SignatureFunctionalTests.vue'
 import {
   flattenProtoFields,
   KNOWN_SIGNATURE_FIELDS,
@@ -440,7 +460,9 @@ function meaningOf(path: string): string {
 
 // The harvest request uses adaptive thinking, which Claude 3.x and the dated
 // 4 / 4.1 / 4.5 releases reject (they only take enabled + budget_tokens).
-const verifyModels = claudeModels.filter((m) => !/^claude-3|-\d{8}$/.test(m)).sort()
+const verifyModels = [
+  ...new Set([...claudeModels.filter((m) => !/^claude-3|-\d{8}$/.test(m)), 'claude-fable-5-2'])
+].sort()
 
 const conn = ref<ReasoningConn>({
   baseUrl: '',

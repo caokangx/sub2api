@@ -138,9 +138,10 @@ function normalizeBaseUrl(baseUrl: string): string {
 /**
  * Build a copy-pasteable curl for the Messages request the backend relays upstream.
  * It mirrors the relay exactly: POST {baseUrl}/v1/messages with the content-type,
- * x-api-key and anthropic-version headers, so running it hits the same endpoint.
+ * x-api-key and anthropic-version headers (plus anthropic-beta when given), so running
+ * it hits the same endpoint.
  */
-export function buildMessagesCurl(conn: ReasoningConn, body: AnyRecord): string {
+export function buildMessagesCurl(conn: ReasoningConn, body: AnyRecord, beta?: string): string {
   const base = normalizeBaseUrl(conn.baseUrl) || 'https://api.anthropic.com'
   const sq = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
   return [
@@ -148,6 +149,7 @@ export function buildMessagesCurl(conn: ReasoningConn, body: AnyRecord): string 
     `  -H 'content-type: application/json' \\`,
     `  -H ${sq(`x-api-key: ${conn.apiKey}`)} \\`,
     `  -H 'anthropic-version: 2023-06-01' \\`,
+    ...(beta ? [`  -H ${sq(`anthropic-beta: ${beta}`)} \\`] : []),
     `  --data-binary ${sq(JSON.stringify(body, null, 2))}`
   ].join('\n')
 }

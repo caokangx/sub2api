@@ -18,9 +18,12 @@ import (
 )
 
 const (
-	// Signatures grow with the amount of hidden thinking (tens of KB for long traces).
-	signatureVerifyMaxRequestBytes  = 4 << 20
+	// Signatures grow with the amount of hidden thinking (tens of KB for long traces), and
+	// the functional tests send ~1M-token long-context prompts (about 3.2 MB of text).
+	signatureVerifyMaxRequestBytes  = 8 << 20
 	signatureVerifyMaxResponseBytes = 16 << 20
+	signatureVerifyMaxTextBytes     = 2000
+	signatureVerifyMaxBetaBytes     = 1024
 	// A high-effort harvest can think for several minutes before responding.
 	signatureVerifyTimeout          = 15 * time.Minute
 	signatureVerifyAnthropicVersion = "2023-06-01"
@@ -42,15 +45,19 @@ type SignatureVerifyMessagesRequest struct {
 	BaseURL string          `json:"base_url" binding:"required"`
 	APIKey  string          `json:"api_key" binding:"required"`
 	Body    json.RawMessage `json:"body" binding:"required"`
+	// Optional anthropic-beta header value; the header is omitted when empty.
+	AnthropicBeta string `json:"anthropic_beta"`
 }
 
 // SignatureVerifyMessagesResponse wraps the upstream reply. The upstream status is
 // reported in the payload instead of the HTTP status so that, e.g., an upstream 401
 // for a bad gateway key is not mistaken for an expired admin session.
 type SignatureVerifyMessagesResponse struct {
-	Status int             `json:"status"`
-	Body   json.RawMessage `json:"body,omitempty"`
-	Text   string          `json:"text,omitempty"`
+	Status      int             `json:"status"`
+	Body        json.RawMessage `json:"body,omitempty"`
+	Text        string          `json:"text,omitempty"`
+	ContentType string          `json:"content_type,omitempty"`
+	ElapsedMs   int64           `json:"elapsed_ms"`
 }
 
 // Messages POST /api/v1/admin/signature-verify/messages
@@ -70,6 +77,11 @@ func (h *SignatureVerifyHandler) Messages(c *gin.Context) {
 	apiKey := strings.TrimSpace(req.APIKey)
 	if apiKey == "" {
 		response.BadRequest(c, "api_key is required")
+		return
+	}
+	beta := strings.TrimSpace(req.AnthropicBeta)
+	if len(beta) > signatureVerifyMaxBetaBytes || strings.ContainsAny(beta, "\r\n") {
+		response.BadRequest(c, "Invalid anthropic_beta")
 		return
 	}
 
@@ -99,7 +111,11 @@ func (h *SignatureVerifyHandler) Messages(c *gin.Context) {
 	upstreamReq.Header.Set("Content-Type", "application/json")
 	upstreamReq.Header.Set("x-api-key", apiKey)
 	upstreamReq.Header.Set("anthropic-version", signatureVerifyAnthropicVersion)
+	if beta != "" {
+		upstreamReq.Header.Set("anthropic-beta", beta)
+	}
 
+	started := time.Now()
 	resp, err := h.upstream.Do(upstreamReq, "", 0, 1)
 	if err != nil {
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
@@ -121,13 +137,21 @@ func (h *SignatureVerifyHandler) Messages(c *gin.Context) {
 		return
 	}
 
-	out := SignatureVerifyMessagesResponse{Status: resp.StatusCode}
-	if json.Valid(raw) {
+	contentType := resp.Header.Get("Content-Type")
+	out := SignatureVerifyMessagesResponse{
+		Status:      resp.StatusCode,
+		ContentType: contentType,
+		ElapsedMs:   time.Since(started).Milliseconds(),
+	}
+	switch {
+	case strings.HasPrefix(strings.ToLower(contentType), "text/event-stream"):
+		out.Text = string(raw)
+	case json.Valid(raw):
 		out.Body = raw
-	} else {
+	default:
 		text := string(raw)
-		if len(text) > 2000 {
-			text = text[:2000]
+		if len(text) > signatureVerifyMaxTextBytes {
+			text = text[:signatureVerifyMaxTextBytes]
 		}
 		out.Text = text
 	}

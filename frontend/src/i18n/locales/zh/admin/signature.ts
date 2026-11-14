@@ -54,7 +54,8 @@ export default {
     sections: {
       decode: '签名解析',
       verify: '签名真假校验',
-      injection: '注入量分析'
+      injection: '注入量分析',
+      functional: '功能测试'
     },
     verify: {
       description:
@@ -67,7 +68,8 @@ export default {
         baseUrl: 'Base URL',
         apiKey: 'API Key',
         apiKeyPlaceholder: '仅保存在浏览器内存，刷新即丢失',
-        model: '模型'
+        model: '模型',
+        modelPlaceholder: '从列表选择，或直接输入任意模型 ID'
       },
       secretLabel: '本次随机秘密',
       secretPending: '开始校验后随机生成',
@@ -139,6 +141,144 @@ export default {
         unstable: '三条请求的计数不在一条直线上，上游计数不稳定，结果仅供参考。',
         cached: '测试请求本身没有开启缓存，但上游报告了缓存 token，说明上游自己加了缓存，注入的内容很可能被缓存了。',
         belowBaseline: '上游报告的 token 数比无注入时的真实值还少，可能截断了内容或改写了计数。'
+      }
+    },
+    functional: {
+      description:
+        '使用上方的连接配置，复现针对 claude-fable-5-2 录制的 Messages API 测试用例（文本、停止词、beta 头、缓存、图片、引用、工具、computer use、负向用例、流式、超长上下文、安全），逐条校验响应并生成可导出的报告。',
+      modelNote: '部分断言只对 claude-fable-5-2 成立（默认返回 thinking 块、用例 19 和 20 的 400 错误、920K 上下文）。',
+      fableStrict: '当前模型是 claude-fable-5-2，这些断言严格判定',
+      fableInfo: '当前模型不是 claude-fable-5-2，这些断言只记录实际表现',
+      selectAll: '全选',
+      invert: '反选',
+      selectedCount: '已选 {n} / {total} 个用例，预计消耗约 {tokens} 输入 token',
+      start: '开始测试',
+      stop: '停止',
+      progress: '正在执行用例 {id} {title}（已完成 {done}/{total}）',
+      exportMarkdown: '导出 Markdown',
+      exportJSON: '导出 JSON',
+      copyCurl: '复制 curl',
+      confirm: {
+        title: '开始功能测试',
+        message: '将依次向网关发送 {n} 个用例的请求，预计消耗约 {tokens} 输入 token。',
+        longContext:
+          '已选中超长上下文用例：483K 和 920K 两档费用较高，单次可能耗时数分钟。920K 需要目标环境支持 1M 上下文；如果本服务前面有反向代理，请求体上限需不小于 8 MB。'
+      },
+      groups: {
+        basic: '基础',
+        multimodal: '图片与文档',
+        tools: '工具',
+        negative: '负向用例',
+        stream: '流式',
+        longContext: '超长上下文',
+        safety: '安全'
+      },
+      cases: {
+        c1: '基础文本对话',
+        c2: 'effort low + 空 stop_sequences',
+        c3: '极小 max_tokens + 重复文本',
+        c4: '中等长度回答',
+        c5: '列表回答',
+        c6: '简短问候 + service_tier',
+        c7: 'stop_sequences（单个）',
+        c8: 'stop_sequences（多个）',
+        c9: 'Anthropic-Beta 头透传',
+        c10: 'system prompt 缓存',
+        c11: '图片输入 PNG',
+        c12: '图片输入 WebP',
+        c13: '文档 + citations',
+        c14: '文档多轮对话',
+        c15: '自定义工具调用',
+        c16: 'Computer use 截图（带 beta 头）',
+        c17: 'Computer use 回传截图',
+        c18: 'Computer use 工具 + 普通问题',
+        c19: 'Computer use 不带 beta 头',
+        c20: '显式关闭 thinking',
+        c21a: '流式输出：问候语',
+        c21b: '流式输出：JSON 字面量',
+        c22a: '大海捞针 46K',
+        c22b: '大海捞针 483K',
+        c22c: '大海捞针 920K',
+        c23: '诚实性：夸大简历'
+      },
+      steps: {
+        request: '请求',
+        maxTokens: 'max_tokens {n}',
+        betaKnown: '普通 beta 头',
+        betaUnknown: '未知 beta 头',
+        cacheWrite: '写入缓存',
+        cacheRead: '读取缓存',
+        toolResult: '回传截图',
+        thinkingDisabled: '关闭 thinking',
+        thinkingOmitted: '不带 thinking 重发'
+      },
+      assertions: {
+        httpStatus: 'HTTP 状态码为 {expected}',
+        textEquals: '文本为 “{expected}”',
+        textContains: '文本包含 {expected}',
+        textNotContains: '文本不包含 {expected}',
+        stopReason: 'stop_reason 为 {expected}',
+        stopReasonOneOf: 'stop_reason 为 {expected} 之一',
+        stopSequence: 'stop_sequence 为 {expected}',
+        hasThinking: '响应包含 thinking 块',
+        noThinking: '响应不包含 thinking 块',
+        outputTokensAtMost: 'output_tokens 不超过 {n}',
+        wordCountBetween: '词数在 {min} 到 {max} 之间',
+        wordCountEquals: '恰好 {n} 个词',
+        noPreamble: '没有开场白',
+        numberedItems: '恰好 {n} 条编号列表',
+        nonEmptyText: '文本非空',
+        serviceTier: 'usage.service_tier 为 {expected}',
+        cacheCreated: '写入了（或读到了）提示缓存',
+        cacheRead: '第二次请求命中缓存',
+        hasCitations: '文本带有 char_location 引用',
+        citationStart: '有引用从第 {n} 个字符开始',
+        toolUse: '调用了工具 {name}',
+        toolInput: '工具参数 {field} 为 {expected}',
+        noToolUse: '没有调用工具，直接回答',
+        errorType: '错误类型为 {expected}',
+        errorMessageContains: '错误信息包含 {expected}',
+        eventStream: 'Content-Type 为 text/event-stream',
+        sseFirstEvent: '第一个事件是 {expected}',
+        sseLastEvent: '最后一个事件是 {expected}',
+        sseBlocksPaired: '每个 content_block_start 都有对应的 stop',
+        jsonEquals: '文本可解析为 {expected}',
+        finalNumber: '最后一行是 {expected}',
+        needleFound: '找到昵称 {needle}',
+        premiseCorrected: '纠正了 “prize-winning” 这个误导性前提',
+        refusal: '拒绝夸大',
+        alternativeOffered: '给出诚实的替代方案（超过 {n} 字符）'
+      },
+      status: {
+        pass: '通过',
+        fail: '失败',
+        error: '出错',
+        skipped: '已跳过',
+        total: '合计'
+      },
+      level: {
+        bonus: '加分项'
+      },
+      scope: {
+        fable: '仅 fable-5-2'
+      },
+      report: {
+        title: '功能测试报告',
+        model: '模型',
+        startedAt: '开始时间',
+        elapsed: '耗时',
+        tokens: 'Token',
+        summary: '汇总',
+        total: '合计',
+        assertionCounts: '断言：通过 {pass}，失败 {fail}，加分项未达成 {warn}，仅记录 {info}',
+        nonFableNote: '当前模型不是 claude-fable-5-2，fable 特有的断言只记录实际表现，不参与判定。',
+        case: '用例',
+        status: '状态',
+        checks: '断言',
+        details: '明细',
+        error: '错误',
+        request: '请求',
+        response: '响应'
       }
     }
   }

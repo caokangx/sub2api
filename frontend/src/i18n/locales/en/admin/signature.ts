@@ -54,7 +54,8 @@ export default {
     sections: {
       decode: 'Signature decoding',
       verify: 'Genuineness check',
-      injection: 'Injection analysis'
+      injection: 'Injection analysis',
+      functional: 'Functional tests'
     },
     verify: {
       description:
@@ -67,7 +68,8 @@ export default {
         baseUrl: 'Base URL',
         apiKey: 'API Key',
         apiKeyPlaceholder: 'Kept in browser memory only; lost on refresh',
-        model: 'Model'
+        model: 'Model',
+        modelPlaceholder: 'Pick from the list or type any model ID'
       },
       secretLabel: 'Random secret for this check',
       secretPending: 'Generated when the check starts',
@@ -139,6 +141,144 @@ export default {
         unstable: 'The three counts do not fall on a straight line. The upstream count is unstable, so treat the result as a rough guide.',
         cached: 'The probes do not enable caching, yet the upstream reported cached tokens: the upstream adds caching itself, so the injected content is likely cached.',
         belowBaseline: 'The upstream reports fewer tokens than the genuine count; it may truncate the content or rewrite the count.'
+      }
+    },
+    functional: {
+      description:
+        'Uses the connection above to replay the Messages API test cases recorded against claude-fable-5-2 (text, stop sequences, beta headers, caching, images, citations, tools, computer use, negative cases, streaming, long context and safety), checks every response and produces a report you can export.',
+      modelNote: 'Some checks only hold for claude-fable-5-2 (default thinking block, the 400 errors of cases 19 and 20, the 920K context).',
+      fableStrict: 'Current model is claude-fable-5-2: those checks are judged strictly',
+      fableInfo: 'Current model is not claude-fable-5-2: those checks are recorded only',
+      selectAll: 'Select all',
+      invert: 'Invert',
+      selectedCount: '{n} / {total} cases selected · about {tokens} input tokens',
+      start: 'Start tests',
+      stop: 'Stop',
+      progress: 'Running case {id} {title} ({done}/{total} done)',
+      exportMarkdown: 'Export Markdown',
+      exportJSON: 'Export JSON',
+      copyCurl: 'Copy curl',
+      confirm: {
+        title: 'Start functional tests',
+        message: '{n} cases will be sent to the gateway one by one, using about {tokens} input tokens.',
+        longContext:
+          'Long-context cases are selected: the 483K and 920K requests are expensive and can each take several minutes. The 920K case needs a 1M context window, and any reverse proxy in front of this app must accept request bodies of at least 8 MB.'
+      },
+      groups: {
+        basic: 'Basics',
+        multimodal: 'Images and documents',
+        tools: 'Tools',
+        negative: 'Negative cases',
+        stream: 'Streaming',
+        longContext: 'Long context',
+        safety: 'Safety'
+      },
+      cases: {
+        c1: 'Basic text reply',
+        c2: 'effort low + empty stop_sequences',
+        c3: 'Tiny max_tokens + repeated text',
+        c4: 'Medium-length answer',
+        c5: 'Numbered list answer',
+        c6: 'Short greeting + service_tier',
+        c7: 'Single stop sequence',
+        c8: 'Multiple stop sequences',
+        c9: 'anthropic-beta pass-through',
+        c10: 'System prompt caching',
+        c11: 'PNG image input',
+        c12: 'WebP image input',
+        c13: 'Document + citations',
+        c14: 'Multi-turn document chat',
+        c15: 'Custom tool call',
+        c16: 'Computer use screenshot (with beta)',
+        c17: 'Computer use tool_result image',
+        c18: 'Computer use tool + plain question',
+        c19: 'Computer use without beta header',
+        c20: 'Thinking explicitly disabled',
+        c21a: 'Streaming greeting',
+        c21b: 'Streaming JSON literal',
+        c22a: 'Needle in a haystack 46K',
+        c22b: 'Needle in a haystack 483K',
+        c22c: 'Needle in a haystack 920K',
+        c23: 'Honesty: inflated resume'
+      },
+      steps: {
+        request: 'Request',
+        maxTokens: 'max_tokens {n}',
+        betaKnown: 'Common beta header',
+        betaUnknown: 'Unknown beta header',
+        cacheWrite: 'Cache write',
+        cacheRead: 'Cache read',
+        toolResult: 'Send screenshot back',
+        thinkingDisabled: 'thinking disabled',
+        thinkingOmitted: 'thinking omitted'
+      },
+      assertions: {
+        httpStatus: 'HTTP status is {expected}',
+        textEquals: 'Text is "{expected}"',
+        textContains: 'Text contains {expected}',
+        textNotContains: 'Text does not contain {expected}',
+        stopReason: 'stop_reason is {expected}',
+        stopReasonOneOf: 'stop_reason is one of {expected}',
+        stopSequence: 'stop_sequence is {expected}',
+        hasThinking: 'Response has a thinking block',
+        noThinking: 'Response has no thinking block',
+        outputTokensAtMost: 'output_tokens is at most {n}',
+        wordCountBetween: 'Word count is between {min} and {max}',
+        wordCountEquals: 'Exactly {n} words',
+        noPreamble: 'No preamble',
+        numberedItems: 'Exactly {n} numbered items',
+        nonEmptyText: 'Text is not empty',
+        serviceTier: 'usage.service_tier is {expected}',
+        cacheCreated: 'Prompt cache was written (or read)',
+        cacheRead: 'Second request reads the cache',
+        hasCitations: 'Text carries char_location citations',
+        citationStart: 'A citation starts at character {n}',
+        toolUse: 'Calls tool {name}',
+        toolInput: 'Tool input {field} is {expected}',
+        noToolUse: 'Answers without calling a tool',
+        errorType: 'Error type is {expected}',
+        errorMessageContains: 'Error message contains {expected}',
+        eventStream: 'Content-Type is text/event-stream',
+        sseFirstEvent: 'First event is {expected}',
+        sseLastEvent: 'Last event is {expected}',
+        sseBlocksPaired: 'Every content_block_start has a matching stop',
+        jsonEquals: 'Text parses to {expected}',
+        finalNumber: 'Last line is {expected}',
+        needleFound: 'Finds nickname {needle}',
+        premiseCorrected: 'Corrects the misleading "prize-winning" premise',
+        refusal: 'Declines to exaggerate',
+        alternativeOffered: 'Offers an honest alternative (over {n} characters)'
+      },
+      status: {
+        pass: 'Passed',
+        fail: 'Failed',
+        error: 'Error',
+        skipped: 'Skipped',
+        total: 'Total'
+      },
+      level: {
+        bonus: 'bonus'
+      },
+      scope: {
+        fable: 'fable-5-2 only'
+      },
+      report: {
+        title: 'Functional test report',
+        model: 'Model',
+        startedAt: 'Started at',
+        elapsed: 'Duration',
+        tokens: 'Tokens',
+        summary: 'Summary',
+        total: 'Total',
+        assertionCounts: 'Checks: {pass} passed, {fail} failed, {warn} bonus missed, {info} recorded only',
+        nonFableNote: 'The model is not claude-fable-5-2, so fable-specific checks are recorded only and not judged.',
+        case: 'Case',
+        status: 'Status',
+        checks: 'Checks',
+        details: 'Details',
+        error: 'Error',
+        request: 'Request',
+        response: 'Response'
       }
     }
   }
