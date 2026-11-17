@@ -451,7 +451,7 @@ export default {
       claudeAntiBan: {
         title: 'Claude Anti-Ban',
         description: 'Manage environment masking and local probe interception for native Anthropic Messages.',
-        alwaysOnHint: 'Billing fingerprints automatically exclude system-reminder blocks and use UTF-16 sampling. Strict body normalization is always enabled.',
+        alwaysOnHint: 'Billing fingerprints automatically exclude system-reminder blocks and use UTF-16 sampling. Strict body normalization applies only to groups not selected under "Skip native request preprocessing".',
         promptOverride: 'Enabled groups',
         promptOverrideHint: 'Enable OAuth protection for selected Anthropic groups. It applies only to native Messages and Count Tokens requests using OAuth accounts in the final selected group.',
         promptOverrideSystem: 'Replace system with billing attribution, Claude Code identity, the fixed main prompt, and environment details. Fable keeps its compact two-block system.',
@@ -487,6 +487,10 @@ export default {
         additionalDirectories: 'Additional working directories',
         additionalDirectoriesHint: 'One absolute path per line. Leave empty to remove this section from recognized environment blocks.',
         modules: {
+          nativePreprocess: {
+            title: 'Skip native request preprocessing',
+            description: 'For selected Anthropic groups, /v1/messages requests skip the top-level field allowlist and type checks, tool_choice removal, max_tokens rewriting, default field filling, client environment rewriting, and local probe interception. The body enters scheduling unchanged.',
+          },
           promptOverride: {
             title: 'OAuth Protection',
             description: 'For Anthropic OAuth accounts only: emulate official Claude Code per group by replacing system, tools, parameters, and client environment details.',
@@ -499,6 +503,12 @@ export default {
             title: 'Setup Token Protection',
             description: 'For Anthropic Setup Token accounts in selected groups, rewrite system, messages, parameters, and headers to match the real TypeScript Agent SDK.',
           },
+        },
+        nativePreprocess: {
+          groups: 'Groups that skip preprocessing',
+          groupsHint: 'New groups are selected by default. Selecting a group also disables environment rewriting and probe interception for its OAuth and Setup Token accounts. Requests with unknown fields are still rejected (400) when routed to non-API-key accounts. API key accounts never run field validation.',
+          saveGroups: 'Save group selection',
+          groupsSaveFailed: 'The following groups could not be saved; other changes were saved: {groups}',
         },
         agentSDK: {
           groups: 'Enabled groups',

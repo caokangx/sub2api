@@ -22148,6 +22148,7 @@ type GroupMutation struct {
 	claude_code_only                        *bool
 	force_claude_code_profile               *bool
 	simulate_claude_agent_sdk               *bool
+	skip_native_claude_validation           *bool
 	fallback_group_id                       *int64
 	addfallback_group_id                    *int64
 	fallback_group_id_on_invalid_request    *int64
@@ -24619,6 +24620,42 @@ func (m *GroupMutation) ResetSimulateClaudeAgentSdk() {
 	m.simulate_claude_agent_sdk = nil
 }
 
+// SetSkipNativeClaudeValidation sets the "skip_native_claude_validation" field.
+func (m *GroupMutation) SetSkipNativeClaudeValidation(b bool) {
+	m.skip_native_claude_validation = &b
+}
+
+// SkipNativeClaudeValidation returns the value of the "skip_native_claude_validation" field in the mutation.
+func (m *GroupMutation) SkipNativeClaudeValidation() (r bool, exists bool) {
+	v := m.skip_native_claude_validation
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldSkipNativeClaudeValidation returns the old "skip_native_claude_validation" field's value of the Group entity.
+// If the Group object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *GroupMutation) OldSkipNativeClaudeValidation(ctx context.Context) (v bool, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldSkipNativeClaudeValidation is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldSkipNativeClaudeValidation requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldSkipNativeClaudeValidation: %w", err)
+	}
+	return oldValue.SkipNativeClaudeValidation, nil
+}
+
+// ResetSkipNativeClaudeValidation resets all changes to the "skip_native_claude_validation" field.
+func (m *GroupMutation) ResetSkipNativeClaudeValidation() {
+	m.skip_native_claude_validation = nil
+}
+
 // SetFallbackGroupID sets the "fallback_group_id" field.
 func (m *GroupMutation) SetFallbackGroupID(i int64) {
 	m.fallback_group_id = &i
@@ -26032,7 +26069,7 @@ func (m *GroupMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *GroupMutation) Fields() []string {
-	fields := make([]string, 0, 69)
+	fields := make([]string, 0, 70)
 	if m.created_at != nil {
 		fields = append(fields, group.FieldCreatedAt)
 	}
@@ -26167,6 +26204,9 @@ func (m *GroupMutation) Fields() []string {
 	}
 	if m.simulate_claude_agent_sdk != nil {
 		fields = append(fields, group.FieldSimulateClaudeAgentSdk)
+	}
+	if m.skip_native_claude_validation != nil {
+		fields = append(fields, group.FieldSkipNativeClaudeValidation)
 	}
 	if m.fallback_group_id != nil {
 		fields = append(fields, group.FieldFallbackGroupID)
@@ -26338,6 +26378,8 @@ func (m *GroupMutation) Field(name string) (ent.Value, bool) {
 		return m.ForceClaudeCodeProfile()
 	case group.FieldSimulateClaudeAgentSdk:
 		return m.SimulateClaudeAgentSdk()
+	case group.FieldSkipNativeClaudeValidation:
+		return m.SkipNativeClaudeValidation()
 	case group.FieldFallbackGroupID:
 		return m.FallbackGroupID()
 	case group.FieldFallbackGroupIDOnInvalidRequest:
@@ -26485,6 +26527,8 @@ func (m *GroupMutation) OldField(ctx context.Context, name string) (ent.Value, e
 		return m.OldForceClaudeCodeProfile(ctx)
 	case group.FieldSimulateClaudeAgentSdk:
 		return m.OldSimulateClaudeAgentSdk(ctx)
+	case group.FieldSkipNativeClaudeValidation:
+		return m.OldSkipNativeClaudeValidation(ctx)
 	case group.FieldFallbackGroupID:
 		return m.OldFallbackGroupID(ctx)
 	case group.FieldFallbackGroupIDOnInvalidRequest:
@@ -26856,6 +26900,13 @@ func (m *GroupMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSimulateClaudeAgentSdk(v)
+		return nil
+	case group.FieldSkipNativeClaudeValidation:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetSkipNativeClaudeValidation(v)
 		return nil
 	case group.FieldFallbackGroupID:
 		v, ok := value.(int64)
@@ -27670,6 +27721,9 @@ func (m *GroupMutation) ResetField(name string) error {
 		return nil
 	case group.FieldSimulateClaudeAgentSdk:
 		m.ResetSimulateClaudeAgentSdk()
+		return nil
+	case group.FieldSkipNativeClaudeValidation:
+		m.ResetSkipNativeClaudeValidation()
 		return nil
 	case group.FieldFallbackGroupID:
 		m.ResetFallbackGroupID()

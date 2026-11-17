@@ -265,6 +265,11 @@ func SimulateClaudeAgentSdk(v bool) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldSimulateClaudeAgentSdk, v))
 }
 
+// SkipNativeClaudeValidation applies equality check predicate on the "skip_native_claude_validation" field. It's identical to SkipNativeClaudeValidationEQ.
+func SkipNativeClaudeValidation(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldSkipNativeClaudeValidation, v))
+}
+
 // FallbackGroupID applies equality check predicate on the "fallback_group_id" field. It's identical to FallbackGroupIDEQ.
 func FallbackGroupID(v int64) predicate.Group {
 	return predicate.Group(sql.FieldEQ(FieldFallbackGroupID, v))
@@ -2123,6 +2128,16 @@ func SimulateClaudeAgentSdkEQ(v bool) predicate.Group {
 // SimulateClaudeAgentSdkNEQ applies the NEQ predicate on the "simulate_claude_agent_sdk" field.
 func SimulateClaudeAgentSdkNEQ(v bool) predicate.Group {
 	return predicate.Group(sql.FieldNEQ(FieldSimulateClaudeAgentSdk, v))
+}
+
+// SkipNativeClaudeValidationEQ applies the EQ predicate on the "skip_native_claude_validation" field.
+func SkipNativeClaudeValidationEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldEQ(FieldSkipNativeClaudeValidation, v))
+}
+
+// SkipNativeClaudeValidationNEQ applies the NEQ predicate on the "skip_native_claude_validation" field.
+func SkipNativeClaudeValidationNEQ(v bool) predicate.Group {
+	return predicate.Group(sql.FieldNEQ(FieldSkipNativeClaudeValidation, v))
 }
 
 // FallbackGroupIDEQ applies the EQ predicate on the "fallback_group_id" field.

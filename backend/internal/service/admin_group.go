@@ -524,6 +524,10 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 	if input.MCPXMLInject != nil {
 		mcpXMLInject = *input.MCPXMLInject
 	}
+	skipNativeClaudeValidation := true
+	if input.SkipNativeClaudeValidation != nil {
+		skipNativeClaudeValidation = *input.SkipNativeClaudeValidation
+	}
 
 	allowImageGeneration := input.AllowImageGeneration || defaultAllowImageGenerationForPlatform(platform)
 	allowBatchImageGeneration := input.AllowBatchImageGeneration && allowImageGeneration && platform == PlatformGemini
@@ -610,6 +614,7 @@ func (s *adminServiceImpl) CreateGroup(ctx context.Context, input *CreateGroupIn
 		ClaudeCodeOnly:                  input.ClaudeCodeOnly,
 		ForceClaudeCodeProfile:          input.ForceClaudeCodeProfile && platform == PlatformAnthropic,
 		SimulateClaudeAgentSDK:          input.SimulateClaudeAgentSDK && platform == PlatformAnthropic,
+		SkipNativeClaudeValidation:      skipNativeClaudeValidation,
 		FallbackGroupID:                 input.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: fallbackOnInvalidRequest,
 		ModelRouting:                    input.ModelRouting,
@@ -1010,6 +1015,9 @@ func (s *adminServiceImpl) UpdateGroup(ctx context.Context, id int64, input *Upd
 	}
 	if input.SimulateClaudeAgentSDK != nil {
 		group.SimulateClaudeAgentSDK = *input.SimulateClaudeAgentSDK
+	}
+	if input.SkipNativeClaudeValidation != nil {
+		group.SkipNativeClaudeValidation = *input.SkipNativeClaudeValidation
 	}
 	if group.Platform != PlatformAnthropic {
 		group.ForceClaudeCodeProfile = false

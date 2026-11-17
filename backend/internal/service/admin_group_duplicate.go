@@ -138,6 +138,7 @@ func cloneGroupForDuplicate(source *Group, operationID string) *Group {
 		ClaudeCodeOnly:                  source.ClaudeCodeOnly,
 		ForceClaudeCodeProfile:          source.ForceClaudeCodeProfile,
 		SimulateClaudeAgentSDK:          source.SimulateClaudeAgentSDK,
+		SkipNativeClaudeValidation:      source.SkipNativeClaudeValidation,
 		FallbackGroupID:                 cloneGroupValuePointer(source.FallbackGroupID),
 		FallbackGroupIDOnInvalidRequest: cloneGroupValuePointer(source.FallbackGroupIDOnInvalidRequest),
 		ModelRouting:                    cloneGroupModelRouting(source.ModelRouting),

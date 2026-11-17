@@ -1771,7 +1771,7 @@ func TestGatewayService_AnthropicAPIKeyPassthrough_Non2xxRecordsOllamaActivity(t
 }
 
 func TestOpus55RejectsUnsupportedParametersBeforeMimicry(t *testing.T) {
-	for _, typ := range []string{AccountTypeOAuth, AccountTypeAPIKey} {
+	for _, typ := range []string{AccountTypeOAuth} {
 		for _, field := range []string{`"thinking":{"type":"disabled"}`, `"thinking":{"type":"enabled","budget_tokens":1024}`, `"tool_choice":{"type":"any"}`, `"tool_choice":{"type":"tool","name":"lookup"}`} {
 			for _, count := range []bool{false, true} {
 				rec := httptest.NewRecorder()
@@ -1779,10 +1779,6 @@ func TestOpus55RejectsUnsupportedParametersBeforeMimicry(t *testing.T) {
 				c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
 				model := "claude-opus-5-5"
 				account := &Account{ID: 1, Platform: PlatformAnthropic, Type: typ}
-				if typ == AccountTypeAPIKey {
-					model = "public-opus"
-					account.Credentials = map[string]any{"model_mapping": map[string]any{model: "claude-opus-5-5"}}
-				}
 				body := []byte(`{"model":"` + model + `","messages":[{"role":"user","content":"hello"}],` + field + `}`)
 				parsed := &ParsedRequest{Model: model, Body: NewRequestBodyRef(body)}
 				svc := &GatewayService{}
@@ -1826,15 +1822,11 @@ func TestSonnet55RejectsUnsupportedParametersBeforeMimicry(t *testing.T) {
 		`"top_k":1`,
 	}
 	for _, field := range fields {
-		for _, typ := range []string{AccountTypeOAuth, AccountTypeAPIKey, AccountTypeBedrock, AccountTypeServiceAccount} {
+		for _, typ := range []string{AccountTypeOAuth, AccountTypeBedrock, AccountTypeServiceAccount} {
 			for _, count := range []bool{false, true} {
 				model := "claude-sonnet-5-5"
 				account := &Account{ID: 1, Platform: PlatformAnthropic, Type: typ}
-				switch typ {
-				case AccountTypeAPIKey:
-					model = "public-sonnet"
-					account.Credentials = map[string]any{"model_mapping": map[string]any{model: "claude-sonnet-5-5"}}
-				case AccountTypeBedrock:
+				if typ == AccountTypeBedrock {
 					account.Credentials = map[string]any{"aws_region": "eu-west-1"}
 				}
 				body := []byte(`{"model":"` + model + `","messages":[{"role":"user","content":"hello"}],` + field + `}`)
@@ -1855,6 +1847,28 @@ func TestSonnet55RejectsUnsupportedParametersBeforeMimicry(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestAnthropicAPIKeyAccountSkipsNativeClaudeValidation(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	body := []byte(`{"model":"claude-sonnet-5-5","messages":[{"role":"user","content":"hello"}],"performanceConfig":{"latency":"optimized"},"thinking":{"type":"disabled"},"tool_choice":{"type":"any"},"temperature":0.7}`)
+	upstream := &anthropicHTTPUpstreamRecorder{err: context.Canceled}
+	svc := &GatewayService{
+		cfg:          &config.Config{Security: config.SecurityConfig{URLAllowlist: config.URLAllowlistConfig{Enabled: false}}},
+		httpUpstream: upstream,
+	}
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodPost, "/v1/messages", nil)
+	parsed := &ParsedRequest{Model: "claude-sonnet-5-5", Body: NewRequestBodyRef(body)}
+
+	_, _ = svc.Forward(context.Background(), c, newAnthropicAPIKeyAccountForTest(), parsed)
+
+	require.NotEqual(t, http.StatusBadRequest, rec.Code)
+	require.NotNil(t, upstream.lastReq, "API key accounts must reach the upstream without native validation")
+	require.JSONEq(t, `{"latency":"optimized"}`, gjson.GetBytes(upstream.lastBody, "performanceConfig").Raw)
+	require.Equal(t, "any", gjson.GetBytes(upstream.lastBody, "tool_choice.type").String())
+	require.Equal(t, "disabled", gjson.GetBytes(upstream.lastBody, "thinking.type").String())
 }
 
 func TestSonnet55PreservesSignedHistoryAndAcceptsDefaultParameters(t *testing.T) {

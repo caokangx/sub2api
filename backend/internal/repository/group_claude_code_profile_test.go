@@ -25,4 +25,11 @@ func TestClaudeCodeProfileGroupAuthProjection(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, loaded.Group.ForceClaudeCodeProfile)
 	require.True(t, loaded.Group.SimulateClaudeAgentSDK)
+	require.True(t, loaded.Group.SkipNativeClaudeValidation, "skip_native_claude_validation defaults to true")
+
+	_, err = client.Group.UpdateOneID(group.ID).SetSkipNativeClaudeValidation(false).Save(ctx)
+	require.NoError(t, err)
+	loaded, err = repo.GetByKeyForAuth(ctx, key.Key)
+	require.NoError(t, err)
+	require.False(t, loaded.Group.SkipNativeClaudeValidation)
 }

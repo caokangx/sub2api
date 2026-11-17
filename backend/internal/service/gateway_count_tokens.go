@@ -48,7 +48,7 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 			validationModel = account.GetMappedModel(validationModel)
 		}
 	}
-	if account != nil && account.Platform == PlatformAnthropic {
+	if account != nil && account.Platform == PlatformAnthropic && account.Type != AccountTypeAPIKey {
 		validationBody := parsed.Body.Bytes()
 		if forceClaudeCodeProfile(ctx, account) {
 			validationBody, _ = deleteJSONPathBytes(validationBody, "tool_choice")

@@ -628,6 +628,20 @@ func (_c *GroupCreate) SetNillableSimulateClaudeAgentSdk(v *bool) *GroupCreate {
 	return _c
 }
 
+// SetSkipNativeClaudeValidation sets the "skip_native_claude_validation" field.
+func (_c *GroupCreate) SetSkipNativeClaudeValidation(v bool) *GroupCreate {
+	_c.mutation.SetSkipNativeClaudeValidation(v)
+	return _c
+}
+
+// SetNillableSkipNativeClaudeValidation sets the "skip_native_claude_validation" field if the given value is not nil.
+func (_c *GroupCreate) SetNillableSkipNativeClaudeValidation(v *bool) *GroupCreate {
+	if v != nil {
+		_c.SetSkipNativeClaudeValidation(*v)
+	}
+	return _c
+}
+
 // SetFallbackGroupID sets the "fallback_group_id" field.
 func (_c *GroupCreate) SetFallbackGroupID(v int64) *GroupCreate {
 	_c.mutation.SetFallbackGroupID(v)
@@ -1173,6 +1187,10 @@ func (_c *GroupCreate) defaults() error {
 		v := group.DefaultSimulateClaudeAgentSdk
 		_c.mutation.SetSimulateClaudeAgentSdk(v)
 	}
+	if _, ok := _c.mutation.SkipNativeClaudeValidation(); !ok {
+		v := group.DefaultSkipNativeClaudeValidation
+		_c.mutation.SetSkipNativeClaudeValidation(v)
+	}
 	if _, ok := _c.mutation.ModelRoutingEnabled(); !ok {
 		v := group.DefaultModelRoutingEnabled
 		_c.mutation.SetModelRoutingEnabled(v)
@@ -1394,6 +1412,9 @@ func (_c *GroupCreate) check() error {
 	}
 	if _, ok := _c.mutation.SimulateClaudeAgentSdk(); !ok {
 		return &ValidationError{Name: "simulate_claude_agent_sdk", err: errors.New(`ent: missing required field "Group.simulate_claude_agent_sdk"`)}
+	}
+	if _, ok := _c.mutation.SkipNativeClaudeValidation(); !ok {
+		return &ValidationError{Name: "skip_native_claude_validation", err: errors.New(`ent: missing required field "Group.skip_native_claude_validation"`)}
 	}
 	if _, ok := _c.mutation.ModelRoutingEnabled(); !ok {
 		return &ValidationError{Name: "model_routing_enabled", err: errors.New(`ent: missing required field "Group.model_routing_enabled"`)}
@@ -1679,6 +1700,10 @@ func (_c *GroupCreate) createSpec() (*Group, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.SimulateClaudeAgentSdk(); ok {
 		_spec.SetField(group.FieldSimulateClaudeAgentSdk, field.TypeBool, value)
 		_node.SimulateClaudeAgentSdk = value
+	}
+	if value, ok := _c.mutation.SkipNativeClaudeValidation(); ok {
+		_spec.SetField(group.FieldSkipNativeClaudeValidation, field.TypeBool, value)
+		_node.SkipNativeClaudeValidation = value
 	}
 	if value, ok := _c.mutation.FallbackGroupID(); ok {
 		_spec.SetField(group.FieldFallbackGroupID, field.TypeInt64, value)
@@ -2679,6 +2704,18 @@ func (u *GroupUpsert) SetSimulateClaudeAgentSdk(v bool) *GroupUpsert {
 // UpdateSimulateClaudeAgentSdk sets the "simulate_claude_agent_sdk" field to the value that was provided on create.
 func (u *GroupUpsert) UpdateSimulateClaudeAgentSdk() *GroupUpsert {
 	u.SetExcluded(group.FieldSimulateClaudeAgentSdk)
+	return u
+}
+
+// SetSkipNativeClaudeValidation sets the "skip_native_claude_validation" field.
+func (u *GroupUpsert) SetSkipNativeClaudeValidation(v bool) *GroupUpsert {
+	u.Set(group.FieldSkipNativeClaudeValidation, v)
+	return u
+}
+
+// UpdateSkipNativeClaudeValidation sets the "skip_native_claude_validation" field to the value that was provided on create.
+func (u *GroupUpsert) UpdateSkipNativeClaudeValidation() *GroupUpsert {
+	u.SetExcluded(group.FieldSkipNativeClaudeValidation)
 	return u
 }
 
@@ -3944,6 +3981,20 @@ func (u *GroupUpsertOne) SetSimulateClaudeAgentSdk(v bool) *GroupUpsertOne {
 func (u *GroupUpsertOne) UpdateSimulateClaudeAgentSdk() *GroupUpsertOne {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateSimulateClaudeAgentSdk()
+	})
+}
+
+// SetSkipNativeClaudeValidation sets the "skip_native_claude_validation" field.
+func (u *GroupUpsertOne) SetSkipNativeClaudeValidation(v bool) *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetSkipNativeClaudeValidation(v)
+	})
+}
+
+// UpdateSkipNativeClaudeValidation sets the "skip_native_claude_validation" field to the value that was provided on create.
+func (u *GroupUpsertOne) UpdateSkipNativeClaudeValidation() *GroupUpsertOne {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateSkipNativeClaudeValidation()
 	})
 }
 
@@ -5432,6 +5483,20 @@ func (u *GroupUpsertBulk) SetSimulateClaudeAgentSdk(v bool) *GroupUpsertBulk {
 func (u *GroupUpsertBulk) UpdateSimulateClaudeAgentSdk() *GroupUpsertBulk {
 	return u.Update(func(s *GroupUpsert) {
 		s.UpdateSimulateClaudeAgentSdk()
+	})
+}
+
+// SetSkipNativeClaudeValidation sets the "skip_native_claude_validation" field.
+func (u *GroupUpsertBulk) SetSkipNativeClaudeValidation(v bool) *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.SetSkipNativeClaudeValidation(v)
+	})
+}
+
+// UpdateSkipNativeClaudeValidation sets the "skip_native_claude_validation" field to the value that was provided on create.
+func (u *GroupUpsertBulk) UpdateSkipNativeClaudeValidation() *GroupUpsertBulk {
+	return u.Update(func(s *GroupUpsert) {
+		s.UpdateSkipNativeClaudeValidation()
 	})
 }
 

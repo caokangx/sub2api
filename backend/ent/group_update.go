@@ -868,6 +868,20 @@ func (_u *GroupUpdate) SetNillableSimulateClaudeAgentSdk(v *bool) *GroupUpdate {
 	return _u
 }
 
+// SetSkipNativeClaudeValidation sets the "skip_native_claude_validation" field.
+func (_u *GroupUpdate) SetSkipNativeClaudeValidation(v bool) *GroupUpdate {
+	_u.mutation.SetSkipNativeClaudeValidation(v)
+	return _u
+}
+
+// SetNillableSkipNativeClaudeValidation sets the "skip_native_claude_validation" field if the given value is not nil.
+func (_u *GroupUpdate) SetNillableSkipNativeClaudeValidation(v *bool) *GroupUpdate {
+	if v != nil {
+		_u.SetSkipNativeClaudeValidation(*v)
+	}
+	return _u
+}
+
 // SetFallbackGroupID sets the "fallback_group_id" field.
 func (_u *GroupUpdate) SetFallbackGroupID(v int64) *GroupUpdate {
 	_u.mutation.ResetFallbackGroupID()
@@ -1850,6 +1864,9 @@ func (_u *GroupUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.SimulateClaudeAgentSdk(); ok {
 		_spec.SetField(group.FieldSimulateClaudeAgentSdk, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.SkipNativeClaudeValidation(); ok {
+		_spec.SetField(group.FieldSkipNativeClaudeValidation, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.FallbackGroupID(); ok {
 		_spec.SetField(group.FieldFallbackGroupID, field.TypeInt64, value)
@@ -3105,6 +3122,20 @@ func (_u *GroupUpdateOne) SetNillableSimulateClaudeAgentSdk(v *bool) *GroupUpdat
 	return _u
 }
 
+// SetSkipNativeClaudeValidation sets the "skip_native_claude_validation" field.
+func (_u *GroupUpdateOne) SetSkipNativeClaudeValidation(v bool) *GroupUpdateOne {
+	_u.mutation.SetSkipNativeClaudeValidation(v)
+	return _u
+}
+
+// SetNillableSkipNativeClaudeValidation sets the "skip_native_claude_validation" field if the given value is not nil.
+func (_u *GroupUpdateOne) SetNillableSkipNativeClaudeValidation(v *bool) *GroupUpdateOne {
+	if v != nil {
+		_u.SetSkipNativeClaudeValidation(*v)
+	}
+	return _u
+}
+
 // SetFallbackGroupID sets the "fallback_group_id" field.
 func (_u *GroupUpdateOne) SetFallbackGroupID(v int64) *GroupUpdateOne {
 	_u.mutation.ResetFallbackGroupID()
@@ -4117,6 +4148,9 @@ func (_u *GroupUpdateOne) sqlSave(ctx context.Context) (_node *Group, err error)
 	}
 	if value, ok := _u.mutation.SimulateClaudeAgentSdk(); ok {
 		_spec.SetField(group.FieldSimulateClaudeAgentSdk, field.TypeBool, value)
+	}
+	if value, ok := _u.mutation.SkipNativeClaudeValidation(); ok {
+		_spec.SetField(group.FieldSkipNativeClaudeValidation, field.TypeBool, value)
 	}
 	if value, ok := _u.mutation.FallbackGroupID(); ok {
 		_spec.SetField(group.FieldFallbackGroupID, field.TypeInt64, value)

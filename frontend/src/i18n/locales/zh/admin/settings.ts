@@ -444,7 +444,7 @@ export default {
       claudeAntiBan: {
         title: 'Claude 防封配置',
         description: '统一管理原生 Anthropic Messages 的环境伪装与本地探针拦截。',
-        alwaysOnHint: 'Billing 指纹会自动排除 system-reminder 并按 UTF-16 取样；严格字段规范化始终启用。',
+        alwaysOnHint: 'Billing 指纹会自动排除 system-reminder 并按 UTF-16 取样；严格字段规范化只对未勾选"跳过原生请求预处理"的分组启用。',
         promptOverride: '启用分组',
         promptOverrideHint: '为选中的 Anthropic 分组开启 OAuth 防封。仅对最终命中这些分组的 OAuth 原生 Messages 和 Count Tokens 请求生效。',
         promptOverrideSystem: '完整替换 system：Billing 归因、Claude Code 身份、固定主提示词和环境信息；Fable 保留两块精简 system。',
@@ -480,6 +480,10 @@ export default {
         additionalDirectories: '附加工作目录',
         additionalDirectoriesHint: '每行一个绝对路径；留空会从识别到的环境块中删除该段。',
         modules: {
+          nativePreprocess: {
+            title: '跳过原生请求预处理',
+            description: '勾选的 Anthropic 分组收到 /v1/messages 请求时，网关不做顶层字段白名单和类型校验，不删除 tool_choice，不改写 max_tokens，不补齐缺省字段，不做客户端环境覆写，也不拦截本地探针，请求体原样进入调度。'
+          },
           promptOverride: {
             title: 'OAuth 防封',
             description: '仅针对 Anthropic OAuth 账号：按分组模拟官方 Claude Code，替换 system、tools、参数与客户端环境信息。'
@@ -492,6 +496,12 @@ export default {
             title: 'Setup Token 防封',
             description: '仅对选中分组内的 Anthropic Setup Token 账号生效，按真实 TypeScript Agent SDK 的请求形态重写 system、messages、参数与请求头。'
           }
+        },
+        nativePreprocess: {
+          groups: '跳过预处理的分组',
+          groupsHint: '新建分组默认勾选。勾选后 OAuth、Setup Token 账号的环境覆写和探针拦截也会一起关闭；带未知字段的请求调度到非 API Key 账号时仍会被拒绝（400）。API Key 账号始终不做字段校验。',
+          saveGroups: '保存分组选择',
+          groupsSaveFailed: '以下分组保存失败，其他分组已保存；请重试：{groups}'
         },
         agentSDK: {
           groups: '启用分组',

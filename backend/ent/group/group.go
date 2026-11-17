@@ -106,6 +106,8 @@ const (
 	FieldForceClaudeCodeProfile = "force_claude_code_profile"
 	// FieldSimulateClaudeAgentSdk holds the string denoting the simulate_claude_agent_sdk field in the database.
 	FieldSimulateClaudeAgentSdk = "simulate_claude_agent_sdk"
+	// FieldSkipNativeClaudeValidation holds the string denoting the skip_native_claude_validation field in the database.
+	FieldSkipNativeClaudeValidation = "skip_native_claude_validation"
 	// FieldFallbackGroupID holds the string denoting the fallback_group_id field in the database.
 	FieldFallbackGroupID = "fallback_group_id"
 	// FieldFallbackGroupIDOnInvalidRequest holds the string denoting the fallback_group_id_on_invalid_request field in the database.
@@ -274,6 +276,7 @@ var Columns = []string{
 	FieldClaudeCodeOnly,
 	FieldForceClaudeCodeProfile,
 	FieldSimulateClaudeAgentSdk,
+	FieldSkipNativeClaudeValidation,
 	FieldFallbackGroupID,
 	FieldFallbackGroupIDOnInvalidRequest,
 	FieldModelRouting,
@@ -401,6 +404,8 @@ var (
 	DefaultForceClaudeCodeProfile bool
 	// DefaultSimulateClaudeAgentSdk holds the default value on creation for the "simulate_claude_agent_sdk" field.
 	DefaultSimulateClaudeAgentSdk bool
+	// DefaultSkipNativeClaudeValidation holds the default value on creation for the "skip_native_claude_validation" field.
+	DefaultSkipNativeClaudeValidation bool
 	// DefaultModelRoutingEnabled holds the default value on creation for the "model_routing_enabled" field.
 	DefaultModelRoutingEnabled bool
 	// DefaultMcpXMLInject holds the default value on creation for the "mcp_xml_inject" field.
@@ -667,6 +672,11 @@ func ByForceClaudeCodeProfile(opts ...sql.OrderTermOption) OrderOption {
 // BySimulateClaudeAgentSdk orders the results by the simulate_claude_agent_sdk field.
 func BySimulateClaudeAgentSdk(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSimulateClaudeAgentSdk, opts...).ToFunc()
+}
+
+// BySkipNativeClaudeValidation orders the results by the skip_native_claude_validation field.
+func BySkipNativeClaudeValidation(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSkipNativeClaudeValidation, opts...).ToFunc()
 }
 
 // ByFallbackGroupID orders the results by the fallback_group_id field.

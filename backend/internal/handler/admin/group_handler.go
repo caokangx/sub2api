@@ -228,6 +228,7 @@ type CreateGroupRequest struct {
 	ClaudeCodeOnly                  bool                          `json:"claude_code_only"`
 	ForceClaudeCodeProfile          bool                          `json:"force_claude_code_profile"`
 	SimulateClaudeAgentSDK          bool                          `json:"simulate_claude_agent_sdk"`
+	SkipNativeClaudeValidation      *bool                         `json:"skip_native_claude_validation"`
 	FallbackGroupID                 *int64                        `json:"fallback_group_id"`
 	FallbackGroupIDOnInvalidRequest *int64                        `json:"fallback_group_id_on_invalid_request"`
 	// 模型路由配置（仅 anthropic 平台使用）
@@ -306,6 +307,7 @@ type UpdateGroupRequest struct {
 	ClaudeCodeOnly                  *bool                         `json:"claude_code_only"`
 	ForceClaudeCodeProfile          *bool                         `json:"force_claude_code_profile"`
 	SimulateClaudeAgentSDK          *bool                         `json:"simulate_claude_agent_sdk"`
+	SkipNativeClaudeValidation      *bool                         `json:"skip_native_claude_validation"`
 	FallbackGroupID                 *int64                        `json:"fallback_group_id"`
 	FallbackGroupIDOnInvalidRequest *int64                        `json:"fallback_group_id_on_invalid_request"`
 	// 模型路由配置（仅 anthropic 平台使用）
@@ -717,6 +719,7 @@ func (h *GroupHandler) Create(c *gin.Context) {
 		ClaudeCodeOnly:                  req.ClaudeCodeOnly,
 		ForceClaudeCodeProfile:          req.ForceClaudeCodeProfile,
 		SimulateClaudeAgentSDK:          req.SimulateClaudeAgentSDK,
+		SkipNativeClaudeValidation:      req.SkipNativeClaudeValidation,
 		FallbackGroupID:                 req.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: req.FallbackGroupIDOnInvalidRequest,
 		ModelRouting:                    req.ModelRouting,
@@ -866,6 +869,7 @@ func (h *GroupHandler) Update(c *gin.Context) {
 		ClaudeCodeOnly:                  req.ClaudeCodeOnly,
 		ForceClaudeCodeProfile:          req.ForceClaudeCodeProfile,
 		SimulateClaudeAgentSDK:          req.SimulateClaudeAgentSDK,
+		SkipNativeClaudeValidation:      req.SkipNativeClaudeValidation,
 		FallbackGroupID:                 req.FallbackGroupID,
 		FallbackGroupIDOnInvalidRequest: req.FallbackGroupIDOnInvalidRequest,
 		ModelRouting:                    req.ModelRouting,

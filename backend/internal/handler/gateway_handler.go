@@ -166,7 +166,8 @@ func (h *GatewayHandler) Messages(c *gin.Context) {
 	var probeReply *string
 	var originalMaxTokens *int
 	nativeClaudeMessages := c.Request.URL.Path == "/v1/messages" &&
-		apiKey.Group != nil && apiKey.Group.Platform == service.PlatformAnthropic
+		apiKey.Group != nil && apiKey.Group.Platform == service.PlatformAnthropic &&
+		!apiKey.Group.SkipNativeClaudeValidation
 	if nativeClaudeMessages {
 		antiBan := service.DefaultClaudeAntiBanSettings()
 		var settingsErr error

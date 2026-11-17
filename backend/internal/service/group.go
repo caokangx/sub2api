@@ -80,7 +80,9 @@ type Group struct {
 	ClaudeCodeOnly         bool
 	ForceClaudeCodeProfile bool
 	SimulateClaudeAgentSDK bool
-	FallbackGroupID        *int64
+	// SkipNativeClaudeValidation 跳过 Anthropic 原生 /v1/messages 预处理
+	SkipNativeClaudeValidation bool
+	FallbackGroupID            *int64
 	// 无效请求兜底分组（仅 anthropic 平台使用）
 	FallbackGroupIDOnInvalidRequest *int64
 

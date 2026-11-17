@@ -210,6 +210,9 @@ func (Group) Fields() []ent.Field {
 		field.Bool("simulate_claude_agent_sdk").
 			Default(false).
 			Comment("Anthropic setup-token 原生请求模拟 Claude Agent SDK"),
+		field.Bool("skip_native_claude_validation").
+			Default(true).
+			Comment("Anthropic 原生 /v1/messages 请求跳过网关预处理（字段校验、改写、探测拦截）"),
 		field.Int64("fallback_group_id").
 			Optional().
 			Nillable().

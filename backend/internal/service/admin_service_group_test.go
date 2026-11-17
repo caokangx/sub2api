@@ -593,6 +593,29 @@ func TestAdminService_CreateGroup_DefaultsGrokMediaGenerationEnabled(t *testing.
 	require.True(t, group.AllowImageGeneration)
 }
 
+func TestAdminService_CreateGroup_SkipNativeClaudeValidationDefaultsTrue(t *testing.T) {
+	repo := &groupRepoStubForAdmin{}
+	svc := &adminServiceImpl{groupRepo: repo}
+
+	_, err := svc.CreateGroup(context.Background(), &CreateGroupInput{Name: "default", Platform: PlatformAnthropic, RateMultiplier: 1})
+	require.NoError(t, err)
+	require.True(t, repo.created.SkipNativeClaudeValidation)
+
+	disabled := false
+	_, err = svc.CreateGroup(context.Background(), &CreateGroupInput{Name: "strict", Platform: PlatformAnthropic, RateMultiplier: 1, SkipNativeClaudeValidation: &disabled})
+	require.NoError(t, err)
+	require.False(t, repo.created.SkipNativeClaudeValidation)
+
+	repo.getByID = &Group{ID: 1, Name: "strict", Platform: PlatformAnthropic, RateMultiplier: 1}
+	enabled := true
+	updated, err := svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{SkipNativeClaudeValidation: &enabled})
+	require.NoError(t, err)
+	require.True(t, updated.SkipNativeClaudeValidation)
+	updated, err = svc.UpdateGroup(context.Background(), 1, &UpdateGroupInput{})
+	require.NoError(t, err)
+	require.True(t, updated.SkipNativeClaudeValidation, "nil leaves the flag unchanged")
+}
+
 func TestAdminService_CreateGroup_PreservesNonGrokImageGenerationDisabled(t *testing.T) {
 	repo := &groupRepoStubForAdmin{}
 	svc := &adminServiceImpl{groupRepo: repo}

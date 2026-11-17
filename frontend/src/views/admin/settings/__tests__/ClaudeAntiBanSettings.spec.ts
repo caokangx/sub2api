@@ -59,9 +59,9 @@ const mountSettings = () => mount(ClaudeAntiBanSettings, {
 });
 
 const groups = () => [
-  { id: 1, name: "Primary", platform: "anthropic", status: "active", force_claude_code_profile: true, simulate_claude_agent_sdk: false },
-  { id: 2, name: "Secondary", platform: "anthropic", status: "active", force_claude_code_profile: false, simulate_claude_agent_sdk: true },
-  { id: 3, name: "Inactive", platform: "anthropic", status: "inactive", force_claude_code_profile: true, simulate_claude_agent_sdk: false },
+  { id: 1, name: "Primary", platform: "anthropic", status: "active", force_claude_code_profile: true, simulate_claude_agent_sdk: false, skip_native_claude_validation: true },
+  { id: 2, name: "Secondary", platform: "anthropic", status: "active", force_claude_code_profile: false, simulate_claude_agent_sdk: true, skip_native_claude_validation: false },
+  { id: 3, name: "Inactive", platform: "anthropic", status: "inactive", force_claude_code_profile: true, simulate_claude_agent_sdk: false, skip_native_claude_validation: true },
   { id: 4, name: "OpenAI", platform: "openai", status: "active", force_claude_code_profile: false },
   { id: 5, name: "Composite", platform: "composite", status: "active", force_claude_code_profile: false },
 ];
@@ -159,6 +159,7 @@ describe("ClaudeAntiBanSettings", () => {
         "anti-ban-module-prompt",
         "anti-ban-module-agent-sdk",
         "anti-ban-module-thinking-strip",
+        "anti-ban-module-native-preprocess",
       ]);
 
     const promptModule = wrapper.get('[data-testid="anti-ban-module-prompt"]');
@@ -185,7 +186,7 @@ describe("ClaudeAntiBanSettings", () => {
     const wrapper = mountSettings();
     await flushPromises();
     const selectors = wrapper.findAllComponents(GroupSelector);
-    expect(selectors).toHaveLength(2);
+    expect(selectors).toHaveLength(3);
     expect(selectors[1].props("modelValue")).toEqual([2]);
     selectors[1].vm.$emit("update:modelValue", [1]);
     await wrapper.vm.$nextTick();
@@ -193,6 +194,23 @@ describe("ClaudeAntiBanSettings", () => {
     await flushPromises();
     expect(mocks.updateGroup).toHaveBeenCalledWith(1, { simulate_claude_agent_sdk: true });
     expect(mocks.updateGroup).toHaveBeenCalledWith(2, { simulate_claude_agent_sdk: false });
+  });
+
+  it("loads and saves native preprocessing skip groups separately", async () => {
+    const wrapper = mountSettings();
+    await flushPromises();
+    const selector = wrapper.findAllComponents(GroupSelector)[2];
+    expect(selector.props("modelValue")).toEqual([1, 3]);
+    const save = wrapper.get<HTMLButtonElement>('[data-testid="native-preprocess-skip-groups-save"]');
+    expect(save.element.disabled).toBe(true);
+    selector.vm.$emit("update:modelValue", [2, 3]);
+    await wrapper.vm.$nextTick();
+    await save.trigger("click");
+    await flushPromises();
+    expect(mocks.updateGroup).toHaveBeenCalledTimes(2);
+    expect(mocks.updateGroup).toHaveBeenCalledWith(1, { skip_native_claude_validation: false });
+    expect(mocks.updateGroup).toHaveBeenCalledWith(2, { skip_native_claude_validation: true });
+    expect(save.element.disabled).toBe(true);
   });
 
   it("defaults thinking strip to disabled when the server omits it", async () => {

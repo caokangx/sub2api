@@ -107,7 +107,7 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 			validationModel = account.GetMappedModel(validationModel)
 		}
 	}
-	if account != nil && account.Platform == PlatformAnthropic {
+	if account != nil && account.Platform == PlatformAnthropic && account.Type != AccountTypeAPIKey {
 		validationBody, rewrittenProfile := nativeClaudeValidationInput(ctx, account, parsed.Body.Bytes())
 		if err := validateNativeClaudeRequest(validationBody, claude.NormalizeModelID(validationModel), rewrittenProfile); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"type": "error", "error": gin.H{"type": "invalid_request_error", "message": err.Error()}})

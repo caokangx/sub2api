@@ -1,0 +1,1 @@
+ALTER TABLE groups ADD COLUMN IF NOT EXISTS skip_native_claude_validation BOOLEAN NOT NULL DEFAULT TRUE;

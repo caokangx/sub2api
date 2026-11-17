@@ -260,6 +260,40 @@ func TestGatewayHandlerMessages_LocalProbeReturnsBeforeAccountSelection(t *testi
 	require.Contains(t, rec.Body.String(), `"text":"pong"`)
 }
 
+func TestGatewayHandlerMessages_SkipNativeClaudeValidationBypassesPreprocess(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	groupID := int64(2102)
+	group := &service.Group{
+		ID: groupID, Hydrated: true, Platform: service.PlatformAnthropic, Status: service.StatusActive,
+		SkipNativeClaudeValidation: true,
+	}
+	h, cleanup := newTestGatewayHandler(t, group, nil)
+	defer cleanup()
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/v1/messages",
+		bytes.NewBufferString(`{"model":"claude-sonnet-5-5","stream":false,"performanceConfig":{"latency":"optimized"},"messages":[{"role":"user","content":"ping"}]}`),
+	)
+	req.Header.Set("Content-Type", "application/json")
+	req = req.WithContext(context.WithValue(req.Context(), ctxkey.Group, group))
+	c.Request = req
+	apiKey := &service.APIKey{
+		ID: 3102, UserID: 4102, GroupID: &groupID, Status: service.StatusActive,
+		User: &service.User{ID: 4102, Concurrency: 10, Balance: 100}, Group: group,
+	}
+	c.Set(string(middleware.ContextKeyAPIKey), apiKey)
+	c.Set(string(middleware.ContextKeyUser), middleware.AuthSubject{UserID: apiKey.UserID, Concurrency: 10})
+
+	h.Messages(c)
+
+	require.NotEqual(t, http.StatusBadRequest, rec.Code, rec.Body.String())
+	require.NotContains(t, rec.Body.String(), `"text":"pong"`)
+	require.Contains(t, rec.Body.String(), "No available accounts")
+}
+
 func TestGatewayHandlerMessages_MaxTokensOneHaikuSurvivesStrictNormalization(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	groupID, accountID := int64(2101), int64(1101)

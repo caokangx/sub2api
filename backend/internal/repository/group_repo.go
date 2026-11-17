@@ -132,6 +132,7 @@ func createGroupRecord(ctx context.Context, client *dbent.Client, groupIn *servi
 		SetClaudeCodeOnly(groupIn.ClaudeCodeOnly).
 		SetForceClaudeCodeProfile(groupIn.ForceClaudeCodeProfile).
 		SetSimulateClaudeAgentSdk(groupIn.SimulateClaudeAgentSDK).
+		SetSkipNativeClaudeValidation(groupIn.SkipNativeClaudeValidation).
 		SetNillableFallbackGroupID(groupIn.FallbackGroupID).
 		SetNillableFallbackGroupIDOnInvalidRequest(groupIn.FallbackGroupIDOnInvalidRequest).
 		SetModelRoutingEnabled(groupIn.ModelRoutingEnabled).
@@ -320,6 +321,7 @@ func (r *groupRepository) Update(ctx context.Context, groupIn *service.Group) er
 		SetClaudeCodeOnly(groupIn.ClaudeCodeOnly).
 		SetForceClaudeCodeProfile(groupIn.ForceClaudeCodeProfile).
 		SetSimulateClaudeAgentSdk(groupIn.SimulateClaudeAgentSDK).
+		SetSkipNativeClaudeValidation(groupIn.SkipNativeClaudeValidation).
 		SetModelRoutingEnabled(groupIn.ModelRoutingEnabled).
 		SetMcpXMLInject(groupIn.MCPXMLInject).
 		SetAllowMessagesDispatch(groupIn.AllowMessagesDispatch).
