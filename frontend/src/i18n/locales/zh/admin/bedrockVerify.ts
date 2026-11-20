@@ -2,7 +2,7 @@ export default {
   bedrockVerify: {
     title: 'Bedrock 真假测试',
     description:
-      '填写中转站的 Base URL 和 API Key，由服务器通过 /v1/messages 向对方发送几条探测请求（普通消息、工具调用、流式），根据消息 ID 和工具调用 ID 的前缀、AWS 特有的响应头和报错，判断每个 Claude 模型背后是不是 AWS Bedrock。每个模型约消耗几百个 token。',
+      '填写中转站的 Base URL 和 API Key，由服务器通过 /v1/messages 向对方发送探测请求：普通消息、工具调用、流式、不带 beta 头的 computer use，三个真 Bedrock 必定拒绝的请求（max_tokens 超上限、不存在的 effort 取值、budget_tokens 大于 max_tokens 的 enabled thinking），以及一段用来比对分词器的固定文本。只有对方的行为和真 Bedrock 一致（比如参数校验的报错内容对得上），才判定为 Bedrock；消息 ID 前缀、报错的 AWS 外层格式可以伪造，只作为参考。每个模型约消耗几百个 token。',
     connection: {
       baseUrl: 'Base URL',
       apiKey: 'API Key',
@@ -26,13 +26,13 @@ export default {
       clear: '清空',
       start: '开始测试（{n} 个）',
       stop: '停止测试',
-      hint: '所有选中的模型同时测试，通常 5 到 20 秒内全部完成。'
+      hint: '所有选中的模型同时测试，通常 10 到 30 秒内全部完成。'
     },
     results: {
       title: '测试结果',
       summary: '已完成 {finished}/{total}：{match} 个是 Bedrock，{notMatch} 个不是 Bedrock，{failed} 个测试失败',
       servedModel: '实际部署：{model}',
-      suspicious: '同时出现了 Bedrock 特征和非 Bedrock 特征，可能是混合渠道，或者中转站改写了 ID。',
+      suspicious: '同时出现了支持和反对 Bedrock 的证据，可能是混合渠道，或者中转站在模仿 Bedrock 的格式。',
       details: '查看依据',
       evidences: '判断依据',
       steps: '探测请求',
@@ -45,7 +45,9 @@ export default {
         unknown: '无法识别'
       },
       notes: {
-        forced_tool_choice_unsupported: '不支持强制工具调用（tool_choice 为 tool / any）'
+        forced_tool_choice_unsupported: '不支持强制工具调用（tool_choice 为 tool / any）',
+        bedrock_unconfirmed: '只看到了可伪造的 Bedrock 格式（ID 前缀、报错外层），参数校验探测没能确认是真 Bedrock',
+        tokenizer_mismatch: '分词探测的 token 数与参考值不符，可能换了模型'
       },
       states: {
         running: '测试中',
@@ -57,13 +59,19 @@ export default {
       },
       evidenceKinds: {
         bedrock: '支持 Bedrock',
+        bedrock_weak: 'Bedrock 格式（可伪造）',
         non_bedrock: '反对 Bedrock',
         info: '参考'
       },
       stepNames: {
         messages: 'Messages 非流式',
         tool_use: '工具调用',
-        messages_stream: 'Messages 流式'
+        messages_stream: 'Messages 流式',
+        computer_use: 'Computer use 不带 beta 头',
+        max_tokens_overflow: 'max_tokens 超上限',
+        effort_unknown_variant: '不存在的 effort 取值',
+        thinking_type_enabled: 'thinking.type=enabled',
+        tokenizer: '分词器比对'
       }
     }
   }

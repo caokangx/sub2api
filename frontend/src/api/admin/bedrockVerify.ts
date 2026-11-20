@@ -9,7 +9,7 @@ import {
 
 export type BedrockVerifySource = 'bedrock' | 'vertex' | 'anthropic' | 'subscription' | 'unknown'
 
-export type BedrockVerifyNote = 'forced_tool_choice_unsupported'
+export type BedrockVerifyNote = 'forced_tool_choice_unsupported' | 'bedrock_unconfirmed' | 'tokenizer_mismatch'
 
 export interface BedrockVerifyProbeResponse extends UpstreamVerifyProbeBase {
   is_bedrock: boolean

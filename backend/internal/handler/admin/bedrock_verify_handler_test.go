@@ -44,7 +44,16 @@ func bedrockLikeUpstream() *azureVerifyFakeUpstream {
 	return &azureVerifyFakeUpstream{respond: func(req *http.Request, body string) (int, http.Header, string) {
 		h := http.Header{}
 		h.Set("X-Oneapi-Request-Id", "202611050836047487683158268d9d6Yz6j0pFR")
+		awsErr := func(msg string) string {
+			return `{"type":"error","error":{"type":"aws_invoke_error","message":"InvokeModel: operation error Bedrock Runtime: InvokeModel, https response error StatusCode: 400, RequestID: 78bd30a9, ValidationException: ` + msg + `"}}`
+		}
 		switch {
+		case strings.Contains(body, `"max_tokens":999999`):
+			return http.StatusBadRequest, h, awsErr("max_tokens: 999999 > 64000, which is the maximum allowed number of output tokens for anthropic.claude-sonnet-5-5")
+		case strings.Contains(body, `"effort":"ultra"`):
+			return http.StatusBadRequest, h, awsErr("Request does not satisfy the required constraints.")
+		case strings.Contains(body, `"budget_tokens":1024`):
+			return http.StatusBadRequest, h, awsErr(`\"thinking.type.enabled\" is not supported for this model.`)
 		case strings.Contains(body, `"stream":true`):
 			return http.StatusOK, h, "event: message_start\n" +
 				`data: {"type":"message_start","message":{"id":"msg_bdrk_przdnsjuk5be6qscvbb7m3f7jii4g","type":"message","role":"assistant","content":[]}}` + "\n\n"
@@ -74,14 +83,20 @@ func TestBedrockVerifyProbeDetectsBedrockAndRetriesForcedTool(t *testing.T) {
 	require.False(t, res.Suspicious)
 	require.Equal(t, service.BedrockVerifySourceBedrock, res.DetectedSource)
 	require.Equal(t, []string{service.BedrockVerifyNoteForcedToolUnsupported}, res.Notes)
-	require.Len(t, res.Steps, 3)
+	names := make([]string, 0, len(res.Steps))
 	for _, step := range res.Steps {
+		names = append(names, step.Name)
 		require.True(t, step.OK, step.Name)
 	}
+	require.Equal(t, []string{
+		service.BedrockVerifyStepMessages, service.BedrockVerifyStepToolUse, service.BedrockVerifyStepStream,
+		service.BedrockVerifyStepComputer, service.BedrockVerifyStepMaxTokensOverflow, service.BedrockVerifyStepEffortUnknown,
+		service.BedrockVerifyStepThinkingEnabled, service.BedrockVerifyStepTokenizer,
+	}, names)
 	require.Contains(t, res.Steps[0].Headers, "x-oneapi-request-id")
 
-	// message, forced tool, auto retry, stream
-	require.Len(t, up.requests, 4)
+	// message, forced tool, auto retry, stream, computer, three validations, tokenizer
+	require.Len(t, up.requests, 9)
 	for _, req := range up.requests {
 		require.Equal(t, "relay.example.com", req.URL.Host)
 		require.Equal(t, "/v1/messages", req.URL.Path)
@@ -91,13 +106,16 @@ func TestBedrockVerifyProbeDetectsBedrockAndRetriesForcedTool(t *testing.T) {
 		require.True(t, service.HTTPUpstreamRedirectsDisabled(req.Context()))
 		require.True(t, service.HTTPUpstreamPublicHostsOnly(req.Context()))
 	}
-	require.Contains(t, up.bodies[2], `"tool_choice":{"type":"auto"}`)
+	require.Contains(t, strings.Join(up.bodies, "\n"), `"tool_choice":{"type":"auto"}`)
 }
 
 func TestBedrockVerifyProbeReportsOfficialAnthropic(t *testing.T) {
 	up := &azureVerifyFakeUpstream{respond: func(_ *http.Request, body string) (int, http.Header, string) {
 		h := http.Header{}
 		h.Set("request-id", "req_011CgjUcfKijU")
+		if strings.Contains(body, `"max_tokens":999999`) {
+			return http.StatusBadRequest, h, `{"type":"error","error":{"type":"invalid_request_error","message":"max_tokens: 999999 > 64000, which is the maximum allowed number of output tokens for claude-sonnet-4-6"}}`
+		}
 		if strings.Contains(body, `"stream":true`) {
 			return http.StatusOK, h, `data: {"type":"message_start","message":{"id":"msg_01AbC"}}` + "\n\n"
 		}
@@ -119,7 +137,7 @@ func TestBedrockVerifyProbeReportsOfficialAnthropic(t *testing.T) {
 	require.Equal(t, service.BedrockVerifySourceAnthropic, res.DetectedSource)
 	require.Empty(t, res.Notes)
 	// Forced tool_choice succeeded, so there is no auto retry.
-	require.Len(t, up.requests, 3)
+	require.Len(t, up.requests, 8)
 }
 
 func TestBedrockVerifyProbeReportsUnavailableModel(t *testing.T) {

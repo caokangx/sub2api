@@ -10,6 +10,7 @@
       :is-match="(r) => r.is_bedrock"
       match-kind="bedrock"
       counter-kind="non_bedrock"
+      warn-kind="bedrock_weak"
     >
       <template #result-extra="{ result }">
         <div
