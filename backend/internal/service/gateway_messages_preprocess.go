@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"regexp"
 	"sort"
@@ -207,6 +208,19 @@ func PreprocessNativeClaudeMessages(
 	body []byte,
 	settings *ClaudeAntiBanSettings,
 ) (ClaudeMessagesPreprocessResult, error) {
+	body, envelopeErr := normalizeNativeClaudeEnvelope(body)
+	switch {
+	case errors.Is(envelopeErr, errNativeClaudeCacheControlType):
+		return ClaudeMessagesPreprocessResult{}, &ClaudeMessagesPreprocessError{
+			Status: 400, Code: "unsupported_cache_control", Message: "顶层 cache_control 必须是对象",
+		}
+	case errors.Is(envelopeErr, errNativeClaudeThreadContinue):
+		return ClaudeMessagesPreprocessResult{}, &ClaudeMessagesPreprocessError{
+			Status: 400, Code: "unsupported_thread", Message: "不支持 thread.type=continue，请在客户端关闭 message threads",
+		}
+	case envelopeErr != nil:
+		return ClaudeMessagesPreprocessResult{}, envelopeErr
+	}
 	var raw any
 	if err := json.Unmarshal(body, &raw); err != nil {
 		return ClaudeMessagesPreprocessResult{}, &ClaudeMessagesPreprocessError{

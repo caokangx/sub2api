@@ -2,11 +2,97 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"github.com/tidwall/gjson"
+	"github.com/tidwall/sjson"
 	"math"
 	"sort"
+	"strconv"
 )
+
+var (
+	errNativeClaudeCacheControlType = errors.New("cache_control must be an object")
+	errNativeClaudeThreadContinue   = errors.New("thread.type=continue is not supported; disable message threads on the client")
+)
+
+// normalizeNativeClaudeEnvelope rewrites the official top-level fields the
+// allowlist does not carry into a shape the mimic profiles can forward.
+// Top-level cache_control becomes a block breakpoint so the 4-breakpoint limit
+// can account for it. thread is dropped only for create: a continue request
+// carries just the new messages, and the gateway owns its own thread state.
+func normalizeNativeClaudeEnvelope(body []byte) ([]byte, error) {
+	if !gjson.ValidBytes(body) || !gjson.ParseBytes(body).IsObject() {
+		return body, nil
+	}
+	body, err := normalizeNativeClaudeThread(body)
+	if err != nil {
+		return body, err
+	}
+	return foldTopLevelCacheControl(body)
+}
+
+func normalizeNativeClaudeThread(body []byte) ([]byte, error) {
+	thread := gjson.GetBytes(body, "thread")
+	if !thread.Exists() {
+		return body, nil
+	}
+	if thread.Type != gjson.Null && (!thread.IsObject() || thread.Get("type").String() != "create") {
+		return body, errNativeClaudeThreadContinue
+	}
+	next, _ := deleteJSONPathBytes(body, "thread")
+	return next, nil
+}
+
+func foldTopLevelCacheControl(body []byte) ([]byte, error) {
+	top := gjson.GetBytes(body, "cache_control")
+	if !top.Exists() {
+		return body, nil
+	}
+	if !top.IsObject() {
+		return body, errNativeClaudeCacheControlType
+	}
+	out := body
+	messages := gjson.GetBytes(body, "messages").Array()
+	placed := false
+	for i := len(messages) - 1; i >= 0 && !placed; i-- {
+		content := messages[i].Get("content")
+		contentPath := "messages." + strconv.Itoa(i) + ".content"
+		switch {
+		case content.Type == gjson.String:
+			if content.String() == "" {
+				continue
+			}
+			placed = true
+			raw := `[{"type":"text","text":` + content.Raw + `,"cache_control":` + top.Raw + `}]`
+			if next, err := sjson.SetRawBytes(out, contentPath, []byte(raw)); err == nil {
+				out = next
+			}
+		case content.IsArray():
+			blocks := content.Array()
+			for j := len(blocks) - 1; j >= 0; j-- {
+				block := blocks[j]
+				switch block.Get("type").String() {
+				case "thinking", "redacted_thinking":
+					continue
+				case "text":
+					if block.Get("text").String() == "" {
+						continue
+					}
+				}
+				placed = true
+				if !block.Get("cache_control").Exists() {
+					if next, err := sjson.SetRawBytes(out, contentPath+"."+strconv.Itoa(j)+".cache_control", []byte(top.Raw)); err == nil {
+						out = next
+					}
+				}
+				break
+			}
+		}
+	}
+	out, _ = deleteJSONPathBytes(out, "cache_control")
+	return out, nil
+}
 
 // validateNativeClaudeFields validates the protocol envelope only. Tool schemas,
 // tool inputs and vendor content blocks remain open objects.

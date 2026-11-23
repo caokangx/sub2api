@@ -108,6 +108,14 @@ func (s *GatewayService) Forward(ctx context.Context, c *gin.Context, account *A
 		}
 	}
 	if account != nil && account.Platform == PlatformAnthropic && account.Type != AccountTypeAPIKey {
+		envelopeBody, err := normalizeNativeClaudeEnvelope(parsed.Body.Bytes())
+		if err == nil && !bytes.Equal(envelopeBody, parsed.Body.Bytes()) {
+			err = parsed.ReplaceBody(envelopeBody)
+		}
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"type": "error", "error": gin.H{"type": "invalid_request_error", "message": err.Error()}})
+			return nil, err
+		}
 		validationBody, rewrittenProfile := nativeClaudeValidationInput(ctx, account, parsed.Body.Bytes())
 		if err := validateNativeClaudeRequest(validationBody, claude.NormalizeModelID(validationModel), rewrittenProfile); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"type": "error", "error": gin.H{"type": "invalid_request_error", "message": err.Error()}})

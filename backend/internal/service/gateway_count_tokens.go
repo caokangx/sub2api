@@ -49,6 +49,14 @@ func (s *GatewayService) ForwardCountTokens(ctx context.Context, c *gin.Context,
 		}
 	}
 	if account != nil && account.Platform == PlatformAnthropic && account.Type != AccountTypeAPIKey {
+		envelopeBody, err := normalizeNativeClaudeEnvelope(parsed.Body.Bytes())
+		if err == nil && !bytes.Equal(envelopeBody, parsed.Body.Bytes()) {
+			err = parsed.ReplaceBody(envelopeBody)
+		}
+		if err != nil {
+			s.countTokensError(c, http.StatusBadRequest, "invalid_request_error", err.Error())
+			return err
+		}
 		validationBody := parsed.Body.Bytes()
 		if forceClaudeCodeProfile(ctx, account) {
 			validationBody, _ = deleteJSONPathBytes(validationBody, "tool_choice")

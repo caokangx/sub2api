@@ -255,7 +255,7 @@ func (s *GatewayService) prepareClaudeAgentSDK(ctx context.Context, c *gin.Conte
 
 	ctx = context.WithValue(ctx, claudeAgentSDKContextKey{}, &claudeAgentSDKRequestContext{
 		StateKey: stateKey, RequestClass: requestClass, PromptID: state.PromptID, Pending: next, CreateBody: createBody,
-		Betas: agentSDKBetas(model, hasTools),
+		Betas: agentSDKBetasWithClientInlineTools(agentSDKBetas(model, hasTools), c, rawMessages),
 	})
 	encoded, err := marshalClaudeAgentSDKJSON(root)
 	if err != nil {
@@ -1139,6 +1139,34 @@ func agentSDKBetas(model string, hasTools bool) string {
 		}
 	}
 	return strings.Join(out, ",")
+}
+
+// agentSDKBetasWithClientInlineTools keeps inline-tools only when the caller both
+// requested it and sent tool_addition blocks; the recorded SDK set lacks it, and
+// the upstream rejects those blocks without the header.
+func agentSDKBetasWithClientInlineTools(betas string, c *gin.Context, messages []any) string {
+	if c == nil || c.Request == nil ||
+		!containsBetaToken(getHeaderRaw(c.Request.Header, "anthropic-beta"), claude.BetaInlineTools) ||
+		!agentSDKHasToolAddition(messages) {
+		return betas
+	}
+	if betas == "" {
+		return claude.BetaInlineTools
+	}
+	return betas + "," + claude.BetaInlineTools
+}
+
+func agentSDKHasToolAddition(messages []any) bool {
+	for _, raw := range messages {
+		msg, _ := raw.(map[string]any)
+		content, _ := msg["content"].([]any)
+		for _, rawBlock := range content {
+			if block, _ := rawBlock.(map[string]any); block["type"] == "tool_addition" {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func claudeAgentSDKBetaHeader(ctx context.Context) string {
