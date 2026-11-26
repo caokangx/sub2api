@@ -767,13 +767,16 @@ function finalizeNav(items: NavItem[]): NavItem[] {
 }
 
 // User navigation items (for regular users)
-// 只读管理员在用户菜单基础上额外看到「账号管理」；Backend 模式下前台页面不可用，只保留该入口。
+// 只读管理员在用户菜单基础上额外看到「账号管理」「签名解析」；Backend 模式下前台页面不可用，只保留这些入口。
 const userNavItems = computed((): NavItem[] => {
   if (!isReadonlyAdmin.value) return finalizeNav(buildSelfNavItems(true))
-  const accountsItem: NavItem = { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon }
-  if (appStore.backendModeEnabled) return [accountsItem]
+  const readonlyAdminItems: NavItem[] = [
+    { path: '/admin/accounts', label: t('nav.accounts'), icon: GlobeIcon },
+    { path: '/admin/signature-decoder', label: t('nav.signatureDecoder'), icon: CodeIcon }
+  ]
+  if (appStore.backendModeEnabled) return readonlyAdminItems
   const items = finalizeNav(buildSelfNavItems(true))
-  items.splice(1, 0, accountsItem)
+  items.splice(1, 0, ...readonlyAdminItems)
   return items
 })
 

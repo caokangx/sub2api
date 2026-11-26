@@ -445,6 +445,7 @@ const routes: RouteRecordRaw[] = [
     meta: {
       requiresAuth: true,
       requiresAdmin: true,
+      allowReadonlyAdmin: true,
       title: 'Signature Decoder',
       titleKey: 'admin.signatureDecoder.title'
     }
