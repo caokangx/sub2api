@@ -473,6 +473,17 @@ const routes: RouteRecordRaw[] = [
     }
   },
   {
+    path: '/admin/vertex-verify',
+    name: 'AdminVertexVerify',
+    component: () => import('@/views/admin/VertexVerifyView.vue'),
+    meta: {
+      requiresAuth: true,
+      requiresAdmin: true,
+      title: 'Vertex Verify',
+      titleKey: 'admin.vertexVerify.title'
+    }
+  },
+  {
     path: '/admin/users',
     name: 'AdminUsers',
     component: () => import('@/views/admin/UsersView.vue'),

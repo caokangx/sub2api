@@ -162,6 +162,8 @@ var auditBodyOmittedRoutes = map[string]struct{}{
 	"POST /api/v1/admin/azure-verify/probe":                     {},
 	"POST /api/v1/admin/bedrock-verify/models":                  {},
 	"POST /api/v1/admin/bedrock-verify/probe":                   {},
+	"POST /api/v1/admin/vertex-verify/models":                   {},
+	"POST /api/v1/admin/vertex-verify/probe":                    {},
 }
 
 // NewAuditLogMiddleware 创建审计中间件。

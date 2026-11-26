@@ -217,6 +217,7 @@ export default {
     signatureDecoder: '签名解析',
     azureVerify: 'Azure 真假测试',
     bedrockVerify: 'Bedrock 真假测试',
+    vertexVerify: 'Vertex 检测',
   },
 
   // Auth

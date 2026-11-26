@@ -10,6 +10,7 @@ import plugins from './plugins'
 import signature from './signature'
 import azureVerify from './azureVerify'
 import bedrockVerify from './bedrockVerify'
+import vertexVerify from './vertexVerify'
 
 export default {
   ...overview,
@@ -24,4 +25,5 @@ export default {
   ...signature,
   ...azureVerify,
   ...bedrockVerify,
+  ...vertexVerify,
 }

@@ -1,4 +1,4 @@
-// Shared shapes for the admin "is this relay really <provider>" probes (Azure, Bedrock).
+// Shared shapes for the admin "is this relay really <provider>" probes (Azure, Bedrock, Vertex).
 
 export interface UpstreamVerifyConnection {
   base_url: string

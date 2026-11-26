@@ -866,7 +866,8 @@ const adminNavItems = computed((): NavItem[] => {
     { path: '/admin/audit-logs', label: t('nav.auditLogs'), icon: ShieldIcon, hideInSimpleMode: true },
     { path: '/admin/signature-decoder', label: t('nav.signatureDecoder'), icon: CodeIcon },
     { path: '/admin/azure-verify', label: t('nav.azureVerify'), icon: ShieldIcon },
-    { path: '/admin/bedrock-verify', label: t('nav.bedrockVerify'), icon: ShieldIcon }
+    { path: '/admin/bedrock-verify', label: t('nav.bedrockVerify'), icon: ShieldIcon },
+    { path: '/admin/vertex-verify', label: t('nav.vertexVerify'), icon: ShieldIcon }
   ]
 
   const visible = applyFeatureFlags(baseItems)

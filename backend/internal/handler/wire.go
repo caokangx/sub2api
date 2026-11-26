@@ -50,6 +50,7 @@ func ProvideAdminHandlers(
 	signatureVerifyHandler *admin.SignatureVerifyHandler,
 	azureVerifyHandler *admin.AzureVerifyHandler,
 	bedrockVerifyHandler *admin.BedrockVerifyHandler,
+	vertexVerifyHandler *admin.VertexVerifyHandler,
 	upstreamBillingProbe *service.UpstreamBillingProbeService,
 	ollamaCloudUsage *service.OllamaCloudUsageService,
 	opencodeGoUsage *service.OpenCodeGoUsageService,
@@ -99,6 +100,7 @@ func ProvideAdminHandlers(
 		SignatureVerify:        signatureVerifyHandler,
 		AzureVerify:            azureVerifyHandler,
 		BedrockVerify:          bedrockVerifyHandler,
+		VertexVerify:           vertexVerifyHandler,
 	}
 }
 
@@ -300,6 +302,7 @@ var ProviderSet = wire.NewSet(
 	admin.NewSignatureVerifyHandler,
 	admin.NewAzureVerifyHandler,
 	admin.NewBedrockVerifyHandler,
+	admin.NewVertexVerifyHandler,
 
 	// AdminHandlers and Handlers constructors
 	ProvideAdminHandlers,

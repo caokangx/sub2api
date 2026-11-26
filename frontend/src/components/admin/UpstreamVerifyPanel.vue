@@ -98,6 +98,9 @@
             </button>
           </div>
         </div>
+        <p v-if="models.length === 0" class="text-xs text-gray-500 dark:text-gray-400">
+          {{ tk('models.empty') }}
+        </p>
         <div class="grid max-h-72 grid-cols-1 gap-x-4 gap-y-1 overflow-y-auto sm:grid-cols-2 lg:grid-cols-3">
           <label
             v-for="m in models"
@@ -107,6 +110,25 @@
             <input v-model="selected" type="checkbox" :value="m" :disabled="running" />
             {{ m }}
           </label>
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-2">
+          <input
+            v-model="manualModel"
+            spellcheck="false"
+            class="input max-w-xs font-mono text-xs"
+            :placeholder="tk('models.manualPlaceholder')"
+            :disabled="running"
+            @keydown.enter.prevent="addManualModel"
+          />
+          <button
+            type="button"
+            class="btn btn-secondary btn-sm"
+            :disabled="running || !manualModel.trim()"
+            @click="addManualModel"
+          >
+            <Icon name="plus" size="xs" />
+            {{ tk('models.manualAdd') }}
+          </button>
         </div>
         <div class="mt-4 flex flex-wrap items-center gap-3">
           <button
@@ -265,6 +287,7 @@ const selected = ref<string[]>([])
 const modelsLoaded = ref(false)
 const modelsError = ref('')
 const loadingModels = ref(false)
+const manualModel = ref('')
 // Typed via a cast: ref<T>() would deep-unwrap the generic R and break `isMatch(result)`.
 const rows = ref([]) as Ref<ProbeRow[]>
 const running = ref(false)
@@ -284,14 +307,22 @@ function selectDefault(): void {
   selected.value = props.defaultSelect(models.value)
 }
 
+function addManualModel(): void {
+  const model = manualModel.value.trim()
+  if (!model) return
+  if (!models.value.includes(model)) models.value = [...models.value, model]
+  if (!selected.value.includes(model)) selected.value = [...selected.value, model]
+  manualModel.value = ''
+}
+
 async function fetchModels(): Promise<void> {
   loadingModels.value = true
   modelsError.value = ''
   try {
     const res = await props.listModels(connection())
+    // An empty list still opens the model card so models can be added by hand.
     if (res.error && res.models.length === 0) {
       modelsError.value = tk('connection.modelsFailed', { status: res.status || '-', error: res.error })
-      return
     }
     models.value = res.models
     modelsLoaded.value = true

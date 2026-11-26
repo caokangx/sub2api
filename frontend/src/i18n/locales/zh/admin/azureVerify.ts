@@ -24,6 +24,9 @@ export default {
       selectDefault: '只选 gpt-6 系列',
       selectAll: '全选',
       clear: '清空',
+      manualPlaceholder: '手动输入模型名，例如 gemini-4-hydrogen',
+      manualAdd: '添加模型',
+      empty: '模型列表为空，可以在下面手动添加要测试的模型。',
       start: '开始测试（{n} 个）',
       stop: '停止测试',
       hint: '所有选中的模型同时测试，通常 10 到 60 秒内全部完成。'

@@ -217,6 +217,7 @@ export default {
     signatureDecoder: 'Signature Decoder',
     azureVerify: 'Azure Verify',
     bedrockVerify: 'Bedrock Verify',
+    vertexVerify: 'Vertex Verify',
   },
 
   // Auth

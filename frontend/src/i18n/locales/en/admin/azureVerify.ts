@@ -24,6 +24,9 @@ export default {
       selectDefault: 'gpt-6 only',
       selectAll: 'Select all',
       clear: 'Clear',
+      manualPlaceholder: 'Type a model name, e.g. gemini-4-hydrogen',
+      manualAdd: 'Add model',
+      empty: 'The model list is empty. Add the models to probe below.',
       start: 'Start ({n})',
       stop: 'Stop',
       hint: 'All selected models are probed at once; this usually finishes within 10 to 60 seconds.'

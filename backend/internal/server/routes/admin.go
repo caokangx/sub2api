@@ -46,6 +46,9 @@ func RegisterAdminRoutes(
 		// Bedrock 真假测试（探测管理员填写的中转站）
 		registerBedrockVerifyRoutes(admin, h)
 
+		// Vertex 真假测试（探测管理员填写的中转站）
+		registerVertexVerifyRoutes(admin, h)
+
 		// 用户管理
 		registerUserManagementRoutes(admin, h)
 
@@ -180,6 +183,11 @@ func registerAzureVerifyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 func registerBedrockVerifyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
 	admin.POST("/bedrock-verify/models", h.Admin.BedrockVerify.Models)
 	admin.POST("/bedrock-verify/probe", h.Admin.BedrockVerify.Probe)
+}
+
+func registerVertexVerifyRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
+	admin.POST("/vertex-verify/models", h.Admin.VertexVerify.Models)
+	admin.POST("/vertex-verify/probe", h.Admin.VertexVerify.Probe)
 }
 
 func registerAdminComplianceRoutes(admin *gin.RouterGroup, h *handler.Handlers) {
